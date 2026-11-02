@@ -5,8 +5,11 @@ BNB Smart Chain DApp MVP：购买（BNB/USDT）、直推即时奖励、购买业
 ## 仓库结构
 
 ```
-contracts/          Foundry Solidity contracts + tests + deploy script
+contracts/          Foundry Solidity contracts + tests + deploy scripts
 apps/web/           Next.js + wagmi + viem 前端（中文文案）
+deployments/        On-chain address manifests (e.g. bsc-testnet.json)
+scripts/            Helper shells (BSC testnet deploy)
+DEPLOY.md           BSC Testnet deploy + faucet / key checklist
 ```
 
 ## 产品参数（已锁定）
@@ -50,27 +53,32 @@ forge test
 
 ### 部署
 
-```bash
-cd contracts
-# 本地 Anvil
-anvil &
-export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-forge script script/Deploy.s.sol:Deploy --rpc-url http://127.0.0.1:8545 --broadcast -vvvv
+**BSC Testnet（推荐路径）**：见 **[DEPLOY.md](DEPLOY.md)**。
 
-# BSC 测试网
-export PRIVATE_KEY=...
-export BSC_TESTNET_RPC_URL=...
-forge script script/Deploy.s.sol:Deploy --rpc-url $BSC_TESTNET_RPC_URL --broadcast --verify
+```bash
+# 需要：PRIVATE_KEY（已充值 tBNB）+ 可选 BSC_TESTNET_RPC_URL / BSCSCAN_API_KEY
+chmod +x scripts/deploy-bsc-testnet.sh
+./scripts/deploy-bsc-testnet.sh
+# → deployments/bsc-testnet.json + 奖励池注资
 ```
 
-脚本会打印各合约地址。将地址写入 `apps/web/.env.local`。
+本地 Anvil 干跑：
+
+```bash
+cd contracts
+anvil &
+export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+forge script script/DeployBscTestnet.s.sol:DeployBscTestnet --rpc-url http://127.0.0.1:8545 --broadcast -vvvv
+```
+
+将 `deployments/bsc-testnet.json` 中的地址写入 `apps/web/.env.local`（模板见 `apps/web/.env.example`）。
 
 部署后运营建议：
 
-1. 向 `MilestoneRewards` 注入 USDT 奖励池  
-2. 向 `Stake` 调用 `fundRewards` 注入利息储备  
-3.（可选）`registry.setPromoter` 引导创世推广人  
-4. 生产环境将 `MockPriceOracle` 替换为 Chainlink 适配器（见下方）
+1. 确认 `MilestoneRewards` / `Stake` 奖励池已由 testnet 脚本注资；不足再补  
+2.（可选）`registry.setPromoter` 引导创世推广人  
+3. 生产环境将 `MockPriceOracle` 替换为 Chainlink 适配器（见下方）  
+4. 跑 `SmokeBscTestnet.s.sol` 或 UI 走通购买 / 质押
 
 ### 主网预言机参考（未接线，仅文档）
 
