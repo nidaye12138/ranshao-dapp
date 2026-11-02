@@ -13,3 +13,5 @@ contracts/broadcast/
 contracts/lib/
 apps/web/.next/
 apps/web/node_modules/
+apps/web/node_modules/
+apps/web/.next/
