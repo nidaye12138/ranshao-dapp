@@ -100,61 +100,65 @@ export default function BuyPage() {
   }
 
   return (
-    <div className="panel">
-      <h2>购买代币</h2>
-      <p className="hint">支持 BNB / USDT。成交后买方即时获得支付额 0.5% 返还；直推上级获 0.5%（无上级则入金库）。</p>
+    <>
+      <header className="page-head">
+        <h1>购买代币</h1>
+        <p>支持 BNB / USDT。成交后买方即时获得支付额 0.5% 返还；直推上级获 0.5%（无上级则入金库）。</p>
+      </header>
 
-      {!isConfigured && <div className="banner warn">请先配置合约地址。</div>}
-      {!isConnected && <div className="banner">请先连接钱包。</div>}
+      <div className="panel">
+        {!isConfigured && <div className="banner warn">请先配置合约地址。</div>}
+        {!isConnected && <div className="banner">请先连接钱包。</div>}
 
-      <label htmlFor="asset">支付币种</label>
-      <select id="asset" value={asset} onChange={(e) => setAsset(e.target.value as PayAsset)}>
-        <option value="USDT">USDT</option>
-        <option value="BNB">BNB</option>
-      </select>
+        <label htmlFor="asset">支付币种</label>
+        <select id="asset" value={asset} onChange={(e) => setAsset(e.target.value as PayAsset)}>
+          <option value="USDT">USDT</option>
+          <option value="BNB">BNB</option>
+        </select>
 
-      <label htmlFor="amt">支付数量</label>
-      <input
-        id="amt"
-        inputMode="decimal"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder={asset === "BNB" ? "例如 0.5" : "例如 100"}
-      />
+        <label htmlFor="amt">支付数量</label>
+        <input
+          id="amt"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={asset === "BNB" ? "例如 0.5" : "例如 100"}
+        />
 
-      <div className="meta">
-        <div>
-          预估到账 RS：<strong>{fmtToken(tokenOut)}</strong>
+        <div className="meta">
+          <div>
+            预估到账 RS：<strong>{fmtToken(tokenOut)}</strong>
+          </div>
+          <div>
+            折合 USD：<strong>{fmtToken(usdAmount)}</strong>
+          </div>
+          <div>
+            自返 0.5%：
+            <strong>
+              {asset === "BNB" ? `${formatEther(selfReward)} BNB` : `${fmtToken(selfReward)} USDT`}
+            </strong>
+          </div>
         </div>
-        <div>
-          折合 USD：<strong>{fmtToken(usdAmount)}</strong>
-        </div>
-        <div>
-          自返 0.5%：
-          <strong>
-            {asset === "BNB" ? `${formatEther(selfReward)} BNB` : `${fmtToken(selfReward)} USDT`}
-          </strong>
-        </div>
-      </div>
 
-      <div className="cta-row">
-        {asset === "USDT" && (
-          <button className="btn" type="button" disabled={!isConnected || !needApprove || isPending} onClick={onApprove}>
-            授权 USDT
+        <div className="cta-row">
+          {asset === "USDT" && (
+            <button className="btn" type="button" disabled={!isConnected || !needApprove || isPending} onClick={onApprove}>
+              授权 USDT
+            </button>
+          )}
+          <button
+            className="btn primary"
+            type="button"
+            disabled={!isConnected || !isConfigured || isPending || confirming || (asset === "USDT" && needApprove)}
+            onClick={onBuy}
+          >
+            {isPending || confirming ? "交易处理中…" : "确认购买"}
           </button>
-        )}
-        <button
-          className="btn primary"
-          type="button"
-          disabled={!isConnected || !isConfigured || isPending || confirming || (asset === "USDT" && needApprove)}
-          onClick={onBuy}
-        >
-          {isPending || confirming ? "交易处理中…" : "确认购买"}
-        </button>
-      </div>
+        </div>
 
-      {isSuccess && <div className="banner ok">购买成功。</div>}
-      {error && <div className="banner warn">{error.message}</div>}
-    </div>
+        {isSuccess && <div className="banner ok">购买成功。</div>}
+        {error && <div className="banner warn">{error.message}</div>}
+      </div>
+    </>
   );
 }

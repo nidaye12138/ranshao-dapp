@@ -66,12 +66,16 @@ export default function ShareholderPage() {
   });
 
   return (
+    <>
+      <header className="page-head">
+        <h1>股东中心</h1>
+        <p>
+          席位上限 300。自身持仓（钱包 + 质押）≥ 50 万 RS，直推合计 ≥ 500 万 RS 可申请入座。
+        </p>
+      </header>
     <div className="panel">
-      <h2>股东中心</h2>
-      <p className="hint">
-        席位上限 300。资格：自身持仓（钱包余额 + 质押中）≥ 50 万 RS，且直推合计持仓 ≥ 500 万
-        RS。MVP 提供登记与简单分红期次领取。
-      </p>
+      <h2>资格与登记</h2>
+      <p className="hint">达标后一键入座；MVP 提供简单分红期次领取接口。</p>
 
       <div className="meta">
         <div>
@@ -113,5 +117,6 @@ export default function ShareholderPage() {
       {isSuccess && <div className="banner ok" style={{ marginTop: "1rem" }}>登记成功。</div>}
       {error && <div className="banner warn" style={{ marginTop: "1rem" }}>{error.message}</div>}
     </div>
+    </>
   );
 }

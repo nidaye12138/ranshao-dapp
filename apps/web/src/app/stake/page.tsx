@@ -58,13 +58,17 @@ export default function StakePage() {
   const count = Number(posCount ?? 0n);
 
   return (
+    <>
+      <header className="page-head">
+        <h1>存币生息</h1>
+        <p>
+          单笔折合 ≥ 100 USDT。满 15 日可取本金 + 2%；满 30 日可取本金 + 5%；提前取无收益。满 30 日可自动续期（仅滚本金）。
+        </p>
+      </header>
     <div className="grid-2">
       <div className="panel">
-        <h2>存币生息</h2>
-        <p className="hint">
-          单笔折合 ≥ 100 USDT。满 15 日可取本金 + 2%；满 30 日可取本金 + 5%；未满对应天数提前取则无收益。满 30
-          日可自动续期（仅滚本金，利息不复利）。
-        </p>
+        <h2>开仓质押</h2>
+        <p className="hint">授权 RS 后存入仓位，到期按规则取息。</p>
 
         <div className="meta">
           <div>
@@ -126,6 +130,7 @@ export default function StakePage() {
         ))}
       </div>
     </div>
+    </>
   );
 }
 

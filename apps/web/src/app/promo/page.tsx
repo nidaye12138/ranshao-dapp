@@ -107,6 +107,11 @@ function PromoInner() {
   const bound = myReferrer && (myReferrer as string) !== zeroAddress;
 
   return (
+    <>
+      <header className="page-head">
+        <h1>推广中心</h1>
+        <p>绑定直推上级、查看推广资格，并领取购买业绩档位奖励。</p>
+      </header>
     <div className="grid-2">
       <div className="panel">
         <h2>邀请绑定</h2>
@@ -174,6 +179,7 @@ function PromoInner() {
       {isSuccess && <div className="banner ok" style={{ gridColumn: "1 / -1" }}>交易已确认。</div>}
       {error && <div className="banner warn" style={{ gridColumn: "1 / -1" }}>{error.message}</div>}
     </div>
+    </>
   );
 }
 

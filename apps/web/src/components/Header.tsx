@@ -27,10 +27,10 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="brand-lockup">
-        <Link href="/" className="brand">
+        <Link href="/" className="brand" aria-label="燃烧首页">
           燃烧
         </Link>
-        <span className="brand-sub">Ranshao · BSC</span>
+        <span className="brand-sub">Ranshao</span>
       </div>
       <nav className="nav">
         {links.map((l) => (

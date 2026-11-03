@@ -1,7 +1,22 @@
 import type { Metadata } from "next";
+import { Syne, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { Header } from "@/components/Header";
+import { AppShell } from "@/components/AppShell";
+
+const displayFont = Syne({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-display-face",
+  display: "swap",
+});
+
+const bodyFont = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-body-face",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "燃烧 · Ranshao DApp",
@@ -11,12 +26,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>
+      <body className={`${displayFont.variable} ${bodyFont.variable}`}>
         <Providers>
-          <div className="shell">
-            <Header />
-            <main>{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>
