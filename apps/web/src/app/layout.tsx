@@ -25,8 +25,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
-      <body className={`${displayFont.variable} ${bodyFont.variable}`}>
+    // suppressHydrationWarning: wallet/browser extensions often inject nodes (e.g. #minidam-root)
+    // before React hydrates, which would otherwise surface as recoverable hydration mismatches.
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={`${displayFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

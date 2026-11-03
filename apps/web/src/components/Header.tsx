@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from "wagmi";
 import { bsc, bscTestnet, hardhat } from "wagmi/chains";
 import { shortAddr } from "@/lib/format";
+import { useMounted } from "@/lib/useMounted";
 
 const links = [
   { href: "/", label: "首页" },
@@ -16,6 +17,7 @@ const links = [
 
 export function Header() {
   const pathname = usePathname();
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
@@ -40,24 +42,32 @@ export function Header() {
         ))}
       </nav>
       <div className="wallet">
-        {isConnected && !chainOk && (
-          <button type="button" className="btn ghost" onClick={() => switchChain({ chainId: bsc.id })}>
-            切换 BSC
-          </button>
-        )}
-        {isConnected ? (
-          <button type="button" className="btn ghost" onClick={() => disconnect()}>
-            {shortAddr(address)}
+        {!mounted ? (
+          <button type="button" className="btn primary" disabled>
+            连接钱包
           </button>
         ) : (
-          <button
-            type="button"
-            className="btn primary"
-            disabled={isPending}
-            onClick={() => connect({ connector: connectors[0] })}
-          >
-            {isPending ? "连接中…" : "连接钱包"}
-          </button>
+          <>
+            {isConnected && !chainOk && (
+              <button type="button" className="btn ghost" onClick={() => switchChain({ chainId: bsc.id })}>
+                切换 BSC
+              </button>
+            )}
+            {isConnected ? (
+              <button type="button" className="btn ghost" onClick={() => disconnect()}>
+                {shortAddr(address)}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn primary"
+                disabled={isPending || !connectors[0]}
+                onClick={() => connect({ connector: connectors[0] })}
+              >
+                {isPending ? "连接中…" : "连接钱包"}
+              </button>
+            )}
+          </>
         )}
       </div>
     </header>

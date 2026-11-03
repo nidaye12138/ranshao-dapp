@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { fmtToken, parseAmount } from "@/lib/format";
 import StakeAbi from "@/lib/abi/Stake.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import TokenAbi from "@/lib/abi/RanshaoToken.json";
+import { useMounted } from "@/lib/useMounted";
 
 export default function StakePage() {
   const { address, isConnected } = useAccount();
@@ -159,6 +160,12 @@ function PositionRow({
     query: { enabled: isConfigured && !!address },
   });
 
+  const mounted = useMounted();
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+  }, []);
+
   if (!data) return null;
   const [amount, start, , active] = data as [bigint, bigint, bigint, boolean];
   if (!active) {
@@ -170,7 +177,7 @@ function PositionRow({
   }
 
   const startMs = Number(start) * 1000;
-  const days = Math.floor((Date.now() - startMs) / 86_400_000);
+  const days = now == null ? 0 : Math.floor((now - startMs) / 86_400_000);
 
   return (
     <div className="tier">
@@ -179,7 +186,7 @@ function PositionRow({
           仓位 #{posId} · {fmtToken(amount)} RS
         </div>
         <div className="muted">
-          已过约 {days} 天 · 预计利息 {fmtToken(interest as bigint | undefined)} RS
+          {mounted ? `已过约 ${days} 天 · 预计利息 ${fmtToken(interest as bigint | undefined)} RS` : "加载仓位…"}
         </div>
       </div>
       <div className="cta-row">

@@ -9,6 +9,7 @@ import { fmtToken, shortAddr } from "@/lib/format";
 import RegistryAbi from "@/lib/abi/ReferralRegistry.json";
 import MilestoneAbi from "@/lib/abi/MilestoneRewards.json";
 import { Suspense } from "react";
+import { useMounted } from "@/lib/useMounted";
 
 const TIERS = [
   { id: 0, label: "5,000 USD", pct: "0.3%" },
@@ -28,6 +29,7 @@ export default function PromoPage() {
 
 function PromoInner() {
   const { address, isConnected } = useAccount();
+  const mounted = useMounted();
   const search = useSearchParams();
   const [referrer, setReferrer] = useState("");
   const { writeContract, data: hash, isPending, error } = useWriteContract();
@@ -38,7 +40,7 @@ function PromoInner() {
     if (ref && isAddress(ref)) setReferrer(ref);
   }, [search]);
 
-  const enabled = isConfigured && !!address;
+  const enabled = isConfigured && !!address && mounted;
 
   const { data: myReferrer } = useReadContract({
     address: addresses.registry,
@@ -81,9 +83,9 @@ function PromoInner() {
   });
 
   const inviteLink = useMemo(() => {
-    if (typeof window === "undefined" || !address) return "";
+    if (!mounted || !address) return "";
     return `${window.location.origin}/promo?ref=${address}`;
-  }, [address]);
+  }, [mounted, address]);
 
   function onBind() {
     if (!isAddress(referrer)) return;
