@@ -4,7 +4,8 @@ pragma solidity ^0.8.24;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title 燃烧 (Ranshao) BEP-20 project token
+/// @title 燃烧 (Ranshao) BEP-20 — **testnet/local mintable** project token.
+/// @dev BSC mainnet uses external UMplan `0xad09D287327C383283820CfCEe7AC0e6C7De7777` instead (Sale inventory mode).
 contract RanshaoToken is ERC20, Ownable {
     mapping(address => bool) public minters;
 

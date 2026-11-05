@@ -70,7 +70,7 @@ export default function ShareholderPage() {
       <header className="page-head">
         <h1>股东中心</h1>
         <p>
-          席位上限 300。自身持仓（钱包 + 质押）≥ 50 万 RS，直推合计 ≥ 500 万 RS 可申请入座。
+          席位上限 300。自身持仓（钱包 + 质押）≥ 50 万 UMplan，直推合计 ≥ 500 万 UMplan 可申请入座。
         </p>
       </header>
     <div className="panel">

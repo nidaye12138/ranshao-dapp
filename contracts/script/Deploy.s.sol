@@ -49,7 +49,9 @@ contract Deploy is Script {
             address(oracle),
             address(registry),
             address(milestones),
-            payable(address(treasury))
+            payable(address(treasury)),
+            true, // mintMode for local/mock token
+            0
         );
         Stake stake_ = new Stake(admin, address(token), address(oracle), address(registry), address(milestones));
         Shareholder shareholder =

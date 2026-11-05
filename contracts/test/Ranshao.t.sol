@@ -47,7 +47,9 @@ contract RanshaoTest is Test {
             address(oracle),
             address(registry),
             address(milestones),
-            payable(address(treasury))
+            payable(address(treasury)),
+            true, // mintMode — local RanshaoToken
+            0
         );
         stake_ = new Stake(admin, address(token), address(oracle), address(registry), address(milestones));
         shareholder = new Shareholder(admin, address(token), address(registry), address(stake_));

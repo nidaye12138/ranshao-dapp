@@ -45,7 +45,9 @@ contract DeployBscTestnet is Script {
             address(oracle),
             address(registry),
             address(milestones),
-            payable(address(treasury))
+            payable(address(treasury)),
+            true, // mintMode — testnet deploys RanshaoToken
+            0
         );
         Stake stake_ = new Stake(admin, address(token), address(oracle), address(registry), address(milestones));
         Shareholder shareholder = new Shareholder(admin, address(token), address(registry), address(stake_));

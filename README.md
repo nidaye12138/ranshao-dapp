@@ -17,6 +17,7 @@ DEPLOY.md           BSC Testnet deploy + faucet / key checklist
 | 项 | 值 |
 |----|----|
 | 链 | BNB Smart Chain (BEP-20) |
+| 主网项目币 | 外部 **UMplan** [`0xad09…7777`](https://bscscan.com/token/0xad09d287327c383283820cfcee7ac0e6c7de7777)（不新发 mint）；详见 [`docs/TOKEN.md`](docs/TOKEN.md) |
 | 即时奖励 | 买方 0.5% + 直推 0.5%，与支付币种相同 |
 | 无推荐人 | 直推 0.5% 进入 Treasury |
 | 档位 | 达标快照模型；奖励 USDT；MVP 仅购买侧 |

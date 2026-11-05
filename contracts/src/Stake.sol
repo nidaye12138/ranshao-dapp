@@ -78,9 +78,13 @@ contract Stake is IStakeView, Ownable, Pausable, ReentrancyGuard {
     }
 
     function fundRewards(uint256 amount) external onlyOwner {
+        // Credit only tokens actually received (fee-on-transfer safe).
+        uint256 beforeBal = token.balanceOf(address(this));
         token.safeTransferFrom(msg.sender, address(this), amount);
-        rewardReserve += amount;
-        emit RewardFunded(amount);
+        uint256 received = token.balanceOf(address(this)) - beforeBal;
+        require(received > 0, "stake: fot zero");
+        rewardReserve += received;
+        emit RewardFunded(received);
     }
 
     function positionCount(address user) external view returns (uint256) {
@@ -113,15 +117,25 @@ contract Stake is IStakeView, Ownable, Pausable, ReentrancyGuard {
         require(amount > 0, "stake: zero");
         uint256 price = oracle.tokenUsd();
         require(price > 0, "stake: bad price");
-        uint256 usd = (amount * price) / 1e18;
-        require(usd >= MIN_STAKE_USD, "stake: min 100 USD");
 
         address user = msg.sender;
+        // Account principal as tokens actually received (fee-on-transfer / sell-tax tokens).
+        uint256 beforeBal = token.balanceOf(address(this));
         token.safeTransferFrom(user, address(this), amount);
+        uint256 received = token.balanceOf(address(this)) - beforeBal;
+        require(received > 0, "stake: fot zero");
 
-        stakedBalance[user] += amount;
+        uint256 usd = (received * price) / 1e18;
+        require(usd >= MIN_STAKE_USD, "stake: min 100 USD");
+
+        stakedBalance[user] += received;
         _positions[user].push(
-            Position({amount: uint128(amount), start: uint64(block.timestamp), lastRenew: uint64(block.timestamp), active: true})
+            Position({
+                amount: uint128(received),
+                start: uint64(block.timestamp),
+                lastRenew: uint64(block.timestamp),
+                active: true
+            })
         );
         uint256 posId = _positions[user].length - 1;
 
@@ -132,10 +146,11 @@ contract Stake is IStakeView, Ownable, Pausable, ReentrancyGuard {
             }
         }
 
-        emit Staked(user, posId, amount, usd);
+        emit Staked(user, posId, received, usd);
     }
 
     /// @notice Withdraw principal (+ interest if eligible). Closes the position.
+    /// @dev Outbound transfers may still incur token sell/transfer tax; user receives post-tax amount.
     function withdraw(uint256 posId) external nonReentrant whenNotPaused {
         address user = msg.sender;
         Position storage p = _positions[user][posId];

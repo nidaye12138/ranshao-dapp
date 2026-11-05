@@ -6,27 +6,31 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {RanshaoToken} from "./RanshaoToken.sol";
+import {IMintableERC20} from "./interfaces/IMintableERC20.sol";
 import {IPriceOracle} from "./interfaces/IPriceOracle.sol";
 import {IReferralRegistry} from "./interfaces/IReferralRegistry.sol";
 import {IMilestoneRewards} from "./interfaces/IMilestoneRewards.sol";
 
 /// @title BNB / USDT sale with 0.5% buyer + 0.5% referrer instant rewards
+/// @dev Mainnet: use mintMode=false with pre-funded inventory of external IERC20 (e.g. UMplan).
+///      Testnet: mintMode=true with RanshaoToken (Sale is minter).
 contract Sale is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint16 public constant INSTANT_REWARD_BPS = 50; // 0.5%
     uint16 public constant BPS_DENOM = 10_000;
 
-    RanshaoToken public immutable token;
+    IERC20 public immutable token;
     IERC20 public immutable usdt;
     IPriceOracle public oracle;
     IReferralRegistry public registry;
     IMilestoneRewards public milestones;
     address payable public treasury;
 
-    /// @notice Fallback fixed token USD price (1e18) if oracle.tokenUsd() is used via oracle.
-    /// Sale always reads oracle.tokenUsd() / oracle.bnbUsd().
+    /// @notice If true, deliver via IMintableERC20.mint; if false, transfer from Sale inventory.
+    bool public immutable mintMode;
+    /// @notice Max tolerated shortfall on token delivery / pulls for fee-on-transfer tokens (e.g. 300 = 3%).
+    uint16 public maxTransferTaxBps;
     uint8 public usdtDecimals;
 
     event Bought(
@@ -34,11 +38,14 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
         address indexed paymentToken,
         uint256 paymentAmount,
         uint256 usdAmount,
-        uint256 tokenAmount,
+        uint256 tokenAmountQuoted,
+        uint256 tokenAmountDelivered,
         uint256 buyerReward,
         uint256 referrerReward
     );
     event ConfigUpdated(address oracle, address registry, address milestones, address treasury);
+    event InventoryDeposited(address indexed from, uint256 amount);
+    event MaxTransferTaxUpdated(uint16 bps);
 
     constructor(
         address admin,
@@ -48,20 +55,25 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
         address oracle_,
         address registry_,
         address milestones_,
-        address payable treasury_
+        address payable treasury_,
+        bool mintMode_,
+        uint16 maxTransferTaxBps_
     ) Ownable(admin) {
         require(
             token_ != address(0) && usdt_ != address(0) && oracle_ != address(0) && registry_ != address(0)
                 && milestones_ != address(0) && treasury_ != address(0),
             "sale: zero"
         );
-        token = RanshaoToken(token_);
+        require(maxTransferTaxBps_ <= 2_000, "sale: tax too high");
+        token = IERC20(token_);
         usdt = IERC20(usdt_);
         usdtDecimals = usdtDecimals_;
         oracle = IPriceOracle(oracle_);
         registry = IReferralRegistry(registry_);
         milestones = IMilestoneRewards(milestones_);
         treasury = treasury_;
+        mintMode = mintMode_;
+        maxTransferTaxBps = maxTransferTaxBps_;
     }
 
     function setConfig(address oracle_, address registry_, address milestones_, address payable treasury_)
@@ -75,6 +87,23 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
         emit ConfigUpdated(address(oracle), address(registry), address(milestones), treasury);
     }
 
+    function setMaxTransferTaxBps(uint16 bps) external onlyOwner {
+        require(bps <= 2_000, "sale: tax too high");
+        maxTransferTaxBps = bps;
+        emit MaxTransferTaxUpdated(bps);
+    }
+
+    /// @notice Fund inventory for external-token (non-mint) sales. Prefer transferring from a tax-exempt pair/wallet.
+    function depositInventory(uint256 amount) external onlyOwner {
+        require(!mintMode, "sale: mint mode");
+        require(amount > 0, "sale: zero");
+        uint256 beforeBal = token.balanceOf(address(this));
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = token.balanceOf(address(this)) - beforeBal;
+        require(received > 0, "sale: fot zero");
+        emit InventoryDeposited(msg.sender, received);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
@@ -83,13 +112,11 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
         _unpause();
     }
 
-    /// @notice Preview tokens out for a USDT payment amount.
     function quoteUsdt(uint256 usdtAmount) public view returns (uint256 tokenOut, uint256 usdAmount) {
         usdAmount = _usdtToUsd(usdtAmount);
         tokenOut = _tokensForUsd(usdAmount);
     }
 
-    /// @notice Preview tokens out for a BNB payment amount (wei).
     function quoteBnb(uint256 bnbAmount) public view returns (uint256 tokenOut, uint256 usdAmount) {
         usdAmount = (bnbAmount * oracle.bnbUsd()) / 1e18;
         tokenOut = _tokensForUsd(usdAmount);
@@ -111,7 +138,7 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
             milestones.addBuyVolume(referrer, usdAmount);
         }
 
-        token.mint(buyer, tokenOut);
+        uint256 delivered = _deliverTokens(buyer, tokenOut);
         usdt.safeTransfer(buyer, reward);
 
         uint256 paidToRef = 0;
@@ -125,7 +152,7 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
         uint256 remainder = usdt.balanceOf(address(this));
         if (remainder > 0) usdt.safeTransfer(treasury, remainder);
 
-        emit Bought(buyer, address(usdt), usdtAmount, usdAmount, tokenOut, reward, paidToRef);
+        emit Bought(buyer, address(usdt), usdtAmount, usdAmount, tokenOut, delivered, reward, paidToRef);
     }
 
     function buyWithBNB() external payable nonReentrant whenNotPaused {
@@ -143,7 +170,7 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
             milestones.addBuyVolume(referrer, usdAmount);
         }
 
-        token.mint(buyer, tokenOut);
+        uint256 delivered = _deliverTokens(buyer, tokenOut);
         _sendBnb(payable(buyer), reward);
 
         uint256 paidToRef = 0;
@@ -157,7 +184,23 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
         uint256 remainder = address(this).balance;
         if (remainder > 0) _sendBnb(treasury, remainder);
 
-        emit Bought(buyer, address(0), bnbAmount, usdAmount, tokenOut, reward, paidToRef);
+        emit Bought(buyer, address(0), bnbAmount, usdAmount, tokenOut, delivered, reward, paidToRef);
+    }
+
+    function _deliverTokens(address to, uint256 amount) private returns (uint256 delivered) {
+        if (mintMode) {
+            IMintableERC20(address(token)).mint(to, amount);
+            return amount;
+        }
+        uint256 beforeBal = token.balanceOf(to);
+        token.safeTransfer(to, amount);
+        delivered = token.balanceOf(to) - beforeBal;
+        _requireWithinTax(amount, delivered);
+    }
+
+    function _requireWithinTax(uint256 expected, uint256 actual) private view {
+        // actual >= expected * (1 - maxTransferTaxBps / 10000)
+        require(actual * BPS_DENOM >= expected * (BPS_DENOM - maxTransferTaxBps), "sale: fot too high");
     }
 
     function _tokensForUsd(uint256 usdAmount) private view returns (uint256) {
@@ -167,7 +210,6 @@ contract Sale is Ownable, Pausable, ReentrancyGuard {
     }
 
     function _usdtToUsd(uint256 usdtAmount) private view returns (uint256) {
-        // Treat USDT ≈ $1. Normalize to 1e18 USD.
         if (usdtDecimals == 18) return usdtAmount;
         if (usdtDecimals < 18) return usdtAmount * (10 ** (18 - usdtDecimals));
         return usdtAmount / (10 ** (usdtDecimals - 18));

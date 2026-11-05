@@ -69,11 +69,11 @@ export default function StakePage() {
     <div className="grid-2">
       <div className="panel">
         <h2>开仓质押</h2>
-        <p className="hint">授权 RS 后存入仓位，到期按规则取息。</p>
+        <p className="hint">授权 UMplan 后存入仓位，到期按规则取息。</p>
 
         <div className="meta">
           <div>
-            钱包 RS：<strong>{fmtToken(balance as bigint | undefined)}</strong>
+            钱包 UMplan：<strong>{fmtToken(balance as bigint | undefined)}</strong>
           </div>
           <div>
             质押中：<strong>{fmtToken(staked as bigint | undefined)}</strong>
@@ -83,7 +83,7 @@ export default function StakePage() {
           </div>
         </div>
 
-        <label htmlFor="stakeAmt">质押数量（RS）</label>
+        <label htmlFor="stakeAmt">质押数量（UMplan）</label>
         <input id="stakeAmt" value={amount} onChange={(e) => setAmount(e.target.value)} />
 
         <div className="cta-row">
@@ -100,7 +100,7 @@ export default function StakePage() {
               })
             }
           >
-            授权 RS
+            授权 UMplan
           </button>
           <button
             className="btn primary"
@@ -183,10 +183,10 @@ function PositionRow({
     <div className="tier">
       <div>
         <div>
-          仓位 #{posId} · {fmtToken(amount)} RS
+          仓位 #{posId} · {fmtToken(amount)} UMplan
         </div>
         <div className="muted">
-          {mounted ? `已过约 ${days} 天 · 预计利息 ${fmtToken(interest as bigint | undefined)} RS` : "加载仓位…"}
+          {mounted ? `已过约 ${days} 天 · 预计利息 ${fmtToken(interest as bigint | undefined)} UMplan` : "加载仓位…"}
         </div>
       </div>
       <div className="cta-row">

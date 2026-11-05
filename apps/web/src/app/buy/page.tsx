@@ -127,7 +127,7 @@ export default function BuyPage() {
 
         <div className="meta">
           <div>
-            预估到账 RS：<strong>{fmtToken(tokenOut)}</strong>
+            预估到账 UMplan：<strong>{fmtToken(tokenOut)}</strong>
           </div>
           <div>
             折合 USD：<strong>{fmtToken(usdAmount)}</strong>

@@ -1,3 +1,15 @@
+# Deployment
+
+Project token on **BSC mainnet** is the external **UMplan** contract  
+`0xad09D287327C383283820CfCEe7AC0e6C7De7777` — see [`docs/TOKEN.md`](docs/TOKEN.md).
+
+| Network | Project token | Sale delivery |
+|---------|---------------|---------------|
+| Mainnet (56) | Existing UMplan | Inventory (`mintMode=false`) |
+| Testnet (97) / Anvil | Fresh `RanshaoToken` | Mint (`mintMode=true`) |
+
+---
+
 # BSC Testnet deployment (Chapel · chainId 97)
 
 ## What you need from the owner
@@ -126,3 +138,31 @@ forge script script/DeployBscTestnet.s.sol:DeployBscTestnet \
 2. Update `apps/web/.env.example` / `.env.local` with real addresses.
 3. Run smoke script; manually bind invite + buy in UI on chain 97.
 4. Fund extra milestone/stake pools if smoke exhausts reserves.
+
+---
+
+# BSC Mainnet deployment (chainId 56 · external UMplan)
+
+Does **not** deploy a new project token. Uses UMplan + Binance-Peg USDT.
+
+```bash
+cd contracts
+export PRIVATE_KEY=0xYOUR_MAINNET_KEY   # funded with real BNB — extreme care
+export BSC_RPC_URL=https://bsc-dataseed.binance.org
+# optional overrides:
+# export PROJECT_TOKEN=0xad09D287327C383283820CfCEe7AC0e6C7De7777
+# export MAX_TRANSFER_TAX_BPS=300
+
+forge script script/DeployBscMainnet.s.sol:DeployBscMainnet \
+  --rpc-url "$BSC_RPC_URL" --broadcast --slow -vvvv
+```
+
+Post-deploy:
+
+1. Transfer UMplan into `Sale` via `depositInventory` (prefer tax-exempt source if available).
+2. `Stake.fundRewards` with UMplan for interest pool.
+3. Fund `MilestoneRewards` with USDT.
+4. Commit `deployments/bsc-mainnet.json` and set `NEXT_PUBLIC_*` module addresses in the web app.
+5. Replace `MockPriceOracle` with Chainlink adapter before serious volume.
+
+**Blockers today:** mainnet module deploy still needs a funded mainnet `PRIVATE_KEY` (not present in this agent env). Token address config is already wired.
