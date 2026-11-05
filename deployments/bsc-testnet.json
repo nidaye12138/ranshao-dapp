@@ -1,0 +1,23 @@
+{
+  "network": "bsc-testnet",
+  "chainId": 97,
+  "status": "pending_owner_key",
+  "note": "Not yet broadcast. Provide PRIVATE_KEY + testnet BNB, then run scripts/deploy-bsc-testnet.sh. Testnet deploys a fresh RanshaoToken (mintMode=true). Mainnet uses external UMplan — see bsc-mainnet.json and docs/TOKEN.md.",
+  "tokenMode": "deployed-ranshao-token-mint",
+  "deployer": null,
+  "RanshaoToken": null,
+  "USDT": null,
+  "ReferralRegistry": null,
+  "Treasury": null,
+  "MockPriceOracle": null,
+  "MilestoneRewards": null,
+  "Sale": null,
+  "Stake": null,
+  "Shareholder": null,
+  "oracleDefaults": {
+    "bnbUsd": "600e18",
+    "tokenUsd": "0.01e18"
+  },
+  "rpcHint": "https://bsc-testnet-rpc.publicnode.com",
+  "explorer": "https://testnet.bscscan.com"
+}

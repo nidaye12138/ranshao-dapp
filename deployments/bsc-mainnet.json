@@ -1,0 +1,26 @@
+{
+  "network": "bsc-mainnet",
+  "chainId": 56,
+  "status": "token_wired_modules_pending_deploy",
+  "tokenMode": "external-umplan",
+  "note": "Project token is the existing UMplan BEP-20. Sale/Stake/Shareholder modules are not yet deployed on mainnet. Use script/DeployBscMainnet.s.sol (inventory mode, no new token mint).",
+  "UMplan": "0xad09D287327C383283820CfCEe7AC0e6C7De7777",
+  "tokenSymbol": "UMplan",
+  "tokenDecimals": 18,
+  "tokenExplorer": "https://bscscan.com/token/0xad09d287327c383283820cfcee7ac0e6c7de7777",
+  "USDT": "0x55d398326f99059fF775485246999027B3197955",
+  "deployer": null,
+  "ReferralRegistry": null,
+  "Treasury": null,
+  "MockPriceOracle": null,
+  "MilestoneRewards": null,
+  "Sale": null,
+  "Stake": null,
+  "Shareholder": null,
+  "feeOnTransfer": {
+    "reportedSellTaxBps": 300,
+    "notes": "Third parties report ~3% sell tax on UMplan. Sale inventory delivery allows maxTransferTaxBps (default 300). Stake credits principal from tokens actually received. Outbound withdraw/reward transfers may still be taxed by the token."
+  },
+  "rpcHint": "https://bsc-dataseed.binance.org",
+  "explorer": "https://bscscan.com"
+}
