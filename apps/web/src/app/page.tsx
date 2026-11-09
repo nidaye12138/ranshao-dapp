@@ -6,18 +6,11 @@ import { useSearchParams } from "next/navigation";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { isAddress, zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
-import { fmtToken, shortAddr } from "@/lib/format";
+import { shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import {
-  announcements,
-  banners,
-  dappRules,
-  tokenIntro,
-  topDirectRefs,
-} from "@/lib/mockData";
+import { banners as fallbackBanners, dappRules as fallbackRules, tokenIntro as fallbackIntro } from "@/lib/mockData";
+import { useAnnouncements, useLeaderboard, useStats } from "@/lib/api/client";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
-import BurnAbi from "@/lib/abi/BurnRouter.json";
-import OracleHint from "@/lib/abi/SwapFacade.json";
 
 export default function HomePage() {
   return (
@@ -36,10 +29,20 @@ function HomeInner() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
+  const { data: cms } = useAnnouncements();
+  const { data: board } = useLeaderboard();
+  const { data: stats } = useStats();
+
+  const announcements = cms?.announcements?.length ? cms.announcements : [{ id: "0", text: "加载公告…" }];
+  const banner = cms?.banners?.[0] ?? fallbackBanners[0];
+  const tokenIntro = cms?.tokenIntro ?? fallbackIntro;
+  const dappRules = cms?.dappRules?.length ? cms.dappRules : fallbackRules;
+
   useEffect(() => {
+    if (announcements.length === 0) return;
     const t = setInterval(() => setAnnIndex((i) => (i + 1) % announcements.length), 4200);
     return () => clearInterval(t);
-  }, []);
+  }, [announcements.length]);
 
   useEffect(() => {
     const ref = search.get("ref");
@@ -56,32 +59,13 @@ function HomeInner() {
     query: { enabled },
   });
 
-  const { data: totalBurned } = useReadContract({
-    address: addresses.burn,
-    abi: BurnAbi,
-    functionName: "totalBurnedToken",
-    query: { enabled: isConfigured },
-  });
-
-  // Live price via SwapFacade.oracle is not exposed as public view of price directly;
-  // use quoteUsdt(1e18) usdAmount as $ for 1 USDT path — show tokenUsd via 1 token quote inverse.
-  const { data: oneUsdtQuote } = useReadContract({
-    address: addresses.swap,
-    abi: OracleHint,
-    functionName: "quoteUsdt",
-    args: [10n ** 18n],
-    query: { enabled: isConfigured },
-  });
-
-  const tokenPerUsdt = (oneUsdtQuote as [bigint, bigint] | undefined)?.[0];
-  // price ≈ 1 / tokensPerUsdt when 1 USDT buys N tokens at $1 USDT
-  const priceHint =
-    tokenPerUsdt && tokenPerUsdt > 0n
-      ? (1 / Number(tokenPerUsdt) * 1e18).toFixed(4)
-      : null;
-
   const bound = myReferrer && (myReferrer as string) !== zeroAddress;
-  const banner = banners[0];
+  const ann = announcements[annIndex % announcements.length];
+
+  const priceDisplay =
+    stats?.priceUsd != null ? `≈ $${stats.priceUsd}` : stats?.source === "unconfigured" ? "—" : "…";
+  const burnedDisplay =
+    stats?.totalBurnedToken != null ? stats.totalBurnedToken : stats?.source === "unconfigured" ? "—" : "…";
 
   return (
     <div className="home-board">
@@ -95,34 +79,44 @@ function HomeInner() {
 
       <section className="announce-rail" aria-live="polite">
         <span className="announce-tag">公告</span>
-        <p key={announcements[annIndex].id} className="announce-text">
-          {announcements[annIndex].text}
+        <p key={ann.id} className="announce-text">
+          {ann.text}
         </p>
       </section>
 
       <section className="stat-pair">
         <div>
           <dt>实时币价</dt>
-          <dd>{priceHint != null ? `≈ $${priceHint}` : isConfigured ? "…" : "—"}</dd>
+          <dd>{priceDisplay}</dd>
         </div>
         <div>
           <dt>累计销毁</dt>
-          <dd>{totalBurned != null ? fmtToken(totalBurned as bigint, 18, 2) : isConfigured ? "…" : "—"}</dd>
+          <dd>{burnedDisplay}</dd>
         </div>
       </section>
 
       <section className="panel-block">
         <h2>直推排行榜 Top 10</h2>
-        <p className="muted">按直推人数（索引 stub，待接 API）</p>
-        <ol className="rank-list">
-          {topDirectRefs.map((r) => (
-            <li key={r.rank}>
-              <span className="rank-n">{r.rank}</span>
-              <span className="rank-addr">{shortAddr(r.address)}</span>
-              <span className="rank-val">{r.directs}</span>
-            </li>
-          ))}
-        </ol>
+        <p className="muted">
+          {board?.source === "graph"
+            ? "按直推人数（索引）"
+            : board?.source === "unconfigured"
+              ? "索引未配置（GRAPH_URL）— 暂无排行数据"
+              : "加载中…"}
+        </p>
+        {!board || board.items.length === 0 ? (
+          <p className="muted">{board?.source === "unconfigured" ? "—" : "暂无数据"}</p>
+        ) : (
+          <ol className="rank-list">
+            {board.items.map((r) => (
+              <li key={r.address}>
+                <span className="rank-n">{r.rank}</span>
+                <span className="rank-addr">{shortAddr(r.address)}</span>
+                <span className="rank-val">{r.directs}</span>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       <section className="panel-block">

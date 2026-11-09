@@ -1,0 +1,98 @@
+# Umidor UM-plan indexer schema (The Graph)
+# Labels for LayerPaid.layer: 1=直推, 2=间推, 3..9=市场N
+
+"""Account with referral + volume aggregates."""
+type Account @entity {
+  id: ID! # lowercased address
+  referrer: Account
+  directs: [Account!]! @derivedFrom(field: "referrer")
+  directCount: BigInt!
+  """Descendants beyond direct (L2+), maintained on bind walk."""
+  indirectCount: BigInt!
+  """Sum of usdAmount from Buys where this account is buyer."""
+  buyVolumeUsd: BigInt!
+  """Sum of buyVolumeUsd across downline (direct + indirect)."""
+  umbrellaVolumeUsd: BigInt!
+  bindsAsReferrer: [ReferralBind!]! @derivedFrom(field: "referrer")
+  swapRewards: [SwapReward!]! @derivedFrom(field: "recipient")
+  layerRewards: [LayerReward!]! @derivedFrom(field: "recipient")
+  dividendClaims: [DividendClaim!]! @derivedFrom(field: "user")
+  burns: [Burn!]! @derivedFrom(field: "user")
+}
+
+type ReferralBind @entity(immutable: true) {
+  id: ID! # txHash-logIndex
+  user: Account!
+  referrer: Account!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+enum SwapSide {
+  BUY
+  SELL
+}
+
+"""Instant 0.5% self + 0.5% referrer reward from SwapFacade Bought/Sold."""
+type SwapReward @entity(immutable: true) {
+  id: ID! # txHash-logIndex-role
+  side: SwapSide!
+  trader: Account!
+  recipient: Account!
+  """self | referrer"""
+  role: String!
+  paymentToken: Bytes!
+  paymentAmount: BigInt!
+  usdAmount: BigInt!
+  rewardAmount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type Burn @entity(immutable: true) {
+  id: ID! # txHash-logIndex
+  user: Account!
+  amountRequested: BigInt!
+  amountReceived: BigInt!
+  usdValue: BigInt!
+  toSink: BigInt!
+  toLayers: BigInt!
+  toShareholders: BigInt!
+  tier: Int!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+"""LayerRewards.LayerPaid — layer 1..9 for ledger labels."""
+type LayerReward @entity(immutable: true) {
+  id: ID! # txHash-logIndex
+  burner: Account!
+  recipient: Account!
+  layer: Int! # 1..9
+  amount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type DividendClaim @entity(immutable: true) {
+  id: ID! # txHash-logIndex
+  user: Account!
+  amount: BigInt!
+  nextClaimAt: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+"""Singleton protocol stats (id = \"global\")."""
+type ProtocolStats @entity {
+  id: ID!
+  totalBurnedToken: BigInt!
+  totalBurnedUsd: BigInt!
+  bindCount: BigInt!
+  burnCount: BigInt!
+}

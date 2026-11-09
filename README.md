@@ -8,7 +8,8 @@
 
 ```
 contracts/          Foundry Solidity + tests + deploy scripts
-apps/web/           Next.js + wagmi + viem
+apps/web/           Next.js + wagmi + viem + /api read handlers
+subgraph/           The Graph schema + handlers (BSC / Chapel)
 deployments/        Address manifests
 scripts/            Helper shells
 DEPLOY.md           Deploy checklist + locked params + MVP §9 defaults
@@ -68,6 +69,36 @@ npm run dev
 ```
 
 底栏 4 Tab：`/` 首页 · `/swap` · `/promo` 推广 · `/mine` 我的（旧路由重定向）。
+
+### 只读 API（索引骨架）
+
+| Route | 说明 |
+|-------|------|
+| `GET /api/leaderboard` | Top10 直推人数 |
+| `GET /api/team?address=` | 直推/间推/购买量/伞下业绩 |
+| `GET /api/earnings?address=` | Swap 推广 + 层奖（直推/间推/市场3…9）+ 分红明细 |
+| `GET /api/announcements` | 静态 CMS：`apps/web/src/data/announcements.json` |
+| `GET /api/stats` | 币价 stub + 累计销毁（优先链上，可叠 Graph） |
+
+设置 `GRAPH_URL` 指向已部署 subgraph 的 GraphQL HTTP 端点。未设置时返回空结构 + `source: "unconfigured"`（**不会**伪造排行榜）。
+
+## Subgraph（The Graph）
+
+```bash
+cd subgraph
+npm install
+export SUBGRAPH_NETWORK=chapel   # or bsc
+export REGISTRY_ADDRESS=0x… SWAP_ADDRESS=0x… BURN_ADDRESS=0x…
+export LAYER_ADDRESS=0x… DIVIDENDS_ADDRESS=0x… START_BLOCK=…
+npm run prepare:manifest
+# or: npm run prepare:manifest -- --from=../deployments/bsc-testnet.json
+npm run codegen
+npm run build
+# Studio: npm run deploy:studio
+# Local:  npm run create-local && npm run deploy-local
+```
+
+详情见 [`subgraph/README.md`](subgraph/README.md)。
 
 ## License
 

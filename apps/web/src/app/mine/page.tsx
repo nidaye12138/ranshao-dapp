@@ -5,7 +5,7 @@ import { useAccount, useBalance, useReadContract } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { fmtToken, shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import { mockEarnings } from "@/lib/mockData";
+import { useEarnings, useTeam } from "@/lib/api/client";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
@@ -16,7 +16,6 @@ export default function MinePage() {
   const ready = mounted && isConfigured && !!address;
   const [inviteOrigin, setInviteOrigin] = useState("");
 
-  // Absolute invite URL only after mount — never branch on `window` during SSR/first paint.
   useEffect(() => {
     setInviteOrigin(window.location.origin);
   }, []);
@@ -56,7 +55,7 @@ export default function MinePage() {
     query: { enabled: ready },
   });
 
-  const { data: directs } = useReadContract({
+  const { data: directsOnChain } = useReadContract({
     address: addresses.registry,
     abi: TreeAbi,
     functionName: "directRefCount",
@@ -64,10 +63,18 @@ export default function MinePage() {
     query: { enabled: ready },
   });
 
+  const { data: team } = useTeam(mounted && address ? address : undefined);
+  const { data: earnings } = useEarnings(mounted && address ? address : undefined);
+
   const inviteDisplay =
     mounted && address ? (inviteOrigin ? `${inviteOrigin}/?ref=${address}` : `/?ref=${address}`) : "";
 
-  const team = mockEarnings.team;
+  const directsDisplay =
+    mounted && directsOnChain != null
+      ? String(directsOnChain)
+      : team?.directs != null
+        ? String(team.directs)
+        : "—";
 
   return (
     <section className="panel">
@@ -101,23 +108,31 @@ export default function MinePage() {
       </dl>
 
       <h2>我的团队</h2>
-      <p className="muted">链上直推数已接；其余为索引 stub</p>
+      <p className="muted">
+        {team?.source === "graph"
+          ? "索引聚合"
+          : team?.source === "unconfigured"
+            ? "索引未配置（GRAPH_URL）；直推可走链上"
+            : mounted && isConnected
+              ? "加载中…"
+              : "连接钱包后查看"}
+      </p>
       <dl className="stats">
         <div>
           <dt>直推</dt>
-          <dd>{mounted && directs != null ? String(directs) : mounted ? String(team.directs) : "—"}</dd>
+          <dd>{directsDisplay}</dd>
         </div>
         <div>
           <dt>间推</dt>
-          <dd>{mounted ? team.indirects : "—"}</dd>
+          <dd>{mounted && team ? String(team.indirects) : "—"}</dd>
         </div>
         <div>
           <dt>购买总量</dt>
-          <dd>{mounted ? `$${team.buyVolumeUsd}` : "—"}</dd>
+          <dd>{mounted && team ? `$${team.buyVolumeUsd}` : "—"}</dd>
         </div>
         <div>
           <dt>伞下总业绩</dt>
-          <dd>{mounted ? `$${team.umbrellaUsd}` : "—"}</dd>
+          <dd>{mounted && team ? `$${team.umbrellaUsd}` : "—"}</dd>
         </div>
       </dl>
 
@@ -136,40 +151,57 @@ export default function MinePage() {
       )}
 
       <h2>我的收益</h2>
+      <p className="muted">
+        {earnings?.source === "graph"
+          ? "账本来自索引"
+          : earnings?.source === "unconfigured"
+            ? "索引未配置 — 明细为空"
+            : mounted && isConnected
+              ? "加载中…"
+              : ""}
+      </p>
       <div className="panel-block">
-        <h3>Swap 推广 · 总量 {mockEarnings.swapPromoTotal}</h3>
-        <ul className="ledger">
-          {mockEarnings.swapPromoRows.map((r) => (
-            <li key={r.id}>
-              <span>{r.label}</span>
-              <span>{r.amount}</span>
-              <span className="muted">{r.at}</span>
-            </li>
-          ))}
-        </ul>
+        <h3>Swap 推广 · 总量 {earnings?.swapPromoTotal ?? "—"}</h3>
+        {!earnings?.swapPromoRows?.length ? (
+          <p className="muted">暂无明细</p>
+        ) : (
+          <ul className="ledger">
+            {earnings.swapPromoRows.map((r) => (
+              <li key={r.id}>
+                <span>{r.label}</span>
+                <span>{r.amount}</span>
+                <span className="muted">{r.at}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="panel-block">
         <h3>
-          层奖励 · 直推 {mockEarnings.layerTotal.直推} / 间推 {mockEarnings.layerTotal.间推} / 市场{" "}
-          {mockEarnings.layerTotal.市场}
+          层奖励 · 直推 {earnings?.layerTotal.直推 ?? "—"} / 间推 {earnings?.layerTotal.间推 ?? "—"} / 市场{" "}
+          {earnings?.layerTotal.市场 ?? "—"}
         </h3>
-        <ul className="ledger">
-          {mockEarnings.layerRows.map((r) => (
-            <li key={r.id}>
-              <span>{r.label}</span>
-              <span>{r.amount}</span>
-              <span className="muted">{r.at}</span>
-            </li>
-          ))}
-        </ul>
+        {!earnings?.layerRows?.length ? (
+          <p className="muted">暂无明细</p>
+        ) : (
+          <ul className="ledger">
+            {earnings.layerRows.map((r) => (
+              <li key={r.id}>
+                <span>{r.label}</span>
+                <span>{r.amount}</span>
+                <span className="muted">{r.at}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="panel-block">
-        <h3>分红 · 总量 {mockEarnings.dividendTotal}</h3>
-        {mockEarnings.dividendRows.length === 0 ? (
+        <h3>分红 · 总量 {earnings?.dividendTotal ?? "—"}</h3>
+        {!earnings?.dividendRows?.length ? (
           <p className="muted">暂无明细（领取后由索引写入）</p>
         ) : (
           <ul className="ledger">
-            {mockEarnings.dividendRows.map((r) => (
+            {earnings.dividendRows.map((r) => (
               <li key={r.id}>
                 <span>{r.label}</span>
                 <span>{r.amount}</span>
