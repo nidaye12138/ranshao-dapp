@@ -59,6 +59,9 @@ library Constants {
     // EliteStake: 5% of notified release distributed to stakers
     uint16 internal constant ELITE_RELEASE_BPS = 500;
 
+    // DividendPools claim cooldown (UI IA C4) — once per 24h on-chain
+    uint256 internal constant CLAIM_COOLDOWN = 24 hours;
+
     // Mainnet addresses (documentation + deploy defaults)
     address internal constant UMPLAN_MAINNET = 0xad09D287327C383283820CfCEe7AC0e6C7De7777;
     address internal constant SPCXB_MAINNET = 0xbe9D156892E55e7154BcD3cB0FEA677F9D3103E1;

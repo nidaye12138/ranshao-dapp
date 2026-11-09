@@ -415,6 +415,68 @@ contract UmPlanTest is Test {
         assertEq(usdt.balanceOf(address(treasury)), 10e18);
     }
 
+    function test_sellUSDT_withReferrer() public {
+        vm.prank(alice);
+        tree.bindReferrer(admin);
+
+        // Fund sell liquidity
+        vm.startPrank(admin);
+        usdt.mint(admin, 10_000e18);
+        usdt.approve(address(swap), 10_000e18);
+        swap.depositUsdtLiquidity(10_000e18);
+        vm.stopPrank();
+
+        uint256 sellAmt = 1_000e18; // $1000 at $1
+        uint256 aliceUsdtBefore = usdt.balanceOf(alice);
+        uint256 adminUsdtBefore = usdt.balanceOf(admin);
+
+        vm.startPrank(alice);
+        token.approve(address(swap), sellAmt);
+        swap.sellForUSDT(sellAmt);
+        vm.stopPrank();
+
+        // seller 99.5% = 995; ref 0.5% = 5
+        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 995e18);
+        assertEq(usdt.balanceOf(admin), adminUsdtBefore + 5e18);
+    }
+
+    function test_dividend_claim_24h_cooldown() public {
+        vm.prank(alice);
+        tree.bindReferrer(admin);
+        vm.startPrank(alice);
+        token.approve(address(burnRouter), 100e18);
+        burnRouter.burn(100e18);
+        vm.stopPrank();
+        assertTrue(dividends.isActivated(alice));
+
+        vm.startPrank(admin);
+        spcxb.approve(address(dividends), 10_000e18);
+        dividends.inject(10_000e18);
+        vm.stopPrank();
+
+        assertTrue(dividends.canClaim(alice));
+        vm.prank(alice);
+        dividends.claim();
+        assertFalse(dividends.canClaim(alice));
+
+        // Accrue more claimable while cooling down, then cooldown must block
+        vm.startPrank(admin);
+        spcxb.approve(address(dividends), 10_000e18);
+        dividends.inject(10_000e18);
+        vm.stopPrank();
+        assertGt(dividends.claimable(alice), 0);
+        assertFalse(dividends.canClaim(alice));
+
+        vm.prank(alice);
+        vm.expectRevert("div: cooldown");
+        dividends.claim();
+
+        vm.warp(block.timestamp + 24 hours);
+        assertTrue(dividends.canClaim(alice));
+        vm.prank(alice);
+        dividends.claim();
+    }
+
     function test_constants_locked() public {
         assertEq(Constants.BURN_BPS, 7000);
         assertEq(Constants.LAYER_BPS, 2000);

@@ -1,16 +1,15 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Header } from "@/components/Header";
+import { TabBar } from "@/components/TabBar";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const home = pathname === "/";
   return (
-    <div className={home ? "shell shell-home" : "shell"}>
+    <div className="shell shell-tabs">
       <Header />
-      <main>{children}</main>
+      <main className="tab-main">{children}</main>
+      <TabBar />
     </div>
   );
 }

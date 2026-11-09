@@ -11,9 +11,9 @@ import {IPriceOracle} from "./interfaces/IPriceOracle.sol";
 import {IReferralTree} from "./interfaces/IReferralTree.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Swap buy facade — BNB/USDT → project token with 0.5%/0.5% instant rewards.
+/// @title Swap facade — buy/sell project token with 0.5%/0.5% instant rewards (UI IA C1/C2).
 /// @dev Q10: no-referrer 0.5% → Treasury. Q11: rewards in payment token. Q12: Ownable+Pausable.
-///      Mainnet: mintMode=false + inventory of external UMplan.
+///      Mainnet: mintMode=false + inventory of external UMplan. Sell needs USDT liquidity.
 contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -37,8 +37,19 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         uint256 buyerReward,
         uint256 referrerReward
     );
+    event Sold(
+        address indexed seller,
+        address indexed paymentToken,
+        uint256 tokenAmount,
+        uint256 paymentQuoted,
+        uint256 paymentDelivered,
+        uint256 usdAmount,
+        uint256 sellerReward,
+        uint256 referrerReward
+    );
     event ConfigUpdated(address oracle, address tree, address treasury);
     event InventoryDeposited(address indexed from, uint256 amount);
+    event UsdtLiquidityDeposited(address indexed from, uint256 amount);
     event MaxTransferTaxUpdated(uint16 bps);
 
     constructor(
@@ -91,6 +102,13 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         emit InventoryDeposited(msg.sender, received);
     }
 
+    /// @notice Fund USDT liquidity for in-app sells.
+    function depositUsdtLiquidity(uint256 amount) external onlyOwner {
+        require(amount > 0, "swap: zero");
+        usdt.safeTransferFrom(msg.sender, address(this), amount);
+        emit UsdtLiquidityDeposited(msg.sender, amount);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
@@ -107,6 +125,12 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
     function quoteBnb(uint256 bnbAmount) public view returns (uint256 tokenOut, uint256 usdAmount) {
         usdAmount = (bnbAmount * oracle.bnbUsd()) / 1e18;
         tokenOut = _tokensForUsd(usdAmount);
+    }
+
+    /// @notice Quote sell: tokens → USDT (gross before 0.5%+0.5% rewards taken from proceeds).
+    function quoteSellUsdt(uint256 tokenAmount) public view returns (uint256 usdtOut, uint256 usdAmount) {
+        usdAmount = _usdForTokens(tokenAmount);
+        usdtOut = _usdToUsdt(usdAmount);
     }
 
     function buyWithUSDT(uint256 usdtAmount) external nonReentrant whenNotPaused {
@@ -165,6 +189,48 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         emit Bought(buyer, address(0), bnbAmount, usdAmount, tokenOut, delivered, reward, paidToRef);
     }
 
+    /// @notice In-app sell (UI IA C1): tokens → USDT; seller 99.5% + referrer/treasury 0.5%.
+    function sellForUSDT(uint256 tokenAmount) external nonReentrant whenNotPaused {
+        require(tokenAmount > 0, "swap: zero");
+        address seller = msg.sender;
+        (uint256 usdtOut, uint256 usdAmount) = quoteSellUsdt(tokenAmount);
+        require(usdtOut > 0, "swap: zero out");
+
+        uint256 reward = (usdtOut * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
+        require(usdtOut >= reward * 2, "swap: dust");
+        address referrer = tree.referrerOf(seller);
+
+        uint256 beforeTok = token.balanceOf(address(this));
+        token.safeTransferFrom(seller, address(this), tokenAmount);
+        uint256 received = token.balanceOf(address(this)) - beforeTok;
+        require(
+            received * Constants.BPS_DENOM >= tokenAmount * (Constants.BPS_DENOM - maxTransferTaxBps),
+            "swap: fot too high"
+        );
+
+        if (received != tokenAmount) {
+            (usdtOut, usdAmount) = quoteSellUsdt(received);
+            reward = (usdtOut * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
+            require(usdtOut >= reward * 2, "swap: dust");
+        }
+
+        require(usdt.balanceOf(address(this)) >= usdtOut, "swap: no usdt liq");
+
+        uint256 sellerPrincipal = usdtOut - (reward * 2);
+        uint256 sellerTotal = sellerPrincipal + reward;
+        usdt.safeTransfer(seller, sellerTotal);
+
+        uint256 paidToRef = 0;
+        if (referrer != address(0)) {
+            usdt.safeTransfer(referrer, reward);
+            paidToRef = reward;
+        } else {
+            usdt.safeTransfer(treasury, reward);
+        }
+
+        emit Sold(seller, address(usdt), received, usdtOut, sellerTotal, usdAmount, reward, paidToRef);
+    }
+
     function _deliverTokens(address to, uint256 amount) private returns (uint256 delivered) {
         if (mintMode) {
             IMintableERC20(address(token)).mint(to, amount);
@@ -184,10 +250,22 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         return (usdAmount * 1e18) / price;
     }
 
+    function _usdForTokens(uint256 tokenAmount) private view returns (uint256) {
+        uint256 price = oracle.tokenUsd();
+        require(price > 0, "swap: bad price");
+        return (tokenAmount * price) / 1e18;
+    }
+
     function _usdtToUsd(uint256 usdtAmount) private view returns (uint256) {
         if (usdtDecimals == 18) return usdtAmount;
         if (usdtDecimals < 18) return usdtAmount * (10 ** (18 - usdtDecimals));
         return usdtAmount / (10 ** (usdtDecimals - 18));
+    }
+
+    function _usdToUsdt(uint256 usdAmount) private view returns (uint256) {
+        if (usdtDecimals == 18) return usdAmount;
+        if (usdtDecimals < 18) return usdAmount / (10 ** (18 - usdtDecimals));
+        return usdAmount * (10 ** (usdtDecimals - 18));
     }
 
     function _sendBnb(address payable to, uint256 amount) private {

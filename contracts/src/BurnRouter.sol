@@ -25,6 +25,8 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
 
     mapping(address => uint256) public burnedToken;
     mapping(address => uint256) public burnedUsd;
+    uint256 public totalBurnedToken;
+    uint256 public totalBurnedUsd;
     uint16 public maxTransferTaxBps;
 
     event Burned(
@@ -109,6 +111,8 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 usdValue = quoteBurnUsd(received);
         burnedToken[user] += received;
         burnedUsd[user] += usdValue;
+        totalBurnedToken += received;
+        totalBurnedUsd += usdValue;
 
         uint256 toSink = (received * Constants.BURN_BPS) / Constants.BPS_DENOM;
         uint256 toLayers = (received * Constants.LAYER_BPS) / Constants.BPS_DENOM;

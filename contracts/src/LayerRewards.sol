@@ -23,6 +23,9 @@ contract LayerRewards is ILayerRewards, Ownable, ReentrancyGuard {
     address public burnRouter;
 
     event Distributed(address indexed burner, uint256 budget, uint256 paid, uint256 toPrecip);
+    /// @notice Per-layer payout for ledger indexing. `layer` is 1..9 (直推/间推/市场N).
+    event LayerPaid(address indexed burner, address indexed recipient, uint8 indexed layer, uint256 amount);
+    event LayerMissing(address indexed burner, uint8 indexed layer, uint256 amount);
     event ConfigUpdated(address tree, address precip, address burnRouter);
 
     modifier onlyBurnRouter() {
@@ -57,14 +60,17 @@ contract LayerRewards is ILayerRewards, Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < Constants.LAYER_COUNT; i++) {
             uint256 share = (budget * Constants.layerBps(i)) / Constants.LAYER_BPS;
             if (share == 0) continue;
+            uint8 layer = uint8(i + 1); // 1..9
             address recipient = ancestors[i];
             if (recipient != address(0)) {
                 token.safeTransfer(recipient, share);
                 paid += share;
+                emit LayerPaid(burner, recipient, layer, share);
             } else {
                 token.safeTransfer(address(precip), share);
                 precip.receiveMissingLayer(share);
                 toPrecip += share;
+                emit LayerMissing(burner, layer, share);
             }
         }
 

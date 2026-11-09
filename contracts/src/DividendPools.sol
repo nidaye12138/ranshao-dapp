@@ -23,10 +23,12 @@ contract DividendPools is IDividendPools, Ownable, Pausable, ReentrancyGuard {
     mapping(uint8 => mapping(address => uint256)) private _memberIndex; // 1-based
     mapping(address => uint256) public claimable;
     mapping(uint8 => uint256) public undistributed; // when tier has 0 members at inject
+    /// @notice Last successful claim timestamp (24h cooldown — UI IA C4).
+    mapping(address => uint256) public lastClaimAt;
 
     event TierUpdated(address indexed user, uint8 oldTier, uint8 newTier);
     event Injected(uint256 amount, uint256[4] perPool);
-    event Claimed(address indexed user, uint256 amount);
+    event Claimed(address indexed user, uint256 amount, uint256 nextClaimAt);
     event BurnRouterUpdated(address burnRouter);
 
     modifier onlyBurnRouter() {
@@ -64,6 +66,23 @@ contract DividendPools is IDividendPools, Ownable, Pausable, ReentrancyGuard {
 
     function isTierMember(uint8 tier, address user) external view returns (bool) {
         return tierOf[user] == tier && tier != 0;
+    }
+
+    /// @notice Promo referral unlock: any burn tier ≥ T1 (100U minimum). UI IA C5.
+    function isActivated(address user) public view returns (bool) {
+        return tierOf[user] >= 1;
+    }
+
+    function nextClaimAt(address user) public view returns (uint256) {
+        uint256 last = lastClaimAt[user];
+        if (last == 0) return 0;
+        return last + Constants.CLAIM_COOLDOWN;
+    }
+
+    function canClaim(address user) public view returns (bool) {
+        if (claimable[user] == 0) return false;
+        uint256 next = nextClaimAt(user);
+        return next == 0 || block.timestamp >= next;
     }
 
     /// @notice Map cumulative burn USD → highest single tier (Q2).
@@ -122,9 +141,13 @@ contract DividendPools is IDividendPools, Ownable, Pausable, ReentrancyGuard {
     function claim() external nonReentrant whenNotPaused {
         uint256 amount = claimable[msg.sender];
         require(amount > 0, "div: zero");
+        uint256 next = nextClaimAt(msg.sender);
+        require(next == 0 || block.timestamp >= next, "div: cooldown");
         claimable[msg.sender] = 0;
+        lastClaimAt[msg.sender] = block.timestamp;
+        uint256 unlock = block.timestamp + Constants.CLAIM_COOLDOWN;
         spcxb.safeTransfer(msg.sender, amount);
-        emit Claimed(msg.sender, amount);
+        emit Claimed(msg.sender, amount, unlock);
     }
 
     function _addMember(uint8 tier, address user) private {

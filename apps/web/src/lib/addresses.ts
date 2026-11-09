@@ -32,11 +32,10 @@ export const addresses = {
   treasury: addr(process.env.NEXT_PUBLIC_TREASURY_ADDRESS),
 } as const;
 
-/** True when core MVP modules are configured. */
+/** True when core 4-tab MVP modules are configured. */
 export const isConfigured =
   addresses.registry !== zeroAddress &&
   addresses.swap !== zeroAddress &&
   addresses.burn !== zeroAddress &&
   addresses.dividends !== zeroAddress &&
-  addresses.shareholders !== zeroAddress &&
   addresses.treasury !== zeroAddress;

@@ -67,7 +67,7 @@ npm install
 npm run dev
 ```
 
-页面：`/` 首页 · `/buy` 购买 · `/burn` 燃烧 · `/dividends` 分红 · `/promo` 推荐 · `/elite` 1500U · `/shareholder` 股东。
+底栏 4 Tab：`/` 首页 · `/swap` · `/promo` 推广 · `/mine` 我的（旧路由重定向）。
 
 ## License
 
