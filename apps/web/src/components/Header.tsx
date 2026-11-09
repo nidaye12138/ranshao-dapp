@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from "wagmi";
@@ -30,12 +31,20 @@ export function Header() {
 
   return (
     <header className="site-header">
-      <div className="brand-lockup">
-        <Link href="/" className="brand" aria-label="燃烧首页">
-          燃烧
-        </Link>
-        <span className="brand-sub">UMplan</span>
-      </div>
+      <Link href="/" className="brand-lockup" aria-label="Umidor 首页">
+        <Image
+          src="/umidor-logo.png"
+          alt="Umidor"
+          width={40}
+          height={38}
+          className="brand-mark"
+          priority
+        />
+        <span className="brand-text">
+          <span className="brand">Umidor</span>
+          <span className="brand-sub">UM plan</span>
+        </span>
+      </Link>
       <nav className="nav">
         {links.map((l) => (
           <Link key={l.href} href={l.href} className={pathname === l.href ? "active" : undefined}>

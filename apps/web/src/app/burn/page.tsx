@@ -77,7 +77,7 @@ export default function BurnPage() {
     <section className="panel">
       <h1>燃烧</h1>
       <p className="muted">
-        金本位定档；拆账 70% 销毁 / 20% 九层 / 10% 股东。MVP：仅保留最高档资格。
+        Umidor · 金本位定档；拆账 70% 销毁 / 20% 九层 / 10% 股东。MVP：仅保留最高档资格。
       </p>
 
       <label className="field">

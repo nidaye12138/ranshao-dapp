@@ -76,8 +76,8 @@ export default function ElitePage() {
     <section className="panel">
       <h1>1500U 可选质押</h1>
       <p className="muted">
-        仅 T4（累计燃烧 ≥ 1500U）可质押。每币分红 = (总释放 × 5%) / 总质押；总释放由管理员 notifyRelease。
-        初版 15 日 / 30 日生息已废弃。
+        Umidor · 仅 T4（累计燃烧 ≥ 1500U）可质押。每币分红 = (总释放 × 5%) / 总质押；总释放由管理员
+        notifyRelease。初版 15 日 / 30 日生息已废弃。
       </p>
 
       <dl className="stats">

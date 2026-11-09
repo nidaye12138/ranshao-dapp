@@ -68,8 +68,8 @@ export default function DividendsPage() {
 
   return (
     <section className="panel">
-      <h1>SPCXB 分红中心</h1>
-      <p className="muted">四档池同档均分（地址均分）。资产为 SPCXB，不是 UMplan。</p>
+      <h1>分红中心</h1>
+      <p className="muted">Umidor · 四档池同档均分（地址均分）。资产为 SPCXB，不是项目币 UMplan。</p>
 
       <dl className="stats">
         <div>

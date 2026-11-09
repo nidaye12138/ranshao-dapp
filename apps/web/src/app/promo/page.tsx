@@ -66,7 +66,7 @@ function PromoInner() {
     <section className="panel">
       <h1>推荐关系</h1>
       <p className="muted">
-        绑定一次不可改；支撑 Swap 直推 0.5% 与燃烧九层。初版业绩里程碑已废弃。
+        Umidor · 绑定一次不可改；支撑 Swap 直推 0.5% 与燃烧九层。初版业绩里程碑已废弃。
       </p>
 
       <dl className="stats">

@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
-import { Syne, Noto_Sans_SC } from "next/font/google";
+import { Sora, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { AppShell } from "@/components/AppShell";
 
-const displayFont = Syne({
+const brandFont = Sora({
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: ["600", "700"],
+  variable: "--font-brand-face",
+  display: "swap",
+});
+
+const displayFont = Sora({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
   variable: "--font-display-face",
   display: "swap",
 });
@@ -19,16 +26,18 @@ const bodyFont = Noto_Sans_SC({
 });
 
 export const metadata: Metadata = {
-  title: "燃烧 · Ranshao DApp",
-  description: "BNB Chain 购买、直推奖励、存币生息与股东登记",
+  title: "Umidor · BNB Chain DApp",
+  description: "Umidor — Swap 买入、推荐、燃烧定档与 SPCXB 四档分红",
+  icons: {
+    icon: "/umidor-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // suppressHydrationWarning: wallet/browser extensions often inject nodes (e.g. #minidam-root)
-    // before React hydrates, which would otherwise surface as recoverable hydration mismatches.
+    // suppressHydrationWarning: wallet/browser extensions often inject nodes before hydrate.
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={`${displayFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
+      <body className={`${brandFont.variable} ${displayFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

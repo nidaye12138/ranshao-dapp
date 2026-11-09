@@ -99,8 +99,10 @@ export default function BuyPage() {
 
   return (
     <section className="panel">
-      <h1>购买 UMplan</h1>
-      <p className="muted">买方即时 0.5% + 直推上级 0.5%（支付币种）。无推荐人时直推份额入 Treasury。</p>
+      <h1>购买</h1>
+      <p className="muted">
+        Umidor · 买方即时 0.5% + 直推上级 0.5%（支付币种）。无推荐人时直推份额入 Treasury。
+      </p>
 
       <div className="row gap">
         <button type="button" className={asset === "USDT" ? "btn primary" : "btn"} onClick={() => setAsset("USDT")}>

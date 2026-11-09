@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { isConfigured } from "@/lib/addresses";
 
@@ -6,8 +7,15 @@ export default function HomePage() {
     <section className="hero-bleed">
       <div className="hero-plane" aria-hidden="true" />
       <div className="hero-content">
-        <p className="hero-brand">燃烧</p>
-        <h1 className="hero-kicker">UMplan · 买入、燃烧、四档分红。</h1>
+        <Image
+          src="/umidor-logo.png"
+          alt="Umidor"
+          width={240}
+          height={228}
+          className="hero-logo"
+          priority
+        />
+        <h1 className="hero-kicker">买入、燃烧、四档分红，在链上运转。</h1>
         <p className="hero-lead">
           BNB / USDT 购币即时 0.5%+0.5%；燃烧 70/20/10 拆账，九层奖励与 SPCXB 四档池。
         </p>

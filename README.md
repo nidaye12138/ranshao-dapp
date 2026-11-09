@@ -1,6 +1,6 @@
-# 燃烧 (Ranshao) DApp — UM plan
+# Umidor DApp — UM plan
 
-BNB Smart Chain DApp：Swap 买入（0.5%+0.5%）、推荐树（最多 9 层）、燃烧 70/20/10、四档 SPCXB 分红、股东池（453）、1500U 可选质押。
+**Umidor** · BNB Smart Chain DApp：Swap 买入（0.5%+0.5%）、推荐树（最多 9 层）、燃烧 70/20/10、四档 SPCXB 分红、股东池（453）、1500U 可选质押。
 
 产品权威：20261106 UM 计划（相对初版仅保留 Swap 即时奖重叠）。
 

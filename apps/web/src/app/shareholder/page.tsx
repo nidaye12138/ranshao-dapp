@@ -47,7 +47,7 @@ export default function ShareholderPage() {
     <section className="panel">
       <h1>股东池</h1>
       <p className="muted">
-        每次燃烧的 10% 均分在册股东。席位上限 453；MVP 由管理员白名单入座（不可自助注册）。
+        Umidor · 每次燃烧的 10% 均分在册股东。席位上限 453；MVP 由管理员白名单入座（不可自助注册）。
         初版「自持 50 万 + 直推 500 万 → 300 席」已废弃。
       </p>
 

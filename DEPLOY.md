@@ -1,6 +1,6 @@
-# Deployment — UM plan (20261106)
+# Deployment — Umidor / UM plan (20261106)
 
-Authority: Project store `docs/dapp-design.md` + `docs/um-plan-delta.md`.
+Product brand: **Umidor**. Authority: Project store `docs/dapp-design.md` + `docs/um-plan-delta.md`.
 
 ## Locked mainnet assets
 
