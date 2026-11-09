@@ -35,7 +35,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // suppressHydrationWarning: wallet/browser extensions often inject nodes before hydrate.
+    // suppressHydrationWarning: browser extensions (e.g. minidam-root / theme-light) inject DOM
+    // before React hydrates; wallet UI is also gated client-side via useMounted().
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={`${brandFont.variable} ${displayFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
         <Providers>

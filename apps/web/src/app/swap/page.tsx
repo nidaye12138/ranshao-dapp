@@ -9,12 +9,14 @@ import {
 } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { fmtToken, parseAmount } from "@/lib/format";
+import { useMounted } from "@/lib/useMounted";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
 type Mode = "buy" | "sell";
 
 export default function SwapPage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("100");
@@ -35,7 +37,7 @@ export default function SwapPage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
-    query: { enabled: !!address && isConfigured },
+    query: { enabled: mounted && !!address && isConfigured },
   });
 
   const { data: usdtBal } = useReadContract({
@@ -43,7 +45,7 @@ export default function SwapPage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
-    query: { enabled: !!address && isConfigured },
+    query: { enabled: mounted && !!address && isConfigured },
   });
 
   const { data: buyQuote } = useReadContract({
@@ -68,7 +70,7 @@ export default function SwapPage() {
     abi: ERC20Abi,
     functionName: "allowance",
     args: [address!, addresses.swap],
-    query: { enabled: !!address && isConfigured },
+    query: { enabled: mounted && !!address && isConfigured },
   });
 
   const quote = mode === "buy" ? (buyQuote as [bigint, bigint] | undefined) : (sellQuote as [bigint, bigint] | undefined);
@@ -172,7 +174,9 @@ export default function SwapPage() {
         <p>不做累计买入业绩 / 里程碑。</p>
       </div>
 
-      {!isConnected ? (
+      {!mounted ? (
+        <p className="muted">加载中…</p>
+      ) : !isConnected ? (
         <p className="banner warn">请先连接钱包</p>
       ) : !isConfigured ? (
         <p className="banner warn">合约地址未配置</p>

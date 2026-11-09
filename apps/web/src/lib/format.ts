@@ -1,10 +1,19 @@
 import { formatUnits, parseUnits } from "viem";
 
+/** Deterministic token format — avoid `toLocaleString` SSR/client locale drift. */
 export function fmtToken(value?: bigint, decimals = 18, digits = 4): string {
   if (value === undefined) return "—";
-  const n = Number(formatUnits(value, decimals));
-  if (!Number.isFinite(n)) return formatUnits(value, decimals);
-  return n.toLocaleString("zh-CN", { maximumFractionDigits: digits });
+  const raw = formatUnits(value, decimals);
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return raw;
+  const neg = n < 0;
+  const abs = Math.abs(n);
+  const fixed = abs.toFixed(digits);
+  const [intPart, fracPart = ""] = fixed.split(".");
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const frac = fracPart.replace(/0+$/, "");
+  const body = frac ? `${withCommas}.${frac}` : withCommas;
+  return neg ? `-${body}` : body;
 }
 
 export function parseAmount(input: string, decimals = 18): bigint {

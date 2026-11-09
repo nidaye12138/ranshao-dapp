@@ -1,39 +1,51 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { fmtToken, shortAddr } from "@/lib/format";
+import { useMounted } from "@/lib/useMounted";
 import { mockEarnings } from "@/lib/mockData";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
 export default function MinePage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
-  const enabled = isConfigured && !!address;
+  const ready = mounted && isConfigured && !!address;
+  const [inviteOrigin, setInviteOrigin] = useState("");
 
-  const { data: bnbBal } = useBalance({ address, query: { enabled: !!address } });
+  // Absolute invite URL only after mount — never branch on `window` during SSR/first paint.
+  useEffect(() => {
+    setInviteOrigin(window.location.origin);
+  }, []);
+
+  const { data: bnbBal } = useBalance({
+    address,
+    query: { enabled: ready },
+  });
 
   const { data: umplan } = useReadContract({
     address: addresses.token,
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
-    query: { enabled },
+    query: { enabled: ready },
   });
   const { data: usdt } = useReadContract({
     address: addresses.usdt,
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
-    query: { enabled },
+    query: { enabled: ready },
   });
   const { data: spcxb } = useReadContract({
     address: addresses.spcxb,
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
-    query: { enabled },
+    query: { enabled: ready },
   });
 
   const { data: activated } = useReadContract({
@@ -41,7 +53,7 @@ export default function MinePage() {
     abi: DivAbi,
     functionName: "isActivated",
     args: [address!],
-    query: { enabled },
+    query: { enabled: ready },
   });
 
   const { data: directs } = useReadContract({
@@ -49,22 +61,20 @@ export default function MinePage() {
     abi: TreeAbi,
     functionName: "directRefCount",
     args: [address!],
-    query: { enabled },
+    query: { enabled: ready },
   });
 
-  const invite =
-    typeof window !== "undefined" && address
-      ? `${window.location.origin}/?ref=${address}`
-      : address
-        ? `/?ref=${address}`
-        : "";
+  const inviteDisplay =
+    mounted && address ? (inviteOrigin ? `${inviteOrigin}/?ref=${address}` : `/?ref=${address}`) : "";
 
   const team = mockEarnings.team;
 
   return (
     <section className="panel">
       <h1>我的</h1>
-      {!isConnected ? (
+      {!mounted ? (
+        <p className="muted">加载中…</p>
+      ) : !isConnected ? (
         <p className="banner warn">请先连接钱包</p>
       ) : (
         <p className="muted">{shortAddr(address)}</p>
@@ -74,19 +84,19 @@ export default function MinePage() {
       <dl className="stats">
         <div>
           <dt>UMplan</dt>
-          <dd>{umplan != null ? fmtToken(umplan as bigint) : "—"}</dd>
+          <dd>{mounted && umplan != null ? fmtToken(umplan as bigint) : "—"}</dd>
         </div>
         <div>
           <dt>USDT</dt>
-          <dd>{usdt != null ? fmtToken(usdt as bigint) : "—"}</dd>
+          <dd>{mounted && usdt != null ? fmtToken(usdt as bigint) : "—"}</dd>
         </div>
         <div>
           <dt>SPCXB</dt>
-          <dd>{spcxb != null ? fmtToken(spcxb as bigint) : "—"}</dd>
+          <dd>{mounted && spcxb != null ? fmtToken(spcxb as bigint) : "—"}</dd>
         </div>
         <div>
           <dt>BNB</dt>
-          <dd>{bnbBal ? fmtToken(bnbBal.value, bnbBal.decimals) : "—"}</dd>
+          <dd>{mounted && bnbBal ? fmtToken(bnbBal.value, bnbBal.decimals) : "—"}</dd>
         </div>
       </dl>
 
@@ -95,28 +105,30 @@ export default function MinePage() {
       <dl className="stats">
         <div>
           <dt>直推</dt>
-          <dd>{directs != null ? String(directs) : String(team.directs)}</dd>
+          <dd>{mounted && directs != null ? String(directs) : mounted ? String(team.directs) : "—"}</dd>
         </div>
         <div>
           <dt>间推</dt>
-          <dd>{team.indirects}</dd>
+          <dd>{mounted ? team.indirects : "—"}</dd>
         </div>
         <div>
           <dt>购买总量</dt>
-          <dd>${team.buyVolumeUsd}</dd>
+          <dd>{mounted ? `$${team.buyVolumeUsd}` : "—"}</dd>
         </div>
         <div>
           <dt>伞下总业绩</dt>
-          <dd>${team.umbrellaUsd}</dd>
+          <dd>{mounted ? `$${team.umbrellaUsd}` : "—"}</dd>
         </div>
       </dl>
 
       <h2>推广资格</h2>
-      {activated ? (
+      {!mounted ? (
+        <p className="muted">…</p>
+      ) : activated ? (
         <div className="rules-box">
           <p className="banner ok">已激活（任意档 ≥100U）</p>
           <p>
-            邀请链接：<code>{invite}</code>
+            邀请链接：<code>{inviteDisplay}</code>
           </p>
         </div>
       ) : (

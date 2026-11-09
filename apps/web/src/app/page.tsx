@@ -7,6 +7,7 @@ import { useAccount, useReadContract, useWriteContract, useWaitForTransactionRec
 import { isAddress, zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { fmtToken, shortAddr } from "@/lib/format";
+import { useMounted } from "@/lib/useMounted";
 import {
   announcements,
   banners,
@@ -27,6 +28,7 @@ export default function HomePage() {
 }
 
 function HomeInner() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const search = useSearchParams();
   const [annIndex, setAnnIndex] = useState(0);
@@ -44,7 +46,7 @@ function HomeInner() {
     if (ref && isAddress(ref)) setRefInput(ref);
   }, [search]);
 
-  const enabled = isConfigured && !!address;
+  const enabled = mounted && isConfigured && !!address;
 
   const { data: myReferrer } = useReadContract({
     address: addresses.registry,
@@ -125,7 +127,9 @@ function HomeInner() {
 
       <section className="panel-block">
         <h2>我的上级</h2>
-        {!isConnected ? (
+        {!mounted ? (
+          <p className="muted">加载中…</p>
+        ) : !isConnected ? (
           <p className="muted">连接钱包后查看 / 绑定</p>
         ) : bound ? (
           <p>

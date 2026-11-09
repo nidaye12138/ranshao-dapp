@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccount,
   useReadContract,
@@ -9,6 +9,7 @@ import {
 } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { fmtToken, parseAmount } from "@/lib/format";
+import { useMounted } from "@/lib/useMounted";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
@@ -21,10 +22,18 @@ const TIERS = [
 ];
 
 export default function PromoPage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [amount, setAmount] = useState("100");
+  const [nowSec, setNowSec] = useState(0);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  useEffect(() => {
+    setNowSec(Math.floor(Date.now() / 1000));
+    const t = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 15_000);
+    return () => clearInterval(t);
+  }, []);
 
   const parsed = useMemo(() => {
     try {
@@ -34,7 +43,7 @@ export default function PromoPage() {
     }
   }, [amount]);
 
-  const enabled = isConfigured && !!address;
+  const enabled = mounted && isConfigured && !!address;
 
   const { data: quoteUsd } = useReadContract({
     address: addresses.burn,
@@ -107,8 +116,8 @@ export default function PromoPage() {
   }
 
   const cooldownLeft =
-    nextClaim && typeof nextClaim === "bigint" && nextClaim > 0n
-      ? Math.max(0, Number(nextClaim) - Math.floor(Date.now() / 1000))
+    mounted && nowSec > 0 && nextClaim && typeof nextClaim === "bigint" && nextClaim > 0n
+      ? Math.max(0, Number(nextClaim) - nowSec)
       : 0;
 
   return (
@@ -139,7 +148,9 @@ export default function PromoPage() {
         </div>
       </dl>
 
-      {!isConnected ? (
+      {!mounted ? (
+        <p className="muted">加载中…</p>
+      ) : !isConnected ? (
         <p className="banner warn">请先连接钱包</p>
       ) : !isConfigured ? (
         <p className="banner warn">合约地址未配置</p>
@@ -204,7 +215,13 @@ export default function PromoPage() {
         <div>
           <dt>冷却</dt>
           <dd>
-            {canClaim ? "可领取" : cooldownLeft > 0 ? `${Math.ceil(cooldownLeft / 3600)}h 后` : "—"}
+            {!mounted
+              ? "—"
+              : canClaim
+                ? "可领取"
+                : cooldownLeft > 0
+                  ? `${Math.ceil(cooldownLeft / 3600)}h 后`
+                  : "—"}
           </dd>
         </div>
       </dl>
@@ -212,7 +229,7 @@ export default function PromoPage() {
       <button
         type="button"
         className="btn primary"
-        disabled={!isConfigured || !isConnected || isPending || confirming || !canClaim}
+        disabled={!mounted || !isConfigured || !isConnected || isPending || confirming || !canClaim}
         onClick={() =>
           writeContract({
             address: addresses.dividends,
