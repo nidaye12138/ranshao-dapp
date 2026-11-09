@@ -1,0 +1,21 @@
+{
+  "network": "bsc-testnet",
+  "chainId": 97,
+  "status": "pending_redeploy_um_plan",
+  "note": "Previous MVP addresses obsolete after UM-plan rewrite. Re-run DeployBscTestnet.s.sol.",
+  "deployer": null,
+  "RanshaoToken": null,
+  "USDT": null,
+  "SPCXB": null,
+  "ReferralTree": null,
+  "Treasury": null,
+  "MockPriceOracle": null,
+  "SwapFacade": null,
+  "BurnRouter": null,
+  "LayerRewards": null,
+  "PrecipitationPool": null,
+  "DividendPools": null,
+  "ShareholderPool": null,
+  "EliteStake": null,
+  "BrokerMarket": null
+}

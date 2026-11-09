@@ -1,0 +1,119 @@
+# Fill contract addresses via `npm run prepare:manifest` (reads networks.json / env).
+# Placeholders below are zero addresses — do not deploy until replaced.
+specVersion: 1.0.0
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: ReferralTree
+    network: chapel # override: bsc | chapel
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: ReferralTree
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Account
+        - ReferralBind
+        - ProtocolStats
+      abis:
+        - name: ReferralTree
+          file: ./abis/ReferralTree.json
+      eventHandlers:
+        - event: ReferrerBound(indexed address,indexed address)
+          handler: handleReferrerBound
+      file: ./src/mappings/referral.ts
+
+  - kind: ethereum
+    name: SwapFacade
+    network: chapel
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: SwapFacade
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Account
+        - SwapReward
+      abis:
+        - name: SwapFacade
+          file: ./abis/SwapFacade.json
+      eventHandlers:
+        - event: Bought(indexed address,indexed address,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleBought
+        - event: Sold(indexed address,indexed address,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleSold
+      file: ./src/mappings/swap.ts
+
+  - kind: ethereum
+    name: BurnRouter
+    network: chapel
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: BurnRouter
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Account
+        - Burn
+        - ProtocolStats
+      abis:
+        - name: BurnRouter
+          file: ./abis/BurnRouter.json
+      eventHandlers:
+        - event: Burned(indexed address,uint256,uint256,uint256,uint256,uint256,uint256,uint8)
+          handler: handleBurned
+      file: ./src/mappings/burn.ts
+
+  - kind: ethereum
+    name: LayerRewards
+    network: chapel
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: LayerRewards
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Account
+        - LayerReward
+      abis:
+        - name: LayerRewards
+          file: ./abis/LayerRewards.json
+      eventHandlers:
+        - event: LayerPaid(indexed address,indexed address,indexed uint8,uint256)
+          handler: handleLayerPaid
+      file: ./src/mappings/layer.ts
+
+  - kind: ethereum
+    name: DividendPools
+    network: chapel
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: DividendPools
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Account
+        - DividendClaim
+      abis:
+        - name: DividendPools
+          file: ./abis/DividendPools.json
+      eventHandlers:
+        - event: Claimed(indexed address,uint256,uint256)
+          handler: handleClaimed
+      file: ./src/mappings/dividend.ts
