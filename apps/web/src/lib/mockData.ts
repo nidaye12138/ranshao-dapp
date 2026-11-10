@@ -11,7 +11,7 @@ export const announcements = [
 ];
 
 export const banners = [
-  { id: "b1", title: "Umidor", subtitle: "买入 · 燃烧 · 四档分红", tone: "teal" as const },
+  { id: "b1", title: "Umidor", subtitle: "买入 · 权重销毁 · 四档分红", tone: "teal" as const },
 ];
 
 export const tokenIntro =
@@ -19,7 +19,7 @@ export const tokenIntro =
 
 export const dappRules = [
   "Swap：买/卖均即时 0.5% 自返 + 0.5% 直推；无累计买入业绩级别。",
-  "燃烧档位：100 / 500 / 800 / 1500 U；九层明细：直推 / 间推 / 市场3…市场9。",
+  "权重销毁档位：100 / 500 / 800 / 1500 U；九层明细：直推 / 间推 / 市场3…市场9。",
   "分红：每地址每 24h 可领一次（链上冷却）。",
-  "推广资格：燃烧任意档（≥100U）后解锁邀请链接。",
+  "推广资格：在「权重」燃烧任意档（≥100U）后解锁邀请链接。",
 ];

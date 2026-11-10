@@ -15,12 +15,14 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
 
 type Mode = "buy" | "sell";
 
+const SLIP_PRESETS = [0.5, 1, 2];
+
 export default function SwapPage() {
   const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("100");
-  const [slippage, setSlippage] = useState("1");
+  const [slippage, setSlippage] = useState(1);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -88,8 +90,7 @@ export default function SwapPage() {
   }
 
   function fmtRaw(v: bigint) {
-    const s = (Number(v) / 1e18).toString();
-    return s;
+    return (Number(v) / 1e18).toString();
   }
 
   async function onApprove() {
@@ -121,85 +122,123 @@ export default function SwapPage() {
 
   return (
     <section className="panel">
-      <h1>Swap</h1>
-      <p className="muted">买/卖即时 0.5% 自返 + 0.5% 直推（支付币种）。无买入业绩级别。</p>
-
-      <div className="row gap">
-        <button type="button" className={mode === "buy" ? "btn primary" : "btn"} onClick={() => setMode("buy")}>
-          Buy
+      <div className="seg" role="tablist" aria-label="买卖切换">
+        <button
+          type="button"
+          className={mode === "buy" ? "seg-btn on-buy" : "seg-btn"}
+          onClick={() => setMode("buy")}
+        >
+          买入
         </button>
-        <button type="button" className={mode === "sell" ? "btn primary" : "btn"} onClick={() => setMode("sell")}>
-          Sell
+        <button
+          type="button"
+          className={mode === "sell" ? "seg-btn on-sell" : "seg-btn"}
+          onClick={() => setMode("sell")}
+        >
+          卖出
         </button>
       </div>
 
-      <label className="field">
-        <span>{mode === "buy" ? "支付 USDT" : "卖出 UMplan"}</span>
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
-      </label>
-
-      <div className="pct-row">
-        {[25, 50, 75, 100].map((p) => (
-          <button key={p} type="button" className="btn ghost" onClick={() => setPct(p)} disabled={!bal}>
-            {p === 100 ? "Max" : `${p}%`}
-          </button>
-        ))}
-      </div>
-
-      <label className="field">
-        <span>滑点容忍 (%)</span>
-        <input value={slippage} onChange={(e) => setSlippage(e.target.value)} inputMode="decimal" />
-      </label>
-      <p className="muted">报价为预言机固定价 MVP；滑点字段预留校验，上线池化后再强制。</p>
-
-      <dl className="stats">
-        <div>
-          <dt>{mode === "buy" ? "预估到账" : "预估 USDT"}</dt>
-          <dd>{outAmount != null ? fmtToken(outAmount) : "—"}</dd>
+      <div className="card">
+        <div className="input-box">
+          <div className="ib-label">{mode === "buy" ? "支付 USDT" : "卖出 UMplan"}</div>
+          <div className="input-row">
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00" />
+            <div className="token-chip">
+              <i className={`tc-dot ${mode === "buy" ? "tc-usdt" : "tc-um"}`} />
+              {mode === "buy" ? "USDT" : "UMplan"}
+            </div>
+          </div>
         </div>
-        <div>
-          <dt>折合 USD</dt>
-          <dd>{usdAmount != null ? fmtToken(usdAmount) : "—"}</dd>
-        </div>
-        <div>
-          <dt>自返 0.5%</dt>
-          <dd>
-            {fmtToken(selfReward)} {mode === "buy" ? "USDT" : "USDT"}
-          </dd>
-        </div>
-      </dl>
 
-      <div className="rules-box">
-        <p>即时奖励：买方/卖方 0.5% + 直推上级 0.5% 到钱包；无推荐人则直推份额入 Treasury。</p>
-        <p>不做累计买入业绩 / 里程碑。</p>
-      </div>
-
-      {!mounted ? (
-        <p className="muted">加载中…</p>
-      ) : !isConnected ? (
-        <p className="banner warn">请先连接钱包</p>
-      ) : !isConfigured ? (
-        <p className="banner warn">合约地址未配置</p>
-      ) : (
-        <div className="cta-row">
-          {needApprove && (
-            <button type="button" className="btn" disabled={isPending || confirming} onClick={onApprove}>
-              授权
+        <div className="chips">
+          {[25, 50, 75, 100].map((p) => (
+            <button key={p} type="button" className="chip" onClick={() => setPct(p)} disabled={!bal}>
+              {p === 100 ? "最大" : `${p}%`}
             </button>
-          )}
-          <button
-            type="button"
-            className="btn primary"
-            disabled={isPending || confirming || needApprove || parsed === 0n}
-            onClick={onSwap}
-          >
-            {isPending || confirming ? "确认中…" : mode === "buy" ? "买入" : "卖出"}
-          </button>
+          ))}
         </div>
-      )}
 
-      {isSuccess && <p className="banner ok">交易已确认</p>}
-      {error && <p className="banner warn">{error.message}</p>}
+        <div className="result-box">
+          <span>可得 {mode === "buy" ? "UMplan" : "USDT"}</span>
+          <span className="rb-value">{outAmount != null ? fmtToken(outAmount) : "0.00"}</span>
+        </div>
+
+        <div className="slip-row">
+          <span>滑点</span>
+          <span>
+            {SLIP_PRESETS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={slippage === s ? "preset on" : "preset"}
+                onClick={() => setSlippage(s)}
+              >
+                {s}%
+              </button>
+            ))}
+          </span>
+        </div>
+
+        <div className="info-strip">
+          <span>
+            {mode === "buy" ? "买入" : "卖出"}瞬间，你与直推上级各获得成交额{" "}
+            <b style={{ color: "var(--theme-color)" }}>0.5%</b> 的奖励，立刻到账钱包。无累计买入业绩 / 级别。
+          </span>
+        </div>
+
+        {!mounted ? (
+          <p className="muted">加载中…</p>
+        ) : !isConnected ? (
+          <p className="banner warn">请先连接钱包</p>
+        ) : !isConfigured ? (
+          <p className="banner warn">合约地址未配置</p>
+        ) : (
+          <div className="cta-row">
+            {needApprove && (
+              <button type="button" className="btn" disabled={isPending || confirming} onClick={onApprove}>
+                授权
+              </button>
+            )}
+            <button
+              type="button"
+              className={mode === "sell" ? "btn primary sell" : "btn primary"}
+              style={{ flex: 1 }}
+              disabled={isPending || confirming || needApprove || parsed === 0n}
+              onClick={onSwap}
+            >
+              {isPending || confirming ? "确认中…" : mode === "buy" ? "确认买入" : "确认卖出"}
+            </button>
+          </div>
+        )}
+
+        <dl className="stats" style={{ marginTop: "1rem" }}>
+          <div>
+            <dt>折合 USD</dt>
+            <dd>{usdAmount != null ? fmtToken(usdAmount) : "—"}</dd>
+          </div>
+          <div>
+            <dt>自返 0.5%</dt>
+            <dd>{fmtToken(selfReward)} USDT</dd>
+          </div>
+        </dl>
+
+        {isSuccess && <p className="banner ok">交易已确认</p>}
+        {error && <p className="banner warn">{error.message}</p>}
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">即时奖励说明</h2>
+        <div className="doc-text">
+          <p>
+            <b>仅即时奖：</b>买/卖 → 交易方 0.5% + 直推上级 0.5%（支付币种）到钱包。
+          </p>
+          <p>
+            <b>不做</b>累计买入业绩、级别或里程碑奖励。
+          </p>
+          <p>滑点字段预留校验（当前 {slippage}%）；报价为预言机固定价 MVP。</p>
+        </div>
+      </div>
     </section>
   );
 }
