@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from "wagmi";
-import { bsc, bscTestnet, hardhat } from "wagmi/chains";
+import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 
@@ -15,7 +15,8 @@ export function Header() {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  const chainOk = chainId === bsc.id || chainId === bscTestnet.id || chainId === hardhat.id;
+  const chainOk = chainId === appChainId;
+  const switchLabel = appChainId === 97 ? "切换 Chapel" : appChainId === 56 ? "切换 BSC" : "切换网络";
 
   return (
     <header className="site-header site-header-compact">
@@ -34,8 +35,12 @@ export function Header() {
         ) : (
           <>
             {isConnected && !chainOk && (
-              <button type="button" className="btn wallet-pill" onClick={() => switchChain({ chainId: bsc.id })}>
-                切换 BSC
+              <button
+                type="button"
+                className="btn wallet-pill"
+                onClick={() => switchChain({ chainId: appChainId })}
+              >
+                {switchLabel}
               </button>
             )}
             {isConnected ? (

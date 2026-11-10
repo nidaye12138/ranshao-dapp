@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { isAddress, zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
+import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { banners as fallbackBanners, dappRules as fallbackRules, tokenIntro as fallbackIntro } from "@/lib/mockData";
@@ -33,7 +34,7 @@ function HomeInner() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const [refInput, setRefInput] = useState("");
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
   const { data: cms } = useAnnouncements();
   const { data: board } = useLeaderboard();
@@ -80,6 +81,7 @@ function HomeInner() {
     abi: TreeAbi,
     functionName: "referrerOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled },
   });
 
@@ -198,6 +200,7 @@ function HomeInner() {
                   abi: TreeAbi,
                   functionName: "bindReferrer",
                   args: [refInput as `0x${string}`],
+                  chainId: appChainId,
                 })
               }
             >

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
+import { appChainId } from "@/lib/chain";
 import { fmtToken, shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useTeam } from "@/lib/api/client";
@@ -26,6 +27,7 @@ export default function MinePage() {
 
   const { data: bnbBal } = useBalance({
     address,
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -34,6 +36,7 @@ export default function MinePage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
   const { data: usdt } = useReadContract({
@@ -41,6 +44,7 @@ export default function MinePage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
   const { data: spcxb } = useReadContract({
@@ -48,6 +52,7 @@ export default function MinePage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -56,6 +61,7 @@ export default function MinePage() {
     abi: DivAbi,
     functionName: "isActivated",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -64,6 +70,7 @@ export default function MinePage() {
     abi: TreeAbi,
     functionName: "directRefCount",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
 

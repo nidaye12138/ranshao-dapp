@@ -8,6 +8,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
+import { appChainId } from "@/lib/chain";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
@@ -24,7 +25,7 @@ export default function SwapPage() {
   const [amount, setAmount] = useState("100");
   const [slippage, setSlippage] = useState(1);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
   const parsed = useMemo(() => {
     try {
@@ -39,6 +40,7 @@ export default function SwapPage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: mounted && !!address && isConfigured },
   });
 
@@ -47,6 +49,7 @@ export default function SwapPage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: mounted && !!address && isConfigured },
   });
 
@@ -55,6 +58,7 @@ export default function SwapPage() {
     abi: SwapAbi,
     functionName: "quoteUsdt",
     args: [parsed],
+    chainId: appChainId,
     query: { enabled: isConfigured && mode === "buy" && parsed > 0n },
   });
 
@@ -63,6 +67,7 @@ export default function SwapPage() {
     abi: SwapAbi,
     functionName: "quoteSellUsdt",
     args: [parsed],
+    chainId: appChainId,
     query: { enabled: isConfigured && mode === "sell" && parsed > 0n },
   });
 
@@ -72,6 +77,7 @@ export default function SwapPage() {
     abi: ERC20Abi,
     functionName: "allowance",
     args: [address!, addresses.swap],
+    chainId: appChainId,
     query: { enabled: mounted && !!address && isConfigured },
   });
 
@@ -99,6 +105,7 @@ export default function SwapPage() {
       abi: ERC20Abi,
       functionName: "approve",
       args: [addresses.swap, parsed],
+      chainId: appChainId,
     });
   }
 
@@ -109,6 +116,7 @@ export default function SwapPage() {
         abi: SwapAbi,
         functionName: "buyWithUSDT",
         args: [parsed],
+        chainId: appChainId,
       });
     } else {
       writeContract({
@@ -116,6 +124,7 @@ export default function SwapPage() {
         abi: SwapAbi,
         functionName: "sellForUSDT",
         args: [parsed],
+        chainId: appChainId,
       });
     }
   }
