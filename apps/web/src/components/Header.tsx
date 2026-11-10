@@ -19,7 +19,7 @@ export function Header() {
 
   return (
     <header className="site-header site-header-compact">
-      <Link href="/" className="brand-lockup" aria-label="Umidor 首页">
+      <Link href="/" className="brand-lockup" aria-label="Umidor 首页" data-testid="brand-umidor">
         <Image src="/umidor-logo.png" alt="Umidor" width={40} height={38} className="brand-mark" priority />
         <span className="brand-text">
           <span className="brand">Umidor</span>
@@ -28,24 +28,24 @@ export function Header() {
       </Link>
       <div className="wallet">
         {!mounted ? (
-          <button type="button" className="btn primary" disabled>
+          <button type="button" className="btn wallet-pill" disabled>
             连接钱包
           </button>
         ) : (
           <>
             {isConnected && !chainOk && (
-              <button type="button" className="btn ghost" onClick={() => switchChain({ chainId: bsc.id })}>
+              <button type="button" className="btn wallet-pill" onClick={() => switchChain({ chainId: bsc.id })}>
                 切换 BSC
               </button>
             )}
             {isConnected ? (
-              <button type="button" className="btn ghost" onClick={() => disconnect()}>
+              <button type="button" className="btn wallet-pill" onClick={() => disconnect()}>
                 {shortAddr(address)}
               </button>
             ) : (
               <button
                 type="button"
-                className="btn primary"
+                className="btn wallet-pill"
                 disabled={isPending || !connectors[0]}
                 onClick={() => connect({ connector: connectors[0] })}
               >

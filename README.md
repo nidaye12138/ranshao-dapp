@@ -34,6 +34,17 @@ docs/TOKEN.md       External UMplan / FoT notes
 
 MVP 对 §9 开放问题的默认值见 `DEPLOY.md` 与 `contracts/src/Constants.sol`。
 
+## 全场景测试（合约 + 前端）
+
+```bash
+# Foundry multi-actor + Playwright 4-tab UI（CI 安全，无需钱包签名）
+npm run test:full-scenario
+# 或
+make test
+```
+
+说明与覆盖/缺口见 Project store：`docs/full-scenario-tests.md`。可选 Chapel 只读 smoke：`BSC_TESTNET_RPC_URL` + `PRIVATE_KEY` 时由脚本自动尝试。
+
 ## 合约
 
 ```bash

@@ -1,0 +1,38 @@
+{
+  "source": "graph",
+  "address": "0x1111111111111111111111111111111111111111",
+  "swapPromoTotal": "12.5 USDT",
+  "swapPromoRows": [
+    {
+      "id": "swap-1",
+      "label": "直推",
+      "amount": "5 USDT",
+      "at": "2026-11-09 12:00"
+    }
+  ],
+  "layerTotal": {
+    "直推": "40 UMplan",
+    "间推": "20 UMplan",
+    "市场": "140 UMplan"
+  },
+  "layerRows": [
+    { "id": "l1", "layer": 1, "label": "直推", "amount": "40 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l2", "layer": 2, "label": "间推", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l3", "layer": 3, "label": "市场3", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l4", "layer": 4, "label": "市场4", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l5", "layer": 5, "label": "市场5", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l6", "layer": 6, "label": "市场6", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l7", "layer": 7, "label": "市场7", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l8", "layer": 8, "label": "市场8", "amount": "20 UMplan", "at": "2026-11-09 12:01" },
+    { "id": "l9", "layer": 9, "label": "市场9", "amount": "20 UMplan", "at": "2026-11-09 12:01" }
+  ],
+  "dividendTotal": "1.667 SPCXB",
+  "dividendRows": [
+    {
+      "id": "div-1",
+      "label": "分红领取",
+      "amount": "1.667 SPCXB",
+      "at": "2026-11-09 18:00"
+    }
+  ]
+}

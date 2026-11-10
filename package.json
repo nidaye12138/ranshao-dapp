@@ -3,6 +3,9 @@
   "private": true,
   "scripts": {
     "test:contracts": "cd contracts && forge test",
+    "test:contracts:scenario": "cd contracts && forge test --match-contract FullScenario",
+    "test:e2e": "npm --prefix apps/web run test:e2e",
+    "test:full-scenario": "bash scripts/run-full-scenario.sh",
     "build:contracts": "cd contracts && forge build",
     "dev:web": "npm --prefix apps/web run dev",
     "build:web": "npm --prefix apps/web run build"
