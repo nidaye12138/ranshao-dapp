@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, formatUnits } from "viem";
-import { bsc, bscTestnet } from "viem/chains";
 import { addresses, isConfigured } from "@/lib/addresses";
+import { appChain, appRpcUrl } from "@/lib/chain";
 import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
 import type { StatsResponse } from "@/lib/api/types";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
@@ -17,10 +17,6 @@ const STATS_QUERY = `
     }
   }
 `;
-
-function rpcUrl(): string | undefined {
-  return process.env.NEXT_PUBLIC_BSC_RPC_URL || process.env.NEXT_PUBLIC_BSC_TESTNET_RPC_URL;
-}
 
 export async function GET() {
   let source: StatsResponse["source"] = "unconfigured";
@@ -40,13 +36,11 @@ export async function GET() {
   }
 
   // Prefer live chain reads when modules are configured (burn totals + 1 USDT quote stub).
-  if (isConfigured && rpcUrl()) {
+  if (isConfigured && appRpcUrl) {
     try {
-      const chain =
-        process.env.NEXT_PUBLIC_BSC_RPC_URL && !process.env.FORCE_TESTNET ? bsc : bscTestnet;
       const client = createPublicClient({
-        chain,
-        transport: http(rpcUrl()),
+        chain: appChain,
+        transport: http(appRpcUrl),
       });
 
       const [burnedTok, burnedUsd, quote] = await Promise.all([

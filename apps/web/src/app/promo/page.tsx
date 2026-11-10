@@ -9,6 +9,7 @@ import {
 } from "wagmi";
 import { formatUnits } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
+import { appChainId } from "@/lib/chain";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
@@ -29,7 +30,7 @@ export default function PromoPage() {
   const [selectedTier, setSelectedTier] = useState<number | null>(100);
   const [nowSec, setNowSec] = useState(0);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
   useEffect(() => {
     setNowSec(Math.floor(Date.now() / 1000));
@@ -52,6 +53,7 @@ export default function PromoPage() {
     abi: BurnAbi,
     functionName: "quoteBurnUsd",
     args: [parsed],
+    chainId: appChainId,
     query: { enabled: enabled && parsed > 0n },
   });
 
@@ -60,6 +62,7 @@ export default function PromoPage() {
     abi: BurnAbi,
     functionName: "quoteBurnUsd",
     args: [10n ** 18n],
+    chainId: appChainId,
     query: { enabled: isConfigured },
   });
 
@@ -68,6 +71,7 @@ export default function PromoPage() {
     abi: DivAbi,
     functionName: "tierOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled },
   });
 
@@ -76,6 +80,7 @@ export default function PromoPage() {
     abi: DivAbi,
     functionName: "claimable",
     args: [address!],
+    chainId: appChainId,
     query: { enabled },
   });
 
@@ -84,6 +89,7 @@ export default function PromoPage() {
     abi: DivAbi,
     functionName: "canClaim",
     args: [address!],
+    chainId: appChainId,
     query: { enabled },
   });
 
@@ -92,6 +98,7 @@ export default function PromoPage() {
     abi: DivAbi,
     functionName: "nextClaimAt",
     args: [address!],
+    chainId: appChainId,
     query: { enabled },
   });
 
@@ -100,6 +107,7 @@ export default function PromoPage() {
     abi: ERC20Abi,
     functionName: "allowance",
     args: [address!, addresses.burn],
+    chainId: appChainId,
     query: { enabled },
   });
 
@@ -233,10 +241,11 @@ export default function PromoPage() {
                     abi: ERC20Abi,
                     functionName: "approve",
                     args: [addresses.burn, parsed],
+                    chainId: appChainId,
                   })
                 }
               >
-                授权
+                {isPending || confirming ? "确认中…" : "授权"}
               </button>
             )}
             <button
@@ -250,6 +259,7 @@ export default function PromoPage() {
                   abi: BurnAbi,
                   functionName: "burn",
                   args: [parsed],
+                  chainId: appChainId,
                 })
               }
             >
@@ -325,6 +335,7 @@ export default function PromoPage() {
               address: addresses.dividends,
               abi: DivAbi,
               functionName: "claim",
+              chainId: appChainId,
             })
           }
         >
