@@ -122,11 +122,12 @@ export default function SwapPage() {
 
   return (
     <section className="panel">
-      <div className="seg" role="tablist" aria-label="买卖切换">
+      <div className="seg" role="tablist" aria-label="买卖切换" data-testid="swap-mode">
         <button
           type="button"
           className={mode === "buy" ? "seg-btn on-buy" : "seg-btn"}
           onClick={() => setMode("buy")}
+          data-testid="swap-buy"
         >
           买入
         </button>
@@ -134,6 +135,7 @@ export default function SwapPage() {
           type="button"
           className={mode === "sell" ? "seg-btn on-sell" : "seg-btn"}
           onClick={() => setMode("sell")}
+          data-testid="swap-sell"
         >
           卖出
         </button>

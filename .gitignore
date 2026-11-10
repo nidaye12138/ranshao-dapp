@@ -13,5 +13,7 @@ contracts/broadcast/
 contracts/lib/
 apps/web/.next/
 apps/web/node_modules/
-apps/web/node_modules/
-apps/web/.next/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/blob-report/
+apps/web/playwright/.cache/

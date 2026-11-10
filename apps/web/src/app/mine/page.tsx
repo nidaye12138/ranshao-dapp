@@ -185,22 +185,26 @@ export default function MinePage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" data-testid="promo-qualify">
         <h2 className="card-title">推广资格</h2>
         {!mounted ? (
           <p className="muted">…</p>
         ) : activated ? (
           <>
-            <div className="qual-on">已激活（燃烧任意档 · 金本位 ≥100U）— 可生成专属邀请链接</div>
+            <div className="qual-on" data-testid="promo-link-unlocked">
+              已激活（燃烧任意档 · 金本位 ≥100U）— 可生成专属邀请链接
+            </div>
             <div className="link-row">
-              <div className="link-box">{inviteDisplay}</div>
+              <div className="link-box" data-testid="invite-link">
+                {inviteDisplay}
+              </div>
               <button type="button" className="btn primary" onClick={copyInvite}>
                 {copied ? "已复制" : "复制"}
               </button>
             </div>
           </>
         ) : (
-          <div className="qual-off">
+          <div className="qual-off" data-testid="promo-link-locked">
             请先在「权重」燃烧任意档（最低 100U）以解锁邀请链接。激活门槛是燃烧入场，不是累计买入。
           </div>
         )}
@@ -220,11 +224,12 @@ export default function MinePage() {
                 ? "加载中…"
                 : ""}
         </p>
-        <div className="filters">
+        <div className="filters" data-testid="earnings-filters">
           <button
             type="button"
             className={incomeTab === "swap" ? "filter-btn on" : "filter-btn"}
             onClick={() => setIncomeTab("swap")}
+            data-testid="earnings-filter-swap"
           >
             Swap 推广
           </button>
@@ -232,6 +237,7 @@ export default function MinePage() {
             type="button"
             className={incomeTab === "layer" ? "filter-btn on" : "filter-btn"}
             onClick={() => setIncomeTab("layer")}
+            data-testid="earnings-filter-layer"
           >
             层奖励
           </button>
@@ -239,6 +245,7 @@ export default function MinePage() {
             type="button"
             className={incomeTab === "div" ? "filter-btn on" : "filter-btn"}
             onClick={() => setIncomeTab("div")}
+            data-testid="earnings-filter-div"
           >
             分红
           </button>

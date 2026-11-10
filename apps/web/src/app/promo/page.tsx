@@ -141,13 +141,14 @@ export default function PromoPage() {
           <div className="bh-sub">选择档位燃烧 UMplan（金本位 U），按合约比例销毁与分配</div>
         </div>
 
-        <div className="presets">
+        <div className="presets" data-testid="burn-tiers">
           {TIERS.map((t) => (
             <button
               key={t.u}
               type="button"
               className={selectedTier === t.u ? "preset-btn on" : "preset-btn"}
               onClick={() => pickTier(t.u)}
+              data-testid={`burn-tier-${t.u}`}
             >
               {t.label}
               <small>{t.sub}</small>

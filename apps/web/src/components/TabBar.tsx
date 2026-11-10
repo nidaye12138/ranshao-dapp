@@ -13,12 +13,14 @@ const tabs = [
 export function TabBar() {
   const pathname = usePathname();
   return (
-    <nav className="tab-bar" aria-label="主导航">
+    <nav className="tab-bar" aria-label="主导航" data-testid="tab-bar">
       {tabs.map((t) => {
         const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
         const cls = [active ? "tab active" : "tab", t.weight ? "tab-weight" : ""].filter(Boolean).join(" ");
+        const testId =
+          t.href === "/" ? "tab-home" : t.href === "/swap" ? "tab-swap" : t.href === "/promo" ? "tab-weight" : "tab-mine";
         return (
-          <Link key={t.href} href={t.href} className={cls}>
+          <Link key={t.href} href={t.href} className={cls} data-testid={testId}>
             <span className="tab-icon" aria-hidden>
               {t.icon}
             </span>

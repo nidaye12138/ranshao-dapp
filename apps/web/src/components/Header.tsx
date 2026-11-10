@@ -19,7 +19,7 @@ export function Header() {
 
   return (
     <header className="site-header site-header-compact">
-      <Link href="/" className="brand-lockup" aria-label="Umidor 首页">
+      <Link href="/" className="brand-lockup" aria-label="Umidor 首页" data-testid="brand-umidor">
         <Image src="/umidor-logo.png" alt="Umidor" width={40} height={38} className="brand-mark" priority />
         <span className="brand-text">
           <span className="brand">Umidor</span>
