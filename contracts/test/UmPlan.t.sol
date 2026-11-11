@@ -186,7 +186,7 @@ contract UmPlanTest is Test {
         assertEq(admin.balance, adminBefore + 0.005 ether);
     }
 
-    // ---------- Burn 70/20/10 + layers + tiers ----------
+    // ---------- Burn 50/40/10 + layers + tiers ----------
 
     function _bindChain() internal {
         // admin <- alice <- bob <- carol (3 layers above carol for bob's burn from carol...)
@@ -216,19 +216,19 @@ contract UmPlanTest is Test {
         burnRouter.burn(amount);
         vm.stopPrank();
 
-        // 70% dead
-        assertEq(token.balanceOf(DEAD), 7_000e18);
-        // L1 (carol) 400 bps of B = 400
-        assertEq(token.balanceOf(carol), 1_000_000e18 + 400e18);
-        // L2 (bob) 200
-        assertEq(token.balanceOf(bob), bobBefore + 200e18);
-        // L3 (alice) 200
-        assertEq(token.balanceOf(alice), aliceBefore + 200e18);
-        // L4 (admin) 200
-        assertEq(token.balanceOf(admin), adminTokBefore + 200e18);
-        // L5-L9 missing → precip (5 * 200 = 1000)
-        assertEq(token.balanceOf(address(precip)), 1_000e18);
-        assertEq(precip.totalDeposited(), 1_000e18);
+        // 50% dead (owner 20/10/10 expands layer bucket to 40%)
+        assertEq(token.balanceOf(DEAD), 5_000e18);
+        // L1 直推 (carol) 2000 bps of B = 2000
+        assertEq(token.balanceOf(carol), 1_000_000e18 + 2_000e18);
+        // L2 间推 (bob) 1000
+        assertEq(token.balanceOf(bob), bobBefore + 1_000e18);
+        // L3 市场3 (alice) 143
+        assertEq(token.balanceOf(alice), aliceBefore + 143e18);
+        // L4 市场4 (admin) 143
+        assertEq(token.balanceOf(admin), adminTokBefore + 143e18);
+        // L5–L9 missing → precip (143×4 + 142 = 714)
+        assertEq(token.balanceOf(address(precip)), 714e18);
+        assertEq(precip.totalDeposited(), 714e18);
 
         // 10% shareholders → admin claimable
         assertEq(shareholders.claimable(admin), 1_000e18);
@@ -372,8 +372,8 @@ contract UmPlanTest is Test {
         vm.stopPrank();
         assertEq(dividends.tierOf(eve), 4);
 
-        // L2-L9 missing = 8 * 200 bps of 1500 = 8 * 30 = 240
-        uint256 expectedPrecip = (1_500e18 * 200 * 8) / 10_000;
+        // L2–L9 missing = 1000 + 143×6 + 142 = 2000 bps of 1500 = 300
+        uint256 expectedPrecip = (1_500e18 * 2_000) / 10_000;
         assertEq(precip.totalDeposited(), expectedPrecip);
 
         uint256 cap5 = (expectedPrecip * 500) / 10_000;
@@ -525,11 +525,20 @@ contract UmPlanTest is Test {
     }
 
     function test_constants_locked() public {
-        assertEq(Constants.BURN_BPS, 7000);
-        assertEq(Constants.LAYER_BPS, 2000);
+        assertEq(Constants.BURN_BPS, 5000);
+        assertEq(Constants.LAYER_BPS, 4000);
         assertEq(Constants.SHAREHOLDER_BPS, 1000);
-        assertEq(Constants.layerBps(0), 400);
-        assertEq(Constants.layerBps(1), 200);
+        assertEq(Constants.layerBps(0), 2000);
+        assertEq(Constants.layerBps(1), 1000);
+        assertEq(Constants.layerBps(2), 143);
+        assertEq(Constants.layerBps(8), 142);
+        uint256 layerSum;
+        for (uint256 i = 0; i < 9; i++) layerSum += Constants.layerBps(i);
+        assertEq(layerSum, Constants.LAYER_BPS);
+        assertEq(
+            uint256(Constants.BURN_BPS) + Constants.LAYER_BPS + Constants.SHAREHOLDER_BPS,
+            Constants.BPS_DENOM
+        );
         assertEq(Constants.poolWeightBps(1), 3333);
         assertEq(Constants.poolWeightBps(2), 2500);
         assertEq(Constants.poolWeightBps(3), 2500);

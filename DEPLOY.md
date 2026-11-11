@@ -13,8 +13,8 @@ Product brand: **Umidor**. Authority: Project store `docs/dapp-design.md` + `doc
 ## Locked economic params
 
 - Swap: buyer **0.5%** + direct referrer **0.5%** (payment token); no-referrer → Treasury
-- Burn split: **70%** dead / **20%** 9-layer / **10%** shareholders
-- Layer bps of B: L1 **400**, L2–L9 **200** each
+- Burn split: **50%** dead / **40%** 9-layer / **10%** shareholders (owner 2026-11-11: 直推20+间推10+市场10 of weight amount expands prior 20% bucket; was 70/20/10)
+- Layer bps of B: L1 **2000** (直推 20%), L2 **1000** (间推 10%), L3–L8 **143**, L9 **142** (市场合计 10%)
 - Tiers (U): **100 / 500 / 800 / 1500**; pool weights bps **[3333, 2500, 2500, 1667]**
 - Shareholder seats cap: **453**
 - Deprecated as primary path: 15d/30d stake yield, buy/stake milestones
@@ -92,7 +92,7 @@ Addresses → [`deployments/bsc-testnet.json`](deployments/bsc-testnet.json).
 | Treasury | Proceeds / module registry |
 | MockPriceOracle | BNB/USD + token/USD |
 | SwapFacade | Buy + 0.5%/0.5% |
-| BurnRouter | 70/20/10 + tier update |
+| BurnRouter | 50/40/10 + tier update |
 | LayerRewards | 9-layer + missing → precip |
 | PrecipitationPool | 5% to T4 / 95% admin |
 | DividendPools | 4 SPCXB pools |

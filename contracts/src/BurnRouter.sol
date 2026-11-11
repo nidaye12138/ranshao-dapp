@@ -12,9 +12,9 @@ import {IShareholderPool} from "./interfaces/IShareholderPool.sol";
 import {IDividendPools} from "./interfaces/IDividendPools.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Burn entry — gold-peg U tiering + 70/20/10 split.
+/// @title Burn entry — gold-peg U tiering + Constants burn/layer/shareholder split (50/40/10).
 /// @dev Tier / activate / 1500U stake unlock only via `burnTier` (preset buttons).
-///      Free-amount `burn` still splits 70/20/10 but does NOT grant tier benefits.
+///      Free-amount `burn` still splits per Constants but does NOT grant tier benefits.
 contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -118,7 +118,7 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         return (targetUsd * 1e18 + price - 1) / price;
     }
 
-    /// @notice Free-amount burn: 70/20/10 split only. Does NOT grant tier / activate / stake unlock.
+    /// @notice Free-amount burn: Constants split only. Does NOT grant tier / activate / stake unlock.
     function burn(uint256 amount) external nonReentrant whenNotPaused {
         _burnAmount(msg.sender, amount, 0);
     }
