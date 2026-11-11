@@ -65,7 +65,12 @@ forge script script/DeployBscTestnet.s.sol:DeployBscTestnet \
   --broadcast --slow -vvvv
 ```
 
-Or: `../scripts/deploy-bsc-testnet.sh`
+Or from any cwd (script resolves repo root, then `cd contracts` and runs `forge script …`):
+
+```bash
+./scripts/deploy-bsc-testnet.sh
+# also ok: cd scripts && ./deploy-bsc-testnet.sh
+```
 
 Addresses → [`deployments/bsc-testnet.json`](deployments/bsc-testnet.json).
 
