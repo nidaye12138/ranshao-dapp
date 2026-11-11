@@ -12,6 +12,7 @@ cd "$ROOT/contracts"
 
 RPC_URL="${BSC_TESTNET_RPC_URL:-https://bsc-testnet-rpc.publicnode.com}"
 CHAIN_ID=97
+SCRIPT_PATH="script/DeployBscTestnet.s.sol:DeployBscTestnet"
 
 need() {
   if [[ -z "${!1:-}" ]]; then
@@ -33,6 +34,7 @@ fi
 DEPLOYER="$(cast wallet address --private-key "$PRIVATE_KEY")"
 BAL="$(cast balance "$DEPLOYER" --rpc-url "$RPC_URL")"
 echo "Repo root: $ROOT"
+echo "Cwd:       $(pwd)"
 echo "Deployer:  $DEPLOYER"
 echo "Balance:   $BAL wei on $RPC_URL"
 if [[ "$BAL" == "0" ]]; then
@@ -42,22 +44,27 @@ fi
 
 mkdir -p "$ROOT/deployments"
 
-echo "Running forge script DeployBscTestnet..."
-# Explicit `script` subcommand — `forge path/to.s.sol:...` is NOT valid and yields
-# "unrecognized subcommand 'script/...'". Path is relative to contracts/ (cwd).
-ARGS=(
+# IMPORTANT: the first arg after `forge` MUST be the subcommand `script`.
+# `forge "$SCRIPT_PATH" ...` is invalid → unrecognized subcommand 'script/...'.
+CMD=(
+  forge
   script
-  script/DeployBscTestnet.s.sol:DeployBscTestnet
+  "$SCRIPT_PATH"
   --rpc-url "$RPC_URL"
   --broadcast
   --slow
   -vvvv
 )
 if [[ -n "${BSCSCAN_API_KEY:-}" ]]; then
-  ARGS+=(--verify --etherscan-api-key "$BSCSCAN_API_KEY" --chain-id "$CHAIN_ID")
+  CMD+=(--verify --etherscan-api-key "$BSCSCAN_API_KEY" --chain-id "$CHAIN_ID")
 fi
 
-forge "${ARGS[@]}"
+# Print exact argv before exec (shell-quoted) so mis-invocation is obvious in logs.
+printf '+ '
+printf '%q ' "${CMD[@]}"
+printf '\n'
+
+"${CMD[@]}"
 
 if [[ -f "$ROOT/deployments/bsc-testnet.json" ]]; then
   echo "Addresses written to deployments/bsc-testnet.json"
