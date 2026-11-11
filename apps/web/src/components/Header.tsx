@@ -24,7 +24,7 @@ export function Header() {
         <Image src="/umidor-logo.png" alt="Umidor" width={40} height={38} className="brand-mark" priority />
         <span className="brand-text">
           <span className="brand">Umidor</span>
-          <span className="brand-sub">UM plan</span>
+          <span className="brand-sub">UMplan</span>
         </span>
       </Link>
       <div className="wallet">

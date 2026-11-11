@@ -13,6 +13,8 @@ import {IDividendPools} from "./interfaces/IDividendPools.sol";
 import {Constants} from "./Constants.sol";
 
 /// @title Burn entry — gold-peg U tiering + 70/20/10 split.
+/// @dev Tier / activate / 1500U stake unlock only via `burnTier` (preset buttons).
+///      Free-amount `burn` still splits 70/20/10 but does NOT grant tier benefits.
 contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -25,6 +27,8 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
 
     mapping(address => uint256) public burnedToken;
     mapping(address => uint256) public burnedUsd;
+    /// @notice Highest preset tier button completed by user (0..4). Source of tier benefits.
+    mapping(address => uint8) public buttonTierOf;
     uint256 public totalBurnedToken;
     uint256 public totalBurnedUsd;
     uint16 public maxTransferTaxBps;
@@ -39,6 +43,7 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 toShareholders,
         uint8 tier
     );
+    event TierButtonBurned(address indexed user, uint8 tierId, uint256 usdValue, uint8 buttonTier);
     event ConfigUpdated(address oracle, address layers, address shareholders, address dividends, address sink);
 
     constructor(
@@ -90,15 +95,43 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         _unpause();
     }
 
+    function tierUsd(uint8 tierId) public pure returns (uint256) {
+        if (tierId == 1) return Constants.TIER1_USD;
+        if (tierId == 2) return Constants.TIER2_USD;
+        if (tierId == 3) return Constants.TIER3_USD;
+        if (tierId == 4) return Constants.TIER4_USD;
+        return 0;
+    }
+
     function quoteBurnUsd(uint256 tokenAmount) public view returns (uint256) {
         uint256 price = oracle.tokenUsd();
         require(price > 0, "burn: bad price");
         return (tokenAmount * price) / 1e18;
     }
 
+    /// @notice Tokens needed (ceil) to hit a preset tier's gold-peg USD at current oracle price.
+    function quoteTokensForTier(uint8 tierId) public view returns (uint256) {
+        uint256 targetUsd = tierUsd(tierId);
+        require(targetUsd > 0, "burn: tier");
+        uint256 price = oracle.tokenUsd();
+        require(price > 0, "burn: bad price");
+        return (targetUsd * 1e18 + price - 1) / price;
+    }
+
+    /// @notice Free-amount burn: 70/20/10 split only. Does NOT grant tier / activate / stake unlock.
     function burn(uint256 amount) external nonReentrant whenNotPaused {
+        _burnAmount(msg.sender, amount, 0);
+    }
+
+    /// @notice Preset tier button burn. Grants / upgrades buttonTier + DividendPools membership.
+    function burnTier(uint8 tierId) external nonReentrant whenNotPaused {
+        require(tierId >= 1 && tierId <= 4, "burn: tier");
+        uint256 amount = quoteTokensForTier(tierId);
+        _burnAmount(msg.sender, amount, tierId);
+    }
+
+    function _burnAmount(address user, uint256 amount, uint8 tierId) private {
         require(amount > 0, "burn: zero");
-        address user = msg.sender;
 
         uint256 beforeBal = token.balanceOf(address(this));
         token.safeTransferFrom(user, address(this), amount);
@@ -109,6 +142,15 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         require(received > 0, "burn: zero recv");
 
         uint256 usdValue = quoteBurnUsd(received);
+        if (tierId != 0) {
+            uint256 targetUsd = tierUsd(tierId);
+            // After FOT, received USD must still clear the preset threshold within tax tolerance.
+            require(
+                usdValue * Constants.BPS_DENOM >= targetUsd * (Constants.BPS_DENOM - maxTransferTaxBps),
+                "burn: usd short"
+            );
+        }
+
         burnedToken[user] += received;
         burnedUsd[user] += usdValue;
         totalBurnedToken += received;
@@ -131,9 +173,13 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
             shareholderPool.receiveBurnShare(toShareholders);
         }
 
-        dividendPools.updateTier(user, burnedUsd[user]);
-        uint8 tier = dividendPools.tierOf(user);
+        if (tierId != 0 && tierId > buttonTierOf[user]) {
+            buttonTierOf[user] = tierId;
+            dividendPools.updateTier(user, tierUsd(tierId));
+            emit TierButtonBurned(user, tierId, usdValue, tierId);
+        }
 
+        uint8 tier = dividendPools.tierOf(user);
         emit Burned(user, amount, received, usdValue, toSink, toLayers, toShareholders, tier);
     }
 }
