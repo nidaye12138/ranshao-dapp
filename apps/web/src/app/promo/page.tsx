@@ -12,7 +12,7 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import { useStats } from "@/lib/api/client";
+import { useEarnings, useStats } from "@/lib/api/client";
 import { StakeDesk } from "@/components/StakeDesk";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
@@ -45,6 +45,7 @@ export default function PromoPage() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
   const { data: stats } = useStats();
+  const { data: earnings } = useEarnings(address);
 
   useEffect(() => {
     setNowSec(Math.floor(Date.now() / 1000));
@@ -176,9 +177,17 @@ export default function PromoPage() {
   const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
   const usdPreview =
     quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
-  const splitFire = usdPreview * 0.7;
-  const splitMarket = usdPreview * 0.2;
+  // Owner 20/10/10 of weight amount → layer bucket 40%; sink 50%; shareholders 10%.
+  const splitFire = usdPreview * 0.5;
+  const splitMarket = usdPreview * 0.4;
   const splitShare = usdPreview * 0.1;
+  const fmtEarn = (v?: string) => {
+    const raw = (v ?? "0 UMplan").trim();
+    return raw.startsWith("+") ? raw : `+${raw}`;
+  };
+  const layerDirect = fmtEarn(earnings?.layerTotal?.直推);
+  const layerIndirect = fmtEarn(earnings?.layerTotal?.间推);
+  const layerMarket = fmtEarn(earnings?.layerTotal?.市场);
 
   const cooldownLeft =
     mounted && nowSec > 0 && nextClaim && typeof nextClaim === "bigint" && nextClaim > 0n
@@ -259,7 +268,7 @@ export default function PromoPage() {
           <div className="split-icon si-fire">🔥</div>
           <div className="split-name">
             权重销毁
-            <span className="pct">70% · 打入销毁地址，永久移出流通</span>
+            <span className="pct">50% · 打入销毁地址，永久移出流通</span>
           </div>
           <div className="split-amt">{splitFire.toFixed(2)} U</div>
         </div>
@@ -267,7 +276,7 @@ export default function PromoPage() {
           <div className="split-icon si-promo">◎</div>
           <div className="split-name">
             市场奖励
-            <span className="pct">20% · 直推 / 间推 / 市场3…9</span>
+            <span className="pct">40% · 直推 20% / 间推 10% / 市场 10%</span>
           </div>
           <div className="split-amt">{splitMarket.toFixed(2)} U</div>
         </div>
@@ -349,36 +358,37 @@ export default function PromoPage() {
           <b className="ws-fire">{myWeight}</b>
         </div>
         <ul className="ws-notes">
-          <li>权重订单资金按 70% 销毁比例打入销毁地址。</li>
+          <li>权重订单资金按 50% 销毁 / 40% 市场层奖 / 10% 股东（业主 直推20·间推10·市场10 占订单额）。</li>
           <li>买卖手续费（最低 3%、默认 3.5%）属交易费用，不计入权重销毁。</li>
           <li>销毁地址链上公开可查。</li>
         </ul>
       </div>
 
       <div className="card">
-        <h2 className="card-title accent">推广收益规则</h2>
+        <h2 className="card-title accent">推广收益</h2>
         <div className="reward-item">
-          <span className="r-l">直推</span>
-          <span className="r-v" style={{ color: "var(--theme-color)" }}>
-            第 1 层 · 总额 4%
-          </span>
+          <span className="r-l">直推奖励</span>
+          <span className="r-v earn-amt">{layerDirect}</span>
         </div>
         <div className="reward-item">
-          <span className="r-l">间推</span>
-          <span className="r-v" style={{ color: "var(--theme-color)" }}>
-            仅第 2 层 · 总额 2%
-          </span>
+          <span className="r-l">间推奖励</span>
+          <span className="r-v earn-amt">{layerIndirect}</span>
         </div>
         <div className="reward-item">
-          <span className="r-l">市场</span>
-          <span className="r-v" style={{ color: "var(--theme-color)" }}>
-            第 3–9 层 · 各 2% 总额
-          </span>
+          <span className="r-l">市场奖励</span>
+          <span className="r-v earn-amt">{layerMarket}</span>
         </div>
         <div className="doc-text" style={{ marginTop: "0.75rem" }}>
+          <p>币种：推广类奖励均以 UMplan 发放，即时到账钱包（汇总来自索引；未配置时显示 0）。</p>
           <p>
-            燃烧额 <b>20%</b> 按锁定九层发放：直推（L1=4%）/ 间推（L2=2%）/ 市场（L3–9 各
-            2%）。明细账本须标 <b>市场3…市场9</b>。不做文档 8%/4%/市场1%。
+            直推：直推成员每笔权重金额的 <b>20%</b> 即时奖励给你（第 1 层）。
+          </p>
+          <p>
+            间推：间推成员权重金额的 <b>10%</b> 奖励给你（仅第 2 层）。
+          </p>
+          <p>
+            市场：直推、间推以外的团队统称市场；合计 <b>10%</b> 由第 3–9 层均分。明细账本标{" "}
+            <b>市场3…市场9</b>（见「我的」收益）。不做文档 8%/4%/1% 或旧版 4%/2%/2%。
           </p>
           <p>任意档位按钮燃烧（≥100U）即激活，解锁邀请链接（见「我的」）— 非累计买入。</p>
         </div>

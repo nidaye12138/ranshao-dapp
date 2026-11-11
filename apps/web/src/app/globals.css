@@ -1490,6 +1490,12 @@ code {
   flex: 1;
 }
 
+.reward-item .earn-amt {
+  color: var(--ok, #3dd68c);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ——— Mine ——— */
 .asset-main {
   text-align: center;

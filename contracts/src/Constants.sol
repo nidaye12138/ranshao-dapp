@@ -21,16 +21,24 @@ library Constants {
     // Swap instant rewards (payment token) — only retained overlap with initial design.
     uint16 internal constant INSTANT_REWARD_BPS = 50; // 0.5%
 
-    // Burn split of B
-    uint16 internal constant BURN_BPS = 7000; // 70% → burn address
-    uint16 internal constant LAYER_BPS = 2000; // 20% → 9-layer
+    // Burn split of B (owner 2026-11-11):
+    // 直推 20% + 间推 10% + 市场 10% = 40% of weight/buy amount B.
+    // That exceeds the prior 20%「市场奖励」bucket under 70/20/10 — so the sink
+    // shrinks to 50% and the layer bucket expands to 40% (shareholders stay 10%).
+    // Sum must remain BPS_DENOM. Distinct from any 70/20/10 *weight* mnemonic.
+    uint16 internal constant BURN_BPS = 5000; // 50% → burn address (was 70%)
+    uint16 internal constant LAYER_BPS = 4000; // 40% → 9-layer (was 20%)
     uint16 internal constant SHAREHOLDER_BPS = 1000; // 10% → shareholders
 
-    // 9-layer of B (sum = 2000 bps): L1 400, L2–L9 200 each
-    // Indexed 0..8 for layers 1..9
+    // 9-layer of B (sum = LAYER_BPS 4000):
+    // 直推 L1 = 2000 (20% of B); 间推 L2 = 1000 (10% of B);
+    // 市场 L3–L9 share 1000 bps (10% of B) equally → 143×6 + 142.
+    // Indexed 0..8 for layers 1..9. Rejected: doc 8%/4%/1% and prior L1=4 L2–9=2.
     function layerBps(uint256 index) internal pure returns (uint16) {
-        if (index == 0) return 400;
-        return 200;
+        if (index == 0) return 2000; // 直推
+        if (index == 1) return 1000; // 间推
+        if (index == 8) return 142; // 市场9 (dust remainder)
+        return 143; // 市场3…市场8
     }
 
     uint8 internal constant LAYER_COUNT = 9;
