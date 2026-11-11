@@ -18,8 +18,7 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
 
 /**
  * 1500U 质押台 — unlock after burnTier(4) / DividendPools.tierOf == 4.
- * Wire: EliteStake (stake UMplan, 24h min, redeem / claim+extend).
- * TODO: copy wants stake dividends in UMplan; deployed rewardToken may be SPCXB — UI labels rewardToken dynamically.
+ * Wire: EliteStake (stake UMplan, dividends UMplan, 24h min, redeem / claim+extend).
  */
 export function StakeDesk() {
   const mounted = useMounted();
@@ -177,17 +176,21 @@ export function StakeDesk() {
 
       <div className="doc-text stake-rules" style={{ marginBottom: "0.75rem" }}>
         <p>
-          分红公式：百 5 总释放量 ÷ 全网总质押 = 每币分红（合约{" "}
+          分红公式：百 5 的总释放量 ÷ 全网总质押量 = 每个质押币的分红（合约{" "}
           <code>notifyRelease</code> × 5% / totalStaked）。
         </p>
         <p>
-          赎回：最短 24 小时；可「领本金 + 分红」清仓，或「仅领分红」并自动顺延 24
-          小时。
+          计算示例：本期百 5 释放 500,000 UMplan，全网总质押 25,000,000 UMplan → 每币分红 =
+          0.02 UMplan；质押 100,000 UMplan 即得 2,000 UMplan。
         </p>
-        <p className="muted">
-          {/* TODO: product copy prefers UMplan payouts; current EliteStake.rewardToken is deploy-time (often SPCXB). */}
-          质押本金为 UMplan；链上分红资产以合约 <b>rewardToken</b> 为准（当前展示：{rewardLabel}
-          ）。
+        <p>币种说明：质押分红以 UMplan 币量发放（本金与分红均为 UMplan）。</p>
+        <p>
+          赎回规则：质押最短期限 24 小时，到期后本金与分红可随时取回；可「本金 +
+          分红」一起领，也可仅领分红继续质押；忘记领取则自动顺延 24
+          小时并持续计息，想起来时只要历史上已满 24 小时即可随时领取。
+        </p>
+        <p>
+          分红池来源：池内 UMplan 来自市场进单——每笔进单只按直推、间推、市场三档发放奖励；邀请链路中超出这三档范围、无对应奖励档次的应付部分，统一注入本池，按质押配额分配。
         </p>
       </div>
 
@@ -201,8 +204,8 @@ export function StakeDesk() {
             🔒
           </span>
           <span>
-            质押权益仅对完成 <b>1500U 档位按钮</b>
-            权重销毁的用户开放；当前未达成，确认质押不可用。手输金额不计入档位。
+            质押权益仅对完成 <b>1500U</b>
+            档位权重销毁的用户开放；当前未达成，下方质押按钮为灰色不可用，达成后自动点亮。手输金额不计入档位。
           </span>
         </p>
       ) : (
@@ -255,12 +258,13 @@ export function StakeDesk() {
             <i className="est-gem" aria-hidden>
               ◆
             </i>
-            预估每期分红（{rewardLabel}）
+            预估每期分红（UMplan{rewardLabel !== "UMplan" ? ` · 链上 ${rewardLabel}` : ""}）
           </span>
           <b className="quota-est">{estimateDisplay}</b>
         </div>
         <p className="quota-note">
-          预估取自链上已累计未领；新一期数值随 <code>notifyRelease</code> × 5% × 配额更新。
+          预估取自链上已累计未领；新一期数值随 <code>notifyRelease</code> × 5% × 配额更新。分红以
+          UMplan 计。
         </p>
         <div className="quota-row muted-row">
           <span>全网总质押</span>

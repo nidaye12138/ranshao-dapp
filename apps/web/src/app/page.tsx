@@ -33,7 +33,7 @@ const FALLBACK_SLIDES = [
   {
     id: "s3",
     title: "通缩模型 · 权重销毁",
-    subtitle: "权重订单 50% 打入销毁地址；40% 层奖（直推20/间推10/市场10）",
+    subtitle: "权重订单 70% 打入销毁地址；20% 市场奖励；10% 股东分红",
     tone: "b3",
     cta: "查看规则",
   },
@@ -284,7 +284,7 @@ function HomeInner() {
       </section>
 
       <section className="card card-dense" id="dapp-rules">
-        <h2 className="card-title">dApp 玩法规则</h2>
+        <h2 className="card-title">DApp 玩法规则</h2>
         <div className="doc-text rules-list">
           {dappRules.map((r) => (
             <p key={r}>{r}</p>

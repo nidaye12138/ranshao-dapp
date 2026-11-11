@@ -89,7 +89,8 @@ abstract contract UmPlanDeployer {
             RanshaoToken(a.token).setMinter(p.admin, true);
         }
 
-        a.elite = address(new EliteStake(p.admin, a.token, a.spcxb, a.dividends));
+        // Stake principal + dividends both UMplan (not SPCXB).
+        a.elite = address(new EliteStake(p.admin, a.token, a.token, a.dividends));
         a.broker = address(new BrokerMarket(p.admin, a.treasury));
 
         Treasury(payable(a.treasury)).setModule(keccak256("SWAP"), a.swap);

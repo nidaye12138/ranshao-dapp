@@ -12,7 +12,7 @@ import {IShareholderPool} from "./interfaces/IShareholderPool.sol";
 import {IDividendPools} from "./interfaces/IDividendPools.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Burn entry — gold-peg U tiering + Constants burn/layer/shareholder split (50/40/10).
+/// @title Burn entry — gold-peg U tiering + Constants burn/layer/shareholder split (70/20/10).
 /// @dev Tier / activate / 1500U stake unlock only via `burnTier` (preset buttons).
 ///      Free-amount `burn` still splits per Constants but does NOT grant tier benefits.
 contract BurnRouter is Ownable, Pausable, ReentrancyGuard {

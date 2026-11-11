@@ -10,11 +10,11 @@ import {ILayerRewards} from "./interfaces/ILayerRewards.sol";
 import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title 9-layer burn rewards — 直推 20% / 间推 10% / 市场 10% of B; missing → precip.
-/// @dev `distribute` pulls `budget` (LAYER_BPS of B, currently 40%) from BurnRouter.
-///      share_i = budget * layerBps(i) / LAYER_BPS ≡ layerBps(i) bps of full B.
-///      Owner rates are of the weight/buy amount (not relative weights inside a 20% bucket).
-///      Do not confuse with the historical 70/20/10 weight mnemonic — see Constants.
+/// @title 9-layer burn rewards — bucket-relative 直推20% / 间推10% / L3–9 each 10% of the 20% bucket.
+/// @dev `distribute` pulls `budget` (LAYER_BPS = 20% of B) from BurnRouter.
+///      share_i = budget * layerBps(i) / LAYER_BPS ≡ layerBps(i) bps of full B
+///      (layerBps stores order-relative bps that encode the bucket-relative split; see Constants).
+///      Missing ancestors → precip.
 contract LayerRewards is ILayerRewards, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 

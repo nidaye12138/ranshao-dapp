@@ -24,10 +24,12 @@
   "BrokerMarket": null,
   "lockedParams": {
     "instantRewardBps": 50,
-    "burnBps": 5000,
-    "layerBps": 4000,
+    "burnBps": 7000,
+    "layerBps": 2000,
     "shareholderBps": 1000,
-    "layerOfB": [2000, 1000, 143, 143, 143, 143, 143, 143, 142],
+    "layerOfB": [400, 200, 200, 200, 200, 200, 200, 200, 200],
+    "layerOfBucketNote": "L1=20% of 20% bucket; L2–L9=10% of bucket each",
+    "eliteStakeRewardToken": "UMplan",
     "tierThresholdsU": [100, 500, 800, 1500],
     "poolWeightBps": [3333, 2500, 2500, 1667],
     "maxShareholderSeats": 453

@@ -21,24 +21,23 @@ library Constants {
     // Swap instant rewards (payment token) — only retained overlap with initial design.
     uint16 internal constant INSTANT_REWARD_BPS = 50; // 0.5%
 
-    // Burn split of B (owner 2026-11-11):
-    // 直推 20% + 间推 10% + 市场 10% = 40% of weight/buy amount B.
-    // That exceeds the prior 20%「市场奖励」bucket under 70/20/10 — so the sink
-    // shrinks to 50% and the layer bucket expands to 40% (shareholders stay 10%).
-    // Sum must remain BPS_DENOM. Distinct from any 70/20/10 *weight* mnemonic.
-    uint16 internal constant BURN_BPS = 5000; // 50% → burn address (was 70%)
-    uint16 internal constant LAYER_BPS = 4000; // 40% → 9-layer (was 20%)
+    // Burn split of inbound coin B (owner corrected 2026-11-11 from mistaken 50/40/10):
+    // 70% sink / 20% market-reward bucket / 10% shareholders. Sum = BPS_DENOM.
+    uint16 internal constant BURN_BPS = 7000; // 70% → burn address
+    uint16 internal constant LAYER_BPS = 2000; // 20% → 9-layer market-reward bucket
     uint16 internal constant SHAREHOLDER_BPS = 1000; // 10% → shareholders
 
-    // 9-layer of B (sum = LAYER_BPS 4000):
-    // 直推 L1 = 2000 (20% of B); 间推 L2 = 1000 (10% of B);
-    // 市场 L3–L9 share 1000 bps (10% of B) equally → 143×6 + 142.
-    // Indexed 0..8 for layers 1..9. Rejected: doc 8%/4%/1% and prior L1=4 L2–9=2.
+    // 9-layer shares stored as bps of full order B (sum = LAYER_BPS 2000).
+    // Bucket-relative semantics (of the 20% market bucket):
+    //   L1 直推 = 20% of bucket (= 4% of B = 400 bps)
+    //   L2 间推 = 10% of bucket (= 2% of B = 200 bps)
+    //   L3–L9  = 10% of bucket each (= 2% of B = 200 bps each; 7×10% = 70% of bucket)
+    // Bucket share sum = 20+10+7×10 = 100% of the 20% bucket.
+    // Formula: share_i = budget * layerBps(i) / LAYER_BPS ≡ layerBps(i) bps of B.
+    // Indexed 0..8 for layers 1..9. Rejected: mistaken order-relative 20/10/10 (=50/40/10).
     function layerBps(uint256 index) internal pure returns (uint16) {
-        if (index == 0) return 2000; // 直推
-        if (index == 1) return 1000; // 间推
-        if (index == 8) return 142; // 市场9 (dust remainder)
-        return 143; // 市场3…市场8
+        if (index == 0) return 400; // 直推 = 20% of bucket
+        return 200; // 间推 + 市场3…市场9 = 10% of bucket each
     }
 
     uint8 internal constant LAYER_COUNT = 9;

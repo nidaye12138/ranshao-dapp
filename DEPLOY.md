@@ -13,11 +13,16 @@ Product brand: **Umidor**. Authority: Project store `docs/dapp-design.md` + `doc
 ## Locked economic params
 
 - Swap: buyer **0.5%** + direct referrer **0.5%** (payment token); no-referrer → Treasury
-- Burn split: **50%** dead / **40%** 9-layer / **10%** shareholders (owner 2026-11-11: 直推20+间推10+市场10 of weight amount expands prior 20% bucket; was 70/20/10)
-- Layer bps of B: L1 **2000** (直推 20%), L2 **1000** (间推 10%), L3–L8 **143**, L9 **142** (市场合计 10%)
+- Burn split: **70%** dead / **20%** market-reward bucket / **10%** shareholders (owner corrected 2026-11-11; mistaken 50/40/10 reverted)
+- Layer bps of B (bucket-relative 20/10/10… of the 20% bucket): L1 **400** (直推 = 20% of bucket = 4% of B), L2–L9 **200** each (10% of bucket = 2% of B each)
+- EliteStake `rewardToken`: **UMplan** (same as stakingToken; not SPCXB)
 - Tiers (U): **100 / 500 / 800 / 1500**; pool weights bps **[3333, 2500, 2500, 1667]**
 - Shareholder seats cap: **453**
 - Deprecated as primary path: 15d/30d stake yield, buy/stake milestones
+
+## Redeploy required after this economics fix
+
+Constants (`BURN_BPS` / `LAYER_BPS` / `layerBps`) and EliteStake `rewardToken` are compile-time / constructor immutables. Merging this PR **does not** change already-deployed Chapel or mainnet contracts. **Do not deploy to Chapel from this PR** (user RPC broken). After merge, redeploy the full UmPlan stack (or at minimum BurnRouter + LayerRewards + EliteStake + dependents that hold the old addresses) and refresh `deployments/` + web env addresses before pointing production UI at the new economics.
 
 ## MVP defaults (§9 open questions)
 
@@ -92,12 +97,12 @@ Addresses → [`deployments/bsc-testnet.json`](deployments/bsc-testnet.json).
 | Treasury | Proceeds / module registry |
 | MockPriceOracle | BNB/USD + token/USD |
 | SwapFacade | Buy + 0.5%/0.5% |
-| BurnRouter | 50/40/10 + tier update |
-| LayerRewards | 9-layer + missing → precip |
+| BurnRouter | 70/20/10 + tier update |
+| LayerRewards | 9-layer (bucket-relative) + missing → precip |
 | PrecipitationPool | 5% to T4 / 95% admin |
 | DividendPools | 4 SPCXB pools |
 | ShareholderPool | 453 seats, admin whitelist |
-| EliteStake | Optional T4 stake |
+| EliteStake | Optional T4 stake (UMplan principal + dividends) |
 | BrokerMarket | Phase 2 fee stub |
 
 ### Smoke

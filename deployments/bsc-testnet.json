@@ -2,7 +2,7 @@
   "network": "bsc-testnet",
   "chainId": 97,
   "status": "pending_redeploy_um_plan",
-  "note": "Previous MVP addresses obsolete after UM-plan rewrite. Re-run DeployBscTestnet.s.sol.",
+  "note": "Pending redeploy for corrected 70/20/10 economics + EliteStake rewardToken=UMplan. Do not deploy to Chapel from the economics PR (user RPC broken); re-run DeployBscTestnet.s.sol after merge when RPC is healthy.",
   "deployer": null,
   "RanshaoToken": null,
   "USDT": null,
