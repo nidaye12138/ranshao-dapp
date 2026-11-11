@@ -8,14 +8,34 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import { banners as fallbackBanners, dappRules as fallbackRules, tokenIntro as fallbackIntro } from "@/lib/mockData";
+import { banners as fallbackBanners, dappRules as fallbackRules } from "@/lib/mockData";
 import { useAnnouncements, useLeaderboard, useStats } from "@/lib/api/client";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
+const TOKEN_SUPPLY = 10_000_000;
+
 const FALLBACK_SLIDES = [
-  { id: "s1", title: "四档分红 · 每日可领", subtitle: "持有对应权重档位后进入 SPCXB 分红池，24 小时可领一次", tone: "b1" },
-  { id: "s2", title: "推广奖励即时到账", subtitle: "买卖皆享交易方与直推各 0.5%，立刻到账钱包", tone: "b2" },
-  { id: "s3", title: "通缩模型 · 权重销毁", subtitle: "权重订单 70% 打入销毁地址，永久移出流通", tone: "b3" },
+  {
+    id: "s1",
+    title: "四档分红 · 每日可领",
+    subtitle: "持有对应权重档位后进入 SPCXB 分红池，24 小时可领一次",
+    tone: "b1",
+    cta: "查看规则",
+  },
+  {
+    id: "s2",
+    title: "推广奖励即时到账",
+    subtitle: "买卖皆享交易方与直推各 0.5%，立刻到账钱包",
+    tone: "b2",
+    cta: "查看规则",
+  },
+  {
+    id: "s3",
+    title: "通缩模型 · 权重销毁",
+    subtitle: "权重订单 70% 打入销毁地址，永久移出流通",
+    tone: "b3",
+    cta: "查看规则",
+  },
 ];
 
 export default function HomePage() {
@@ -49,12 +69,18 @@ function HomeInner() {
           title: b.title,
           subtitle: b.subtitle,
           tone: (`b${(i % 3) + 1}` as "b1" | "b2" | "b3"),
+          cta: "查看规则",
         }))
       : [
-          { id: cmsBanner.id, title: cmsBanner.title, subtitle: cmsBanner.subtitle, tone: "b1" as const },
+          {
+            id: cmsBanner.id,
+            title: cmsBanner.title,
+            subtitle: cmsBanner.subtitle,
+            tone: "b1" as const,
+            cta: "查看规则",
+          },
           ...FALLBACK_SLIDES.slice(1),
         ];
-  const tokenIntro = cms?.tokenIntro ?? fallbackIntro;
   const dappRules = cms?.dappRules?.length ? cms.dappRules : fallbackRules;
 
   useEffect(() => {
@@ -89,9 +115,20 @@ function HomeInner() {
   const ann = announcements[annIndex % announcements.length];
 
   const priceDisplay =
-    stats?.priceUsd != null ? `≈ $${stats.priceUsd}` : stats?.source === "unconfigured" ? "—" : "…";
+    stats?.priceUsd != null ? stats.priceUsd : stats?.source === "unconfigured" ? "—" : "…";
   const burnedDisplay =
     stats?.totalBurnedToken != null ? stats.totalBurnedToken : stats?.source === "unconfigured" ? "—" : "…";
+
+  const burnedNum =
+    stats?.totalBurnedToken != null ? Number(String(stats.totalBurnedToken).replace(/,/g, "")) : NaN;
+  const circulating =
+    Number.isFinite(burnedNum) && burnedNum >= 0
+      ? Math.max(0, TOKEN_SUPPLY - burnedNum).toLocaleString("en-US")
+      : "—";
+
+  function scrollToRules() {
+    document.getElementById("dapp-rules")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <div className="home-board">
@@ -99,8 +136,16 @@ function HomeInner() {
         <div className="banner-track" style={{ transform: `translateX(-${bannerIndex * 100}%)` }}>
           {slides.map((s) => (
             <div key={s.id} className={`banner-slide ${s.tone}`}>
-              <p className="banner-title">{s.title}</p>
-              <p className="banner-sub">{s.subtitle}</p>
+              <div className="banner-copy">
+                <p className="banner-title">{s.title}</p>
+                <p className="banner-sub">{s.subtitle}</p>
+                <button type="button" className="banner-cta" onClick={scrollToRules}>
+                  {s.cta}
+                </button>
+              </div>
+              <div className="banner-art" aria-hidden>
+                <span className="banner-rocket">▲</span>
+              </div>
             </div>
           ))}
         </div>
@@ -128,12 +173,12 @@ function HomeInner() {
 
       <section className="flat-row">
         <div className="flat-card">
-          <div className="flat-label">
-            实时币价
-            <span className="flat-badge">合约实时价</span>
+          <div className="flat-label">实时币价</div>
+          <div className="flat-value">
+            {priceDisplay}
+            <span className="flat-unit">USDT</span>
           </div>
-          <div className="flat-value">{priceDisplay}</div>
-          <div className="flat-extra">USDT</div>
+          <div className="flat-extra">约合约实时价</div>
         </div>
         <div className="flat-card">
           <div className="flat-label">权重销毁总量</div>
@@ -144,12 +189,12 @@ function HomeInner() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card card-dense">
         <h2 className="card-title">
           全网龙虎榜 TOP10
           <span className="muted">按直推人数排行</span>
         </h2>
-        <p className="muted" style={{ marginTop: 0 }}>
+        <p className="muted source-line">
           {board?.source === "graph"
             ? "按直推人数（索引）"
             : board?.source === "unconfigured"
@@ -171,7 +216,7 @@ function HomeInner() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card card-dense">
         <h2 className="card-title">我的邀请人</h2>
         {!mounted ? (
           <p className="muted">加载中…</p>
@@ -179,10 +224,10 @@ function HomeInner() {
           <p className="muted">连接钱包后查看 / 绑定</p>
         ) : bound ? (
           <div className="referrer-row">
-            <div className="avatar" aria-hidden>
+            <div className="avatar avatar-ring" aria-hidden>
               ↑
             </div>
-            <div>
+            <div className="ref-meta">
               <div className="ref-name">邀请人 {shortAddr(myReferrer as string)}</div>
               <div className="ref-addr">{myReferrer as string}</div>
             </div>
@@ -215,11 +260,31 @@ function HomeInner() {
         )}
       </section>
 
-      <section className="card">
-        <h2 className="card-title">代币介绍</h2>
-        <p className="lead-copy">{tokenIntro}</p>
-        <h2 className="card-title">dApp 规则</h2>
-        <div className="doc-text">
+      <section className="card card-dense">
+        <h2 className="card-title">代币信息</h2>
+        <div className="info-quad" aria-label="代币信息四宫格">
+          <div className="iq-cell">
+            <div className="iq-val">{TOKEN_SUPPLY.toLocaleString("en-US")}</div>
+            <div className="iq-label">发行总量 UMplan</div>
+          </div>
+          <div className="iq-cell">
+            <div className="iq-val">{circulating}</div>
+            <div className="iq-label">当前流通量</div>
+          </div>
+          <div className="iq-cell">
+            <div className="iq-val">BNB Chain</div>
+            <div className="iq-label">所属公链</div>
+          </div>
+          <div className="iq-cell">
+            <div className="iq-val">3.5% 默认</div>
+            <div className="iq-label">买卖手续费（≥3%）</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="card card-dense" id="dapp-rules">
+        <h2 className="card-title">dApp 玩法规则</h2>
+        <div className="doc-text rules-list">
           {dappRules.map((r) => (
             <p key={r}>{r}</p>
           ))}

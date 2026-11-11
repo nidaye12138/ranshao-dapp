@@ -6,7 +6,7 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken, shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import { useEarnings, useTeam } from "@/lib/api/client";
+import { useEarnings, useStats, useTeam } from "@/lib/api/client";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import ERC20Abi from "@/lib/abi/ERC20.json";
@@ -24,10 +24,13 @@ export default function MinePage() {
   const [inviteOrigin, setInviteOrigin] = useState("");
   const [incomeTab, setIncomeTab] = useState<IncomeTab>("swap");
   const [copied, setCopied] = useState(false);
+  const [showQrStub, setShowQrStub] = useState(false);
 
   useEffect(() => {
     setInviteOrigin(window.location.origin);
   }, []);
+
+  const { data: stats } = useStats();
 
   const { data: bnbBal } = useBalance({
     address,
@@ -91,6 +94,15 @@ export default function MinePage() {
         ? String(team.directs)
         : "—";
 
+  const totalUsdtValuation = useMemo(() => {
+    const price = stats?.priceUsd != null ? Number(stats.priceUsd) : NaN;
+    const um = umplan != null ? Number(umplan as bigint) / 1e18 : NaN;
+    const u = usdt != null ? Number(usdt as bigint) / 1e18 : NaN;
+    if (!Number.isFinite(price) || !Number.isFinite(um) || !Number.isFinite(u)) return null;
+    // UMplan×price + USDT；SPCXB/BNB 无可靠价时不计入，避免假估值
+    return um * price + u;
+  }, [stats?.priceUsd, umplan, usdt]);
+
   const incomeView = useMemo(() => {
     if (!earnings) return { total: "—", unit: "UMplan", rows: [] as { id: string; label: string; amount: string; at: string }[] };
     if (incomeTab === "swap") {
@@ -134,6 +146,18 @@ export default function MinePage() {
             {shortAddr(address)}
           </p>
         )}
+        <div className="asset-main">
+          <div className="am-sub">总资产估值（USDT）</div>
+          <div className="am-num">
+            {totalUsdtValuation != null
+              ? totalUsdtValuation.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })
+              : "—"}
+          </div>
+          <p className="am-note">含 UMplan×实时价 + USDT；SPCXB / BNB 暂未折算</p>
+        </div>
         <div className="asset-grid">
           <div className="asset-cell">
             <div className="ac-num">{mounted && umplan != null ? fmtToken(umplan as bigint) : "—"}</div>
@@ -207,12 +231,24 @@ export default function MinePage() {
             <div className="link-row">
               <div className="link-box">{inviteDisplay}</div>
               <button type="button" className="btn primary" onClick={copyInvite}>
+                {copied ? "已复制" : "复制"}
+              </button>
+            </div>
+            <div className="invite-actions">
+              <button type="button" className="btn" onClick={copyInvite}>
                 {copied ? "已复制" : "复制链接"}
               </button>
-              <button type="button" className="btn" disabled title="占位">
+              <button type="button" className="btn" onClick={() => setShowQrStub((v) => !v)}>
                 我的二维码
               </button>
             </div>
+            {showQrStub && (
+              <div className="qr-stub" role="status">
+                <div className="qr-placeholder" aria-hidden />
+                <p>二维码占位 · 专属推广链接二维码即将接入</p>
+                <p className="muted mono">{inviteDisplay}</p>
+              </div>
+            )}
           </>
         ) : (
           <div className="qual-off">

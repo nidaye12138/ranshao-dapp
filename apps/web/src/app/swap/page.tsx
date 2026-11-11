@@ -157,7 +157,7 @@ export default function SwapPage() {
         </button>
       </div>
 
-      <div className="card">
+      <div className={`card swap-card ${mode}`}>
         <div className="input-box">
           <div className="ib-label">{mode === "buy" ? "支付 USDT" : "卖出 UMplan"}</div>
           <div className="input-row">
@@ -191,9 +191,6 @@ export default function SwapPage() {
             {mode === "buy" ? "USDT" : "UMplan"}
           </span>
         </div>
-        <p className="muted" style={{ marginTop: "-0.35rem", marginBottom: "0.65rem" }}>
-          展示为产品承诺费率；成交扣费以合约参数为准。
-        </p>
 
         <div className="slip-row">
           <span>滑点</span>
@@ -211,16 +208,15 @@ export default function SwapPage() {
           </span>
         </div>
 
-        <div className="info-strip">
+        <div className="info-strip compact">
           <span>
             {mode === "buy"
               ? "买入瞬间，你与你的邀请人各获得买入金额 0.5% 的奖励，立刻到账钱包。"
-              : "卖出瞬间，你与直推邀请人各获得成交额 0.5% 的奖励，立刻到账钱包。"}{" "}
-            无累计买入业绩 / 级别。
+              : "卖出瞬间，你与你的邀请人各获得卖出金额 0.5% 的奖励，立刻到账钱包。"}
           </span>
         </div>
 
-        <div className="info-strip gold">
+        <div className="info-strip gold compact">
           <span>
             买入 / 卖出手续费按协议最低 {FEE_FLOOR}%、系统默认 {FEE_PCT}% 收取，直接从交易金额中扣除，属正常交易费用，不参与权重销毁分配。
           </span>
