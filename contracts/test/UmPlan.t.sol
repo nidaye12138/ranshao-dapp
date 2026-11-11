@@ -87,7 +87,8 @@ contract UmPlanTest is Test {
         );
         token.setMinter(address(swap), true);
 
-        elite = new EliteStake(admin, address(token), address(spcxb), address(dividends));
+        // rewardToken = UMplan (same as stakingToken)
+        elite = new EliteStake(admin, address(token), address(token), address(dividends));
         broker = new BrokerMarket(admin, address(treasury));
 
         // Seed
@@ -186,7 +187,7 @@ contract UmPlanTest is Test {
         assertEq(admin.balance, adminBefore + 0.005 ether);
     }
 
-    // ---------- Burn 50/40/10 + layers + tiers ----------
+    // ---------- Burn 70/20/10 + layers + tiers ----------
 
     function _bindChain() internal {
         // admin <- alice <- bob <- carol (3 layers above carol for bob's burn from carol...)
@@ -216,19 +217,19 @@ contract UmPlanTest is Test {
         burnRouter.burn(amount);
         vm.stopPrank();
 
-        // 50% dead (owner 20/10/10 expands layer bucket to 40%)
-        assertEq(token.balanceOf(DEAD), 5_000e18);
-        // L1 直推 (carol) 2000 bps of B = 2000
-        assertEq(token.balanceOf(carol), 1_000_000e18 + 2_000e18);
-        // L2 间推 (bob) 1000
-        assertEq(token.balanceOf(bob), bobBefore + 1_000e18);
-        // L3 市场3 (alice) 143
-        assertEq(token.balanceOf(alice), aliceBefore + 143e18);
-        // L4 市场4 (admin) 143
-        assertEq(token.balanceOf(admin), adminTokBefore + 143e18);
-        // L5–L9 missing → precip (143×4 + 142 = 714)
-        assertEq(token.balanceOf(address(precip)), 714e18);
-        assertEq(precip.totalDeposited(), 714e18);
+        // 70% dead; 20% market bucket; 10% shareholders
+        assertEq(token.balanceOf(DEAD), 7_000e18);
+        // L1 直推 (carol) 400 bps of B = 20% of bucket = 400
+        assertEq(token.balanceOf(carol), 1_000_000e18 + 400e18);
+        // L2 间推 (bob) 200 bps = 10% of bucket
+        assertEq(token.balanceOf(bob), bobBefore + 200e18);
+        // L3 市场3 (alice) 200 bps
+        assertEq(token.balanceOf(alice), aliceBefore + 200e18);
+        // L4 市场4 (admin) 200 bps
+        assertEq(token.balanceOf(admin), adminTokBefore + 200e18);
+        // L5–L9 missing → precip (200×5 = 1000 bps)
+        assertEq(token.balanceOf(address(precip)), 1_000e18);
+        assertEq(precip.totalDeposited(), 1_000e18);
 
         // 10% shareholders → admin claimable
         assertEq(shareholders.claimable(admin), 1_000e18);
@@ -372,8 +373,8 @@ contract UmPlanTest is Test {
         vm.stopPrank();
         assertEq(dividends.tierOf(eve), 4);
 
-        // L2–L9 missing = 1000 + 143×6 + 142 = 2000 bps of 1500 = 300
-        uint256 expectedPrecip = (1_500e18 * 2_000) / 10_000;
+        // L2–L9 missing = 200×8 = 1600 bps of 1500 = 240
+        uint256 expectedPrecip = (1_500e18 * 1_600) / 10_000;
         assertEq(precip.totalDeposited(), expectedPrecip);
 
         uint256 cap5 = (expectedPrecip * 500) / 10_000;
@@ -404,9 +405,9 @@ contract UmPlanTest is Test {
         vm.stopPrank();
         assertFalse(elite.isUnlocked(alice));
 
-        // notify release of 10_000 SPCXB → 5% = 500 to stakers
+        // notify release of 10_000 UMplan → 5% = 500 to stakers
         vm.startPrank(admin);
-        spcxb.approve(address(elite), 500e18);
+        token.approve(address(elite), 500e18);
         elite.notifyRelease(10_000e18);
         vm.stopPrank();
 
@@ -416,11 +417,12 @@ contract UmPlanTest is Test {
         elite.claim();
 
         uint256 firstUnlock = elite.unlockAt(alice);
+        uint256 umBeforeClaim = token.balanceOf(alice);
         vm.warp(firstUnlock);
         assertTrue(elite.isUnlocked(alice));
         vm.prank(alice);
         elite.claim();
-        assertEq(spcxb.balanceOf(alice), 500e18);
+        assertEq(token.balanceOf(alice), umBeforeClaim + 500e18);
         // claim-only extends lock another 24h from prior unlock boundary
         assertFalse(elite.isUnlocked(alice));
         assertEq(elite.unlockAt(alice), firstUnlock + 24 hours);
@@ -438,17 +440,16 @@ contract UmPlanTest is Test {
         vm.stopPrank();
 
         vm.startPrank(admin);
-        spcxb.approve(address(elite), 500e18);
+        token.approve(address(elite), 500e18);
         elite.notifyRelease(10_000e18);
         vm.stopPrank();
 
         vm.warp(block.timestamp + 24 hours);
         uint256 umBefore = token.balanceOf(alice);
-        uint256 spBefore = spcxb.balanceOf(alice);
         vm.prank(alice);
         elite.redeem();
-        assertEq(token.balanceOf(alice), umBefore + stakeAmt);
-        assertEq(spcxb.balanceOf(alice), spBefore + 500e18);
+        // principal + UMplan dividend
+        assertEq(token.balanceOf(alice), umBefore + stakeAmt + 500e18);
         assertEq(elite.stakedOf(alice), 0);
         assertEq(elite.unlockAt(alice), 0);
     }
@@ -525,13 +526,13 @@ contract UmPlanTest is Test {
     }
 
     function test_constants_locked() public {
-        assertEq(Constants.BURN_BPS, 5000);
-        assertEq(Constants.LAYER_BPS, 4000);
+        assertEq(Constants.BURN_BPS, 7000);
+        assertEq(Constants.LAYER_BPS, 2000);
         assertEq(Constants.SHAREHOLDER_BPS, 1000);
-        assertEq(Constants.layerBps(0), 2000);
-        assertEq(Constants.layerBps(1), 1000);
-        assertEq(Constants.layerBps(2), 143);
-        assertEq(Constants.layerBps(8), 142);
+        assertEq(Constants.layerBps(0), 400); // 20% of bucket = 4% of B
+        assertEq(Constants.layerBps(1), 200); // 10% of bucket = 2% of B
+        assertEq(Constants.layerBps(2), 200);
+        assertEq(Constants.layerBps(8), 200);
         uint256 layerSum;
         for (uint256 i = 0; i < 9; i++) layerSum += Constants.layerBps(i);
         assertEq(layerSum, Constants.LAYER_BPS);

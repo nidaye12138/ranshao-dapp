@@ -10,10 +10,9 @@ import {IDividendPools} from "./interfaces/IDividendPools.sol";
 import {Constants} from "./Constants.sol";
 
 /// @title Optional 1500U-tier stake — reward = (totalRelease × 5%) / totalStaked (Q6 admin notify).
-/// @dev Stakes project token (UMplan). Rewards paid in `rewardToken` (deploy default: SPCXB —
-///      copy wants UMplan; do not silently retarget economics without redeploy/admin plan).
-///      Unlock: DividendPools.tierOf == 4 (via burnTier button only after BurnRouter change).
-///      Min stake / redeem extend: 24 hours.
+/// @dev Stakes project token (UMplan). Rewards paid in `rewardToken` — deploy default is UMplan
+///      (same as stakingToken). Unlock: DividendPools.tierOf == 4 (via burnTier button only).
+///      Min stake / redeem extend: 24 hours. Redeploy required when changing rewardToken.
 contract EliteStake is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 

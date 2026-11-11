@@ -260,7 +260,7 @@ export default function MinePage() {
       <div className="card">
         <h2 className="card-title">
           我的收益
-          <span className="muted">质押分红=合约 rewardToken · 档位分红=SPCXB</span>
+          <span className="muted">质押分红=UMplan · 档位分红=SPCXB</span>
         </h2>
         {!featuresUnlocked ? (
           <p className="banner warn">请先完成邀请人绑定后查看收益明细</p>

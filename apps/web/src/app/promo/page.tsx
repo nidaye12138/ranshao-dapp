@@ -177,9 +177,9 @@ export default function PromoPage() {
   const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
   const usdPreview =
     quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
-  // Owner 20/10/10 of weight amount → layer bucket 40%; sink 50%; shareholders 10%.
-  const splitFire = usdPreview * 0.5;
-  const splitMarket = usdPreview * 0.4;
+  // 70% sink / 20% market-reward bucket / 10% shareholders.
+  const splitFire = usdPreview * 0.7;
+  const splitMarket = usdPreview * 0.2;
   const splitShare = usdPreview * 0.1;
   const fmtEarn = (v?: string) => {
     const raw = (v ?? "0 UMplan").trim();
@@ -268,7 +268,7 @@ export default function PromoPage() {
           <div className="split-icon si-fire">🔥</div>
           <div className="split-name">
             权重销毁
-            <span className="pct">50% · 打入销毁地址，永久移出流通</span>
+            <span className="pct">70% · 打入销毁地址，永久移出流通</span>
           </div>
           <div className="split-amt">{splitFire.toFixed(2)} U</div>
         </div>
@@ -276,7 +276,7 @@ export default function PromoPage() {
           <div className="split-icon si-promo">◎</div>
           <div className="split-name">
             市场奖励
-            <span className="pct">40% · 直推 20% / 间推 10% / 市场 10%</span>
+            <span className="pct">20% · 桶内再分直推 / 间推 / 市场</span>
           </div>
           <div className="split-amt">{splitMarket.toFixed(2)} U</div>
         </div>
@@ -284,7 +284,7 @@ export default function PromoPage() {
           <div className="split-icon si-div">◆</div>
           <div className="split-name">
             股东分红
-            <span className="pct">10% · 注入 SPCXB 分红池，按权重档位分配</span>
+            <span className="pct">10% · 股东池（与 SPCXB 四档分红分属不同模块）</span>
           </div>
           <div className="split-amt">{splitShare.toFixed(2)} U</div>
         </div>
@@ -358,7 +358,7 @@ export default function PromoPage() {
           <b className="ws-fire">{myWeight}</b>
         </div>
         <ul className="ws-notes">
-          <li>权重订单资金按 50% 销毁 / 40% 市场层奖 / 10% 股东（业主 直推20·间推10·市场10 占订单额）。</li>
+          <li>权重订单资金按 70% 销毁 / 20% 市场奖励 / 10% 股东自动执行。</li>
           <li>买卖手续费（最低 3%、默认 3.5%）属交易费用，不计入权重销毁。</li>
           <li>销毁地址链上公开可查。</li>
         </ul>
@@ -379,16 +379,18 @@ export default function PromoPage() {
           <span className="r-v earn-amt">{layerMarket}</span>
         </div>
         <div className="doc-text" style={{ marginTop: "0.75rem" }}>
-          <p>币种：推广类奖励均以 UMplan 发放，即时到账钱包（汇总来自索引；未配置时显示 0）。</p>
+          <p>币种：推广类奖励均以 UMplan 代币发放，即时到账钱包（汇总来自索引；未配置时显示 0）。</p>
           <p>
-            直推：直推成员每笔权重金额的 <b>20%</b> 即时奖励给你（第 1 层）。
+            直推：直推成员每笔买入 / 权重进单时，从市场奖励桶（占订单 20%）中按桶内{" "}
+            <b>20%</b> 即时奖励给你。
           </p>
           <p>
-            间推：间推成员权重金额的 <b>10%</b> 奖励给你（仅第 2 层）。
+            间推：间推成员（即直推成员的直推）进单时，从市场奖励桶中按桶内 <b>10%</b>{" "}
+            奖励给你。
           </p>
           <p>
-            市场：直推、间推以外的团队统称市场；合计 <b>10%</b> 由第 3–9 层均分。明细账本标{" "}
-            <b>市场3…市场9</b>（见「我的」收益）。不做文档 8%/4%/1% 或旧版 4%/2%/2%。
+            市场：直推、间推以外的团队成员统称市场；市场业绩达到档位，额外享受市场奖励桶内{" "}
+            <b>10%</b> 管理奖励口径。
           </p>
           <p>任意档位按钮燃烧（≥100U）即激活，解锁邀请链接（见「我的」）— 非累计买入。</p>
         </div>
@@ -456,7 +458,21 @@ export default function PromoPage() {
             <dd>24h / 次</dd>
           </div>
         </dl>
-        <p className="muted">每 24h 可领一次（链上强制）；也可累计不领。四档同档均分 SPCXB。</p>
+        <div className="doc-text" style={{ marginTop: "0.75rem" }}>
+          <p>
+            池占比：四个分红池合计分配总释放的 100% —— 100U 档池占 33.33%，500U 档池与 800U
+            档池各占 25%，1500U 档池占 16.67%。
+          </p>
+          <p>
+            个人实得：你所在池的占比额度 ÷ 同池股东人数。达成哪档权重销毁，就成为哪档池的分红股东，仅计入最高已达档位，不叠加。
+          </p>
+          <p>
+            公平性体现：能分多少不只看你在哪个池，更看和你同池的人有多少。青铜池占比最高（33.33%），但门槛最低、可能有几百甚至几千人一起平分，人均反而少；钻石池占比最低（16.67%），但门槛高、同池可能只有几个人，人均反而拿得更多。门槛与人数天然对冲，各档实际收益趋于均衡。
+          </p>
+          <p>
+            24 小时可领取一次 SPCXB，不领取自动叠加计入下期；同池人数每日随达成情况变动，人均随之实时重算。
+          </p>
+        </div>
         <button
           type="button"
           className="btn primary"
