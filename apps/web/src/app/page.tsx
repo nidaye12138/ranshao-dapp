@@ -7,6 +7,7 @@ import { isAddress, zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
+import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
 import { banners as fallbackBanners, dappRules as fallbackRules } from "@/lib/mockData";
 import { useAnnouncements, useLeaderboard, useStats } from "@/lib/api/client";
@@ -254,7 +255,7 @@ function HomeInner() {
             >
               {isPending || confirming ? "确认中…" : "绑定推荐人"}
             </button>
-            {error && <p className="banner warn">{error.message}</p>}
+            {error && <p className="banner warn">{formatTxError(error)}</p>}
             {isSuccess && <p className="banner ok">绑定成功</p>}
           </>
         )}

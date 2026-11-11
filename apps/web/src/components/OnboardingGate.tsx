@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   useAccount,
+  useBalance,
   useConnect,
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -12,6 +13,7 @@ import { isAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
+import { formatTxError } from "@/lib/txError";
 import { useOnboarding } from "@/components/OnboardingProvider";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 import { stashPendingRef } from "@/lib/onboardingStorage";
@@ -32,10 +34,16 @@ export function OnboardingGate() {
   const { connect, connectors, isPending: connecting } = useConnect();
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
+  const { data: nativeBal } = useBalance({
+    address,
+    chainId: appChainId,
+    query: { enabled: !!address && isConnected },
+  });
   const [localError, setLocalError] = useState<string | null>(null);
 
   const validRef = isAddress(refDraft) && refDraft.toLowerCase() !== address?.toLowerCase();
   const fromInvite = isAddress(refDraft);
+  const displayError = localError || (error ? formatTxError(error) : null);
 
   useEffect(() => {
     if (!isSuccess || !address) return;
@@ -66,6 +74,13 @@ export function OnboardingGate() {
     }
     if (refDraft.toLowerCase() === address?.toLowerCase()) {
       setLocalError("不能绑定自己为邀请人");
+      return;
+    }
+    // Preflight: MetaMask often surfaces zero-gas as UnknownRpcError.
+    if (nativeBal && nativeBal.value === 0n) {
+      setLocalError(
+        "钱包 BNB 余额为 0，无法支付 Gas。请先领取 Chapel（BSC Testnet）测试 BNB 后再绑定。",
+      );
       return;
     }
     stashPendingRef(refDraft);
@@ -210,9 +225,7 @@ export function OnboardingGate() {
           {primaryLabel}
         </button>
 
-        {(localError || error) && (
-          <p className="ob-error">{localError || error?.message || "绑定失败"}</p>
-        )}
+        {displayError && <p className="ob-error">{displayError}</p>}
 
         <div className="ob-footer">
           <button type="button" className="ob-skip" onClick={softSkip}>
