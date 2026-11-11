@@ -65,7 +65,20 @@ forge script script/DeployBscTestnet.s.sol:DeployBscTestnet \
   --broadcast --slow -vvvv
 ```
 
-Or: `../scripts/deploy-bsc-testnet.sh`
+Or from any cwd (script resolves repo root, then `cd contracts` and runs `forge script …`; prints the exact cmdline before exec):
+
+```bash
+./scripts/deploy-bsc-testnet.sh
+# also ok: cd scripts && ./deploy-bsc-testnet.sh
+```
+
+One-liner if the wrapper is still broken on your checkout:
+
+```bash
+cd contracts && forge script script/DeployBscTestnet.s.sol:DeployBscTestnet \
+  --rpc-url "${BSC_TESTNET_RPC_URL:-https://bsc-testnet-rpc.publicnode.com}" \
+  --broadcast --slow -vvvv
+```
 
 Addresses → [`deployments/bsc-testnet.json`](deployments/bsc-testnet.json).
 

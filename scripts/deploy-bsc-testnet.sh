@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # Deploy UM-plan modules to BSC Testnet (Chapel, chainId 97).
+# Safe to invoke from any cwd (e.g. `./deploy-bsc-testnet.sh` inside scripts/).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/contracts"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 export PATH="${HOME}/.foundry/bin:${PATH}"
+
+# foundry.toml lives under contracts/
+cd "$ROOT/contracts"
 
 RPC_URL="${BSC_TESTNET_RPC_URL:-https://bsc-testnet-rpc.publicnode.com}"
 CHAIN_ID=97
+SCRIPT_PATH="script/DeployBscTestnet.s.sol:DeployBscTestnet"
 
 need() {
   if [[ -z "${!1:-}" ]]; then
@@ -28,8 +33,10 @@ fi
 
 DEPLOYER="$(cast wallet address --private-key "$PRIVATE_KEY")"
 BAL="$(cast balance "$DEPLOYER" --rpc-url "$RPC_URL")"
-echo "Deployer: $DEPLOYER"
-echo "Balance:  $BAL wei on $RPC_URL"
+echo "Repo root: $ROOT"
+echo "Cwd:       $(pwd)"
+echo "Deployer:  $DEPLOYER"
+echo "Balance:   $BAL wei on $RPC_URL"
 if [[ "$BAL" == "0" ]]; then
   echo "ERROR: deployer has 0 testnet BNB. Fund via BSC testnet faucet, then retry." >&2
   exit 1
@@ -37,13 +44,27 @@ fi
 
 mkdir -p "$ROOT/deployments"
 
-echo "Running forge script DeployBscTestnet..."
-ARGS=(script/DeployBscTestnet.s.sol:DeployBscTestnet --rpc-url "$RPC_URL" --broadcast --slow -vvvv)
+# IMPORTANT: the first arg after `forge` MUST be the subcommand `script`.
+# `forge "$SCRIPT_PATH" ...` is invalid → unrecognized subcommand 'script/...'.
+CMD=(
+  forge
+  script
+  "$SCRIPT_PATH"
+  --rpc-url "$RPC_URL"
+  --broadcast
+  --slow
+  -vvvv
+)
 if [[ -n "${BSCSCAN_API_KEY:-}" ]]; then
-  ARGS+=(--verify --etherscan-api-key "$BSCSCAN_API_KEY" --chain-id "$CHAIN_ID")
+  CMD+=(--verify --etherscan-api-key "$BSCSCAN_API_KEY" --chain-id "$CHAIN_ID")
 fi
 
-forge "${ARGS[@]}"
+# Print exact argv before exec (shell-quoted) so mis-invocation is obvious in logs.
+printf '+ '
+printf '%q ' "${CMD[@]}"
+printf '\n'
+
+"${CMD[@]}"
 
 if [[ -f "$ROOT/deployments/bsc-testnet.json" ]]; then
   echo "Addresses written to deployments/bsc-testnet.json"
@@ -53,6 +74,6 @@ else
 fi
 
 echo
-echo "Optional smoke (buy + burn):"
+echo "Optional smoke (buy + burn) — from contracts/:"
 echo "  export SWAP=... BURN=... TOKEN=... USDT=... from the JSON"
 echo "  forge script script/SmokeBscTestnet.s.sol:SmokeBscTestnet --rpc-url \"\$BSC_TESTNET_RPC_URL\" --broadcast"
