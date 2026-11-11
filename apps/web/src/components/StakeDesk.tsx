@@ -133,8 +133,13 @@ export function StakeDesk() {
   const pendingBn = (pending as bigint | undefined) ?? 0n;
   const unlockTs = unlockAt != null ? Number(unlockAt as bigint) : 0;
   const lockLeft = unlockTs > 0 && nowSec > 0 ? Math.max(0, unlockTs - nowSec) : 0;
+
+  const previewStake = parsed > 0n ? parsed : stakedBn;
+  const previewTotal = totalBn + (parsed > 0n ? parsed : 0n);
   const sharePct =
-    totalBn > 0n && stakedBn > 0n ? (Number(stakedBn) / Number(totalBn)) * 100 : 0;
+    previewTotal > 0n && previewStake > 0n
+      ? (Number(previewStake) / Number(previewTotal)) * 100
+      : 0;
 
   const rewardLabel =
     rewardToken && typeof rewardToken === "string"
@@ -144,6 +149,10 @@ export function StakeDesk() {
           ? "UMplan"
           : "奖励币"
       : "奖励币";
+
+  // Readonly estimate: pending when already staked; else — (no invented notifyRelease size).
+  const estimateDisplay =
+    stakedBn > 0n ? `${fmtToken(pendingBn)} ${rewardLabel}` : "—";
 
   function setPct(pct: number) {
     const bal = tokenBal as bigint | undefined;
@@ -160,13 +169,13 @@ export function StakeDesk() {
   }
 
   return (
-    <div className="card">
+    <div className="card stake-desk">
       <h2 className="card-title">
         质押分红权益
         <span className="muted">1500U 档按钮解锁 · 最短 24h</span>
       </h2>
 
-      <div className="doc-text" style={{ marginBottom: "0.75rem" }}>
+      <div className="doc-text stake-rules" style={{ marginBottom: "0.75rem" }}>
         <p>
           分红公式：百 5 总释放量 ÷ 全网总质押 = 每币分红（合约{" "}
           <code>notifyRelease</code> × 5% / totalStaked）。
@@ -183,15 +192,26 @@ export function StakeDesk() {
       </div>
 
       {!eliteReady ? (
-        <p className="banner warn">
+        <p className="stake-gate warn">
           EliteStake 地址未配置（NEXT_PUBLIC_ELITE_ADDRESS）。UI 已就绪，待部署后接线。
         </p>
       ) : !unlocked ? (
-        <p className="banner warn">
-          质押权益仅对完成 <b>1500U 档位按钮</b>权重销毁的用户开放；当前未达成，确认质押不可用。手输金额不计入档位。
+        <p className="stake-gate locked">
+          <span className="sg-ico" aria-hidden>
+            🔒
+          </span>
+          <span>
+            质押权益仅对完成 <b>1500U 档位按钮</b>
+            权重销毁的用户开放；当前未达成，确认质押不可用。手输金额不计入档位。
+          </span>
         </p>
       ) : (
-        <p className="banner ok">1500U 档位已达成，质押权益已解锁，可自由选择质押数量。</p>
+        <p className="stake-gate open">
+          <span className="sg-ico" aria-hidden>
+            ✓
+          </span>
+          <span>1500U 档位已达成，质押权益已解锁，可自由选择质押数量。</span>
+        </p>
       )}
 
       <div className="input-box">
@@ -225,16 +245,28 @@ export function StakeDesk() {
         ))}
       </div>
 
-      <dl className="stats">
-        <div>
-          <dt>我的分红配额</dt>
-          <dd>{sharePct > 0 ? `${sharePct.toFixed(4)}%` : "—"}</dd>
+      <div className="quota-card" aria-label="分红配额与预估">
+        <div className="quota-row">
+          <span>我的分红配额（占总质押）</span>
+          <b className="quota-pct">{sharePct > 0 ? `${sharePct.toFixed(4)}%` : "0.0000%"}</b>
         </div>
-        <div>
-          <dt>全网总质押</dt>
-          <dd>{totalStaked != null ? fmtToken(totalBn) : "—"}</dd>
+        <div className="quota-row estimate">
+          <span>
+            <i className="est-gem" aria-hidden>
+              ◆
+            </i>
+            预估每期分红（{rewardLabel}）
+          </span>
+          <b className="quota-est">{estimateDisplay}</b>
         </div>
-      </dl>
+        <p className="quota-note">
+          预估取自链上已累计未领；新一期数值随 <code>notifyRelease</code> × 5% × 配额更新。
+        </p>
+        <div className="quota-row muted-row">
+          <span>全网总质押</span>
+          <span>{totalStaked != null ? fmtToken(totalBn) : "—"}</span>
+        </div>
+      </div>
 
       {!mounted ? (
         <p className="muted">加载中…</p>
@@ -262,7 +294,7 @@ export function StakeDesk() {
           )}
           <button
             type="button"
-            className="btn primary"
+            className="btn primary stake-cta"
             style={{ flex: 1 }}
             disabled={
               !unlocked || !eliteReady || isPending || confirming || needApprove || parsed === 0n
@@ -288,17 +320,19 @@ export function StakeDesk() {
             我的质押 · 赎回
             <span className="muted">{isStakeUnlocked ? "可赎回 · 随时领取" : "质押期中"}</span>
           </h3>
-          <dl className="stats">
+          <dl className="stats redeem-stats">
             <div>
               <dt>质押本金</dt>
               <dd>{fmtToken(stakedBn)} UMplan</dd>
             </div>
             <div>
-              <dt>到期倒计时</dt>
-              <dd>{lockLeft > 0 ? fmtCountdown(lockLeft) : isStakeUnlocked ? "已到期" : "—"}</dd>
+              <dt>本期到期倒计时（最短 24h）</dt>
+              <dd className={lockLeft > 0 ? "cd-live" : "cd-done"}>
+                {lockLeft > 0 ? fmtCountdown(lockLeft) : isStakeUnlocked ? "00:00:00 · 已到期" : "—"}
+              </dd>
             </div>
             <div>
-              <dt>未领分红</dt>
+              <dt>累计未领分红</dt>
               <dd>
                 {fmtToken(pendingBn)} {rewardLabel}
               </dd>

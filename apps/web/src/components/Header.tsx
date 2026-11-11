@@ -30,7 +30,7 @@ export function Header() {
       <div className="wallet">
         {!mounted ? (
           <button type="button" className="btn wallet-pill" disabled>
-            连接钱包
+            绑定钱包
           </button>
         ) : (
           <>
@@ -54,7 +54,7 @@ export function Header() {
                 disabled={isPending || !connectors[0]}
                 onClick={() => connect({ connector: connectors[0] })}
               >
-                {isPending ? "连接中…" : "连接钱包"}
+                {isPending ? "连接中…" : "绑定钱包"}
               </button>
             )}
           </>

@@ -12,6 +12,7 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
+import { useStats } from "@/lib/api/client";
 import { StakeDesk } from "@/components/StakeDesk";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
@@ -27,10 +28,10 @@ const TIERS = [
 ];
 
 const POOLS = [
-  { name: "分红池一 · 青铜池", tier: "100U", pct: "33.33%" },
-  { name: "分红池二 · 白银池", tier: "500U", pct: "25%" },
-  { name: "分红池三 · 黄金池", tier: "800U", pct: "25%" },
-  { name: "分红池四 · 钻石池", tier: "1500U", pct: "16.67%" },
+  { name: "分红池一 · 青铜池", tier: "100U", pct: "33.33%", tierId: 1 },
+  { name: "分红池二 · 白银池", tier: "500U", pct: "25%", tierId: 2 },
+  { name: "分红池三 · 黄金池", tier: "800U", pct: "25%", tierId: 3 },
+  { name: "分红池四 · 钻石池", tier: "1500U", pct: "16.67%", tierId: 4 },
 ];
 
 export default function PromoPage() {
@@ -43,6 +44,7 @@ export default function PromoPage() {
   const [nowSec, setNowSec] = useState(0);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
+  const { data: stats } = useStats();
 
   useEffect(() => {
     setNowSec(Math.floor(Date.now() / 1000));
@@ -91,6 +93,15 @@ export default function PromoPage() {
     query: { enabled },
   });
 
+  const { data: myBurnedUsd } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "burnedUsd",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
   const { data: claimable } = useReadContract({
     address: addresses.dividends,
     abi: DivAbi,
@@ -127,6 +138,41 @@ export default function PromoPage() {
     query: { enabled },
   });
 
+  const { data: m1 } = useReadContract({
+    address: addresses.dividends,
+    abi: DivAbi,
+    functionName: "tierMemberCount",
+    args: [1],
+    chainId: appChainId,
+    query: { enabled: mounted && isConfigured },
+  });
+  const { data: m2 } = useReadContract({
+    address: addresses.dividends,
+    abi: DivAbi,
+    functionName: "tierMemberCount",
+    args: [2],
+    chainId: appChainId,
+    query: { enabled: mounted && isConfigured },
+  });
+  const { data: m3 } = useReadContract({
+    address: addresses.dividends,
+    abi: DivAbi,
+    functionName: "tierMemberCount",
+    args: [3],
+    chainId: appChainId,
+    query: { enabled: mounted && isConfigured },
+  });
+  const { data: m4 } = useReadContract({
+    address: addresses.dividends,
+    abi: DivAbi,
+    functionName: "tierMemberCount",
+    args: [4],
+    chainId: appChainId,
+    query: { enabled: mounted && isConfigured },
+  });
+
+  const memberCounts = [m1, m2, m3, m4].map((m) => (m != null ? Number(m as bigint) : null));
+
   const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
   const usdPreview =
     quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
@@ -140,11 +186,15 @@ export default function PromoPage() {
       : 0;
 
   const myTier = tier != null ? Number(tier) : 0;
+  const burnedGlobal =
+    stats?.totalBurnedToken != null ? `${stats.totalBurnedToken} UMplan` : "—";
+  const myWeight =
+    myBurnedUsd != null ? `${fmtToken(myBurnedUsd as bigint)} U` : mounted && isConnected ? "—" : "—";
 
   return (
     <section className="panel">
       <FeatureGateBanner feature="权重" />
-      <div className="card">
+      <div className="card burn-card">
         <div className="burn-head">
           <div className="burn-flame" aria-hidden>
             🔥
@@ -169,7 +219,7 @@ export default function PromoPage() {
           ))}
         </div>
 
-        <div className="input-box">
+        <div className="input-box tight">
           <div className="ib-label">燃烧数量（UMplan · 由档位按钮锁定）</div>
           <div className="input-row">
             <input
@@ -183,11 +233,11 @@ export default function PromoPage() {
             </div>
           </div>
         </div>
-        <p className="muted" style={{ marginTop: "-0.35rem", marginBottom: "0.75rem" }}>
+        <p className="muted tip-line">
           手输金额不触发档位股东 / 质押解锁；须点选上方档位按钮并确认。
         </p>
 
-        <dl className="stats">
+        <dl className="stats compact-stats">
           <div>
             <dt>折合 U</dt>
             <dd>{quoteUsd != null ? fmtToken(quoteUsd as bigint) : `${selected.u}`}</dd>
@@ -202,21 +252,21 @@ export default function PromoPage() {
         </dl>
 
         <div className="split-title">
-          拆账预览（金本位 U）
-          <span className="contract-tag">70 / 20 / 10</span>
+          扣除后资金分配预览
+          <span className="contract-tag">比例以合约参数为准</span>
         </div>
         <div className="split-row">
           <div className="split-icon si-fire">🔥</div>
           <div className="split-name">
             权重销毁
-            <span className="pct">70% · 打入销毁地址</span>
+            <span className="pct">70% · 打入销毁地址，永久移出流通</span>
           </div>
           <div className="split-amt">{splitFire.toFixed(2)} U</div>
         </div>
         <div className="split-row">
           <div className="split-icon si-promo">◎</div>
           <div className="split-name">
-            市场奖励（九层）
+            市场奖励
             <span className="pct">20% · 直推 / 间推 / 市场3…9</span>
           </div>
           <div className="split-amt">{splitMarket.toFixed(2)} U</div>
@@ -225,7 +275,7 @@ export default function PromoPage() {
           <div className="split-icon si-div">◆</div>
           <div className="split-name">
             股东分红
-            <span className="pct">10% · 股东地址均分</span>
+            <span className="pct">10% · 注入 SPCXB 分红池，按权重档位分配</span>
           </div>
           <div className="split-amt">{splitShare.toFixed(2)} U</div>
         </div>
@@ -246,7 +296,7 @@ export default function PromoPage() {
         ) : !isConfigured ? (
           <p className="banner warn">合约地址未配置</p>
         ) : (
-          <div className="cta-row" style={{ marginTop: "0.85rem" }}>
+          <div className="cta-row" style={{ marginTop: "0.75rem" }}>
             {needApprove && (
               <button
                 type="button"
@@ -288,8 +338,25 @@ export default function PromoPage() {
         )}
       </div>
 
+      <div className="card weight-summary">
+        <h2 className="card-title accent">权重数据</h2>
+        <div className="ws-row">
+          <span>全网累计已销毁</span>
+          <b className="ws-fire">{burnedGlobal}</b>
+        </div>
+        <div className="ws-row">
+          <span>我的累计权重</span>
+          <b className="ws-fire">{myWeight}</b>
+        </div>
+        <ul className="ws-notes">
+          <li>权重订单资金按 70% 销毁比例打入销毁地址。</li>
+          <li>买卖手续费（最低 3%、默认 3.5%）属交易费用，不计入权重销毁。</li>
+          <li>销毁地址链上公开可查。</li>
+        </ul>
+      </div>
+
       <div className="card">
-        <h2 className="card-title">推广收益规则</h2>
+        <h2 className="card-title accent">推广收益规则</h2>
         <div className="reward-item">
           <span className="r-l">直推</span>
           <span className="r-v" style={{ color: "var(--theme-color)" }}>
@@ -322,37 +389,46 @@ export default function PromoPage() {
           SPCXB 档位分红
           <span className="muted">成为对应池的分红股东 · 24h 冷却</span>
         </h2>
-        <p className="muted" style={{ marginTop: 0 }}>
+        <p className={myTier > 0 ? "pool-status open" : "pool-status locked"}>
           {myTier > 0
             ? `已达成档位 T${myTier}，成为对应池分红股东（最高档，不叠加）。`
-            : "完成权重销毁档位按钮后，即成为对应分红池股东；当前尚未达成任何档位。"}
+            : "完成权重销毁后，即成为对应分红池的分红股东，按该池占比与同池人数分配 SPCXB；当前尚未达成任何档位。"}
         </p>
-        <div className="pool-table" role="table" aria-label="SPCXB 四池占比">
+        <p className="muted pool-caption">四池合计 100% · 人数来自链上；人均待释放量索引后填入</p>
+        <div className="pool-table pool-table-rich" role="table" aria-label="SPCXB 四池占比">
           <div className="pool-row head" role="row">
             <span>分红池</span>
-            <span>档位</span>
+            <span>人数</span>
             <span>占比</span>
           </div>
-          {POOLS.map((p, i) => (
-            <div
-              key={p.name}
-              className={myTier === i + 1 ? "pool-row on" : "pool-row"}
-              role="row"
-            >
-              <span>
-                {p.name}
-                {myTier === i + 1 ? " · 生效中" : ""}
-              </span>
-              <span>{p.tier}</span>
-              <span>{p.pct}</span>
-            </div>
-          ))}
+          {POOLS.map((p, i) => {
+            const count = memberCounts[i];
+            return (
+              <div
+                key={p.name}
+                className={myTier === p.tierId ? "pool-row on" : "pool-row"}
+                role="row"
+              >
+                <span className="pool-main">
+                  <strong>
+                    {p.name}
+                    {myTier === p.tierId ? " · 生效中" : ""}
+                  </strong>
+                  <small>
+                    {p.tier} 档 · 人均 —
+                  </small>
+                </span>
+                <span>{count != null ? count.toLocaleString("en-US") : "—"}</span>
+                <span>{p.pct}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="my-div-box">
+          <span>我的 SPCXB 可领</span>
+          <b>{claimable != null ? `${fmtToken(claimable as bigint)} SPCXB` : "0 SPCXB"}</b>
         </div>
         <dl className="stats" style={{ marginTop: "0.85rem" }}>
-          <div>
-            <dt>可领 SPCXB</dt>
-            <dd>{claimable != null ? fmtToken(claimable as bigint) : "—"}</dd>
-          </div>
           <div>
             <dt>冷却</dt>
             <dd>
@@ -364,6 +440,10 @@ export default function PromoPage() {
                     ? `${Math.ceil(cooldownLeft / 3600)}h 后`
                     : "—"}
             </dd>
+          </div>
+          <div>
+            <dt>规则</dt>
+            <dd>24h / 次</dd>
           </div>
         </dl>
         <p className="muted">每 24h 可领一次（链上强制）；也可累计不领。四档同档均分 SPCXB。</p>
