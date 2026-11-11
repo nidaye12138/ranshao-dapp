@@ -12,6 +12,8 @@ import { appChainId } from "@/lib/chain";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { StakeDesk } from "@/components/StakeDesk";
+import { FeatureGateBanner } from "@/components/FeatureGateBanner";
+import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
@@ -24,6 +26,8 @@ const FEE_FLOOR = 3;
 export default function SwapPage() {
   const mounted = useMounted();
   const { address, isConnected } = useAccount();
+  const gate = useOnboardingOptional();
+  const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("100");
   const [slippage, setSlippage] = useState(3.5);
@@ -135,6 +139,7 @@ export default function SwapPage() {
 
   return (
     <section className="panel">
+      <FeatureGateBanner feature="买入" />
       <div className="seg" role="tablist" aria-label="买卖切换">
         <button
           type="button"
@@ -225,6 +230,8 @@ export default function SwapPage() {
           <p className="muted">加载中…</p>
         ) : !isConnected ? (
           <p className="banner warn">请先连接钱包</p>
+        ) : !featuresUnlocked ? (
+          <p className="banner warn">请先完成邀请人绑定后再买入 / 卖出</p>
         ) : !isConfigured ? (
           <p className="banner warn">合约地址未配置</p>
         ) : (
@@ -238,7 +245,7 @@ export default function SwapPage() {
               type="button"
               className={mode === "sell" ? "btn primary sell" : "btn primary"}
               style={{ flex: 1 }}
-              disabled={isPending || confirming || needApprove || parsed === 0n}
+              disabled={isPending || confirming || needApprove || parsed === 0n || !featuresUnlocked}
               onClick={onSwap}
             >
               {isPending || confirming ? "确认中…" : mode === "buy" ? "确认买入" : "确认卖出"}

@@ -13,6 +13,8 @@ import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { StakeDesk } from "@/components/StakeDesk";
+import { FeatureGateBanner } from "@/components/FeatureGateBanner";
+import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
@@ -34,6 +36,8 @@ const POOLS = [
 export default function PromoPage() {
   const mounted = useMounted();
   const { address, isConnected } = useAccount();
+  const gate = useOnboardingOptional();
+  const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const [selectedTierId, setSelectedTierId] = useState<number>(1);
   const [agreed, setAgreed] = useState(false);
   const [nowSec, setNowSec] = useState(0);
@@ -139,6 +143,7 @@ export default function PromoPage() {
 
   return (
     <section className="panel">
+      <FeatureGateBanner feature="权重" />
       <div className="card">
         <div className="burn-head">
           <div className="burn-flame" aria-hidden>
@@ -236,6 +241,8 @@ export default function PromoPage() {
           <p className="muted">加载中…</p>
         ) : !isConnected ? (
           <p className="banner warn">请先连接钱包</p>
+        ) : !featuresUnlocked ? (
+          <p className="banner warn">请先完成邀请人绑定后再进行权重销毁</p>
         ) : !isConfigured ? (
           <p className="banner warn">合约地址未配置</p>
         ) : (
@@ -244,7 +251,7 @@ export default function PromoPage() {
               <button
                 type="button"
                 className="btn"
-                disabled={isPending || confirming || !agreed || parsed === 0n}
+                disabled={isPending || confirming || !agreed || parsed === 0n || !featuresUnlocked}
                 onClick={() =>
                   writeContract({
                     address: addresses.token,
@@ -262,7 +269,9 @@ export default function PromoPage() {
               type="button"
               className="btn primary burn"
               style={{ flex: 1 }}
-              disabled={isPending || confirming || needApprove || parsed === 0n || !agreed}
+              disabled={
+                isPending || confirming || needApprove || parsed === 0n || !agreed || !featuresUnlocked
+              }
               onClick={() =>
                 writeContract({
                   address: addresses.burn,

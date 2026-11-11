@@ -7,6 +7,8 @@ import { appChainId } from "@/lib/chain";
 import { fmtToken, shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useTeam } from "@/lib/api/client";
+import { FeatureGateBanner } from "@/components/FeatureGateBanner";
+import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
@@ -16,6 +18,8 @@ type IncomeTab = "swap" | "layer" | "div";
 export default function MinePage() {
   const mounted = useMounted();
   const { address, isConnected } = useAccount();
+  const gate = useOnboardingOptional();
+  const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const ready = mounted && isConfigured && !!address;
   const [inviteOrigin, setInviteOrigin] = useState("");
   const [incomeTab, setIncomeTab] = useState<IncomeTab>("swap");
@@ -118,6 +122,7 @@ export default function MinePage() {
 
   return (
     <section className="panel">
+      <FeatureGateBanner feature="收益" />
       <div className="card">
         <h2 className="card-title">我的钱包</h2>
         {!mounted ? (
@@ -221,63 +226,69 @@ export default function MinePage() {
           我的收益
           <span className="muted">质押分红=合约 rewardToken · 档位分红=SPCXB</span>
         </h2>
-        <p className="muted" style={{ marginTop: 0 }}>
-          {earnings?.source === "graph"
-            ? "账本来自索引"
-            : earnings?.source === "unconfigured"
-              ? "索引未配置 — 明细为空"
-              : mounted && isConnected
-                ? "加载中…"
-                : ""}
-        </p>
-        <div className="filters">
-          <button
-            type="button"
-            className={incomeTab === "swap" ? "filter-btn on" : "filter-btn"}
-            onClick={() => setIncomeTab("swap")}
-          >
-            Swap 推广奖励
-          </button>
-          <button
-            type="button"
-            className={incomeTab === "layer" ? "filter-btn on" : "filter-btn"}
-            onClick={() => setIncomeTab("layer")}
-          >
-            层奖励
-          </button>
-          <button
-            type="button"
-            className={incomeTab === "div" ? "filter-btn on" : "filter-btn"}
-            onClick={() => setIncomeTab("div")}
-          >
-            分红
-          </button>
-        </div>
-        <div className="detail-total">
-          <span>
-            总量（{incomeView.unit}
-            {incomeTab === "layer" ? " · 直推/间推/市场" : ""}）
-          </span>
-          <b>{incomeView.total}</b>
-        </div>
-        {incomeTab === "layer" && earnings?.layerTotal && (
-          <p className="muted" style={{ marginBottom: "0.5rem" }}>
-            直推 {earnings.layerTotal.直推 ?? "—"} / 间推 {earnings.layerTotal.间推 ?? "—"} / 市场{" "}
-            {earnings.layerTotal.市场 ?? "—"}（明细须标市场3…市场9）
-          </p>
-        )}
-        {!incomeView.rows.length ? (
-          <p className="muted">暂无明细</p>
+        {!featuresUnlocked ? (
+          <p className="banner warn">请先完成邀请人绑定后查看收益明细</p>
         ) : (
-          <ul className="ledger">
-            {incomeView.rows.map((r) => (
-              <li key={r.id}>
-                <span>{r.label}</span>
-                <span className="d-amt">{r.amount}</span>
-                <span className="muted">{r.at}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="muted" style={{ marginTop: 0 }}>
+              {earnings?.source === "graph"
+                ? "账本来自索引"
+                : earnings?.source === "unconfigured"
+                  ? "索引未配置 — 明细为空"
+                  : mounted && isConnected
+                    ? "加载中…"
+                    : ""}
+            </p>
+            <div className="filters">
+              <button
+                type="button"
+                className={incomeTab === "swap" ? "filter-btn on" : "filter-btn"}
+                onClick={() => setIncomeTab("swap")}
+              >
+                Swap 推广奖励
+              </button>
+              <button
+                type="button"
+                className={incomeTab === "layer" ? "filter-btn on" : "filter-btn"}
+                onClick={() => setIncomeTab("layer")}
+              >
+                层奖励
+              </button>
+              <button
+                type="button"
+                className={incomeTab === "div" ? "filter-btn on" : "filter-btn"}
+                onClick={() => setIncomeTab("div")}
+              >
+                分红
+              </button>
+            </div>
+            <div className="detail-total">
+              <span>
+                总量（{incomeView.unit}
+                {incomeTab === "layer" ? " · 直推/间推/市场" : ""}）
+              </span>
+              <b>{incomeView.total}</b>
+            </div>
+            {incomeTab === "layer" && earnings?.layerTotal && (
+              <p className="muted" style={{ marginBottom: "0.5rem" }}>
+                直推 {earnings.layerTotal.直推 ?? "—"} / 间推 {earnings.layerTotal.间推 ?? "—"} / 市场{" "}
+                {earnings.layerTotal.市场 ?? "—"}（明细须标市场3…市场9）
+              </p>
+            )}
+            {!incomeView.rows.length ? (
+              <p className="muted">暂无明细</p>
+            ) : (
+              <ul className="ledger">
+                {incomeView.rows.map((r) => (
+                  <li key={r.id}>
+                    <span>{r.label}</span>
+                    <span className="d-amt">{r.amount}</span>
+                    <span className="muted">{r.at}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
     </section>
