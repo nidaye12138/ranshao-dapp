@@ -11,19 +11,22 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
+import { StakeDesk } from "@/components/StakeDesk";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
 type Mode = "buy" | "sell";
 
-const SLIP_PRESETS = [0.5, 1, 2];
+const SLIP_PRESETS = [3.5, 5, 10];
+const FEE_PCT = 3.5;
+const FEE_FLOOR = 3;
 
 export default function SwapPage() {
   const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("100");
-  const [slippage, setSlippage] = useState(1);
+  const [slippage, setSlippage] = useState(3.5);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
@@ -86,6 +89,7 @@ export default function SwapPage() {
   const usdAmount = quote?.[1];
   const selfReward = (parsed * 50n) / 10_000n;
   const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
+  const feePreview = Number(amount || "0") * (FEE_PCT / 100);
 
   const bal = mode === "buy" ? (usdtBal as bigint | undefined) : (tokenBal as bigint | undefined);
 
@@ -173,6 +177,19 @@ export default function SwapPage() {
           <span className="rb-value">{outAmount != null ? fmtToken(outAmount) : "0.00"}</span>
         </div>
 
+        <div className="fee-row">
+          <span>
+            交易手续费 {FEE_PCT}%（最低 {FEE_FLOOR}%）
+          </span>
+          <span className="fee-amt">
+            −{Number.isFinite(feePreview) ? feePreview.toFixed(2) : "0.00"}{" "}
+            {mode === "buy" ? "USDT" : "UMplan"}
+          </span>
+        </div>
+        <p className="muted" style={{ marginTop: "-0.35rem", marginBottom: "0.65rem" }}>
+          展示为产品承诺费率；成交扣费以合约参数为准。
+        </p>
+
         <div className="slip-row">
           <span>滑点</span>
           <span>
@@ -191,8 +208,16 @@ export default function SwapPage() {
 
         <div className="info-strip">
           <span>
-            {mode === "buy" ? "买入" : "卖出"}瞬间，你与直推上级各获得成交额{" "}
-            <b style={{ color: "var(--theme-color)" }}>0.5%</b> 的奖励，立刻到账钱包。无累计买入业绩 / 级别。
+            {mode === "buy"
+              ? "买入瞬间，你与你的邀请人各获得买入金额 0.5% 的奖励，立刻到账钱包。"
+              : "卖出瞬间，你与直推邀请人各获得成交额 0.5% 的奖励，立刻到账钱包。"}{" "}
+            无累计买入业绩 / 级别。
+          </span>
+        </div>
+
+        <div className="info-strip gold">
+          <span>
+            买入 / 卖出手续费按协议最低 {FEE_FLOOR}%、系统默认 {FEE_PCT}% 收取，直接从交易金额中扣除，属正常交易费用，不参与权重销毁分配。
           </span>
         </div>
 
@@ -232,7 +257,13 @@ export default function SwapPage() {
           </div>
         </dl>
 
-        {isSuccess && <p className="banner ok">交易已确认</p>}
+        {isSuccess && (
+          <p className="banner ok">
+            {mode === "buy"
+              ? `买入成功，已按约 ${FEE_PCT}% 手续费口径展示，0.5% 奖励即时到账你与邀请人`
+              : `卖出已提交，按约 ${FEE_PCT}% 手续费口径展示，等待链上确认`}
+          </p>
+        )}
         {error && <p className="banner warn">{error.message}</p>}
       </div>
 
@@ -240,14 +271,19 @@ export default function SwapPage() {
         <h2 className="card-title">即时奖励说明</h2>
         <div className="doc-text">
           <p>
-            <b>仅即时奖：</b>买/卖 → 交易方 0.5% + 直推上级 0.5%（支付币种）到钱包。
+            <b>仅即时奖：</b>买/卖 → 交易方 0.5% + 直推邀请人 0.5%（支付币种）到钱包。
           </p>
           <p>
             <b>不做</b>累计买入业绩、级别或里程碑奖励。
           </p>
-          <p>滑点字段预留校验（当前 {slippage}%）；报价为预言机固定价 MVP。</p>
+          <p>
+            滑点展示预设（当前 {slippage}%）；报价为预言机固定价 MVP。手续费产品承诺{" "}
+            {FEE_PCT}%（最低 {FEE_FLOOR}%）。
+          </p>
         </div>
       </div>
+
+      <StakeDesk />
     </section>
   );
 }

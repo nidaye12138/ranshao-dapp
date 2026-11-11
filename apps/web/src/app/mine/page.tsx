@@ -187,7 +187,7 @@ export default function MinePage() {
           </div>
           <div className="team-cell">
             <div className="t-num">{mounted && team ? `$${team.umbrellaUsd}` : "—"}</div>
-            <div className="t-label">伞下总业绩</div>
+            <div className="t-label">市场总业绩</div>
           </div>
         </div>
       </div>
@@ -198,17 +198,20 @@ export default function MinePage() {
           <p className="muted">…</p>
         ) : activated ? (
           <>
-            <div className="qual-on">已激活（燃烧任意档 · 金本位 ≥100U）— 可生成专属邀请链接</div>
+            <div className="qual-on">已激活，可生成专属推广链接（权重档位按钮 · ≥100U）</div>
             <div className="link-row">
               <div className="link-box">{inviteDisplay}</div>
               <button type="button" className="btn primary" onClick={copyInvite}>
-                {copied ? "已复制" : "复制"}
+                {copied ? "已复制" : "复制链接"}
+              </button>
+              <button type="button" className="btn" disabled title="占位">
+                我的二维码
               </button>
             </div>
           </>
         ) : (
           <div className="qual-off">
-            请先在「权重」燃烧任意档（最低 100U）以解锁邀请链接。激活门槛是燃烧入场，不是累计买入。
+            需在「权重」完成任意档燃烧（最低 ≥100U，点选档位按钮）才可解锁推广资格并生成专属推广链接——不是累计买入。
           </div>
         )}
       </div>
@@ -216,7 +219,7 @@ export default function MinePage() {
       <div className="card">
         <h2 className="card-title">
           我的收益
-          <span className="muted">奖励=UMplan · 分红=SPCXB</span>
+          <span className="muted">质押分红=合约 rewardToken · 档位分红=SPCXB</span>
         </h2>
         <p className="muted" style={{ marginTop: 0 }}>
           {earnings?.source === "graph"
@@ -233,7 +236,7 @@ export default function MinePage() {
             className={incomeTab === "swap" ? "filter-btn on" : "filter-btn"}
             onClick={() => setIncomeTab("swap")}
           >
-            Swap 推广
+            Swap 推广奖励
           </button>
           <button
             type="button"

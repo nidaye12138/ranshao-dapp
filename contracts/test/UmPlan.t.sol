@@ -233,45 +233,54 @@ contract UmPlanTest is Test {
         // 10% shareholders → admin claimable
         assertEq(shareholders.claimable(admin), 1_000e18);
 
-        // Dave burned $10k → tier 4
-        assertEq(dividends.tierOf(dave), 4);
+        // Free-amount burn does NOT grant tier benefits
+        assertEq(dividends.tierOf(dave), 0);
+        assertEq(burnRouter.buttonTierOf(dave), 0);
         assertEq(burnRouter.burnedUsd(dave), 10_000e18);
     }
 
-    function test_burn_tier_thresholds_highest_only() public {
+    function test_burn_tier_buttons_only() public {
         vm.prank(alice);
         tree.bindReferrer(admin);
 
-        // 100 U → T1
+        // Free typed amount ≥100U must NOT activate / grant tier
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), 1_500e18);
+        burnRouter.burn(1_500e18);
+        vm.stopPrank();
+        assertEq(dividends.tierOf(alice), 0);
+        assertFalse(dividends.isActivated(alice));
+
+        // 100U button → T1
+        vm.startPrank(alice);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 1);
+        assertEq(burnRouter.buttonTierOf(alice), 1);
         assertEq(dividends.tierMemberCount(1), 1);
+        assertTrue(dividends.isActivated(alice));
 
-        // +400 → 500 U → T2 (leaves T1)
+        // 500U button → T2 (leaves T1)
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 400e18);
-        burnRouter.burn(400e18);
+        burnRouter.burnTier(2);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 2);
         assertEq(dividends.tierMemberCount(1), 0);
         assertEq(dividends.tierMemberCount(2), 1);
 
-        // +300 → 800 → T3
+        // 800U button → T3
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 300e18);
-        burnRouter.burn(300e18);
+        burnRouter.burnTier(3);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 3);
 
-        // +700 → 1500 → T4
+        // 1500U button → T4 (stake unlock)
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 700e18);
-        burnRouter.burn(700e18);
+        burnRouter.burnTier(4);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 4);
+        assertEq(burnRouter.buttonTierOf(alice), 4);
         assertEq(dividends.tierMemberCount(3), 0);
         assertEq(dividends.tierMemberCount(4), 1);
     }
@@ -284,12 +293,12 @@ contract UmPlanTest is Test {
         tree.bindReferrer(admin);
 
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
         vm.startPrank(bob);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
 
         uint256 injectAmt = 10_000e18;
@@ -358,8 +367,8 @@ contract UmPlanTest is Test {
         tree.bindReferrer(admin);
 
         vm.startPrank(eve);
-        token.approve(address(burnRouter), 1_500e18);
-        burnRouter.burn(1_500e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(4);
         vm.stopPrank();
         assertEq(dividends.tierOf(eve), 4);
 
@@ -383,8 +392,8 @@ contract UmPlanTest is Test {
         vm.prank(alice);
         tree.bindReferrer(admin);
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 1_500e18);
-        burnRouter.burn(1_500e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(4);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 4);
 
@@ -393,6 +402,7 @@ contract UmPlanTest is Test {
         token.approve(address(elite), stakeAmt);
         elite.stake(stakeAmt);
         vm.stopPrank();
+        assertFalse(elite.isUnlocked(alice));
 
         // notify release of 10_000 SPCXB → 5% = 500 to stakers
         vm.startPrank(admin);
@@ -402,8 +412,45 @@ contract UmPlanTest is Test {
 
         assertEq(elite.pendingRewards(alice), 500e18);
         vm.prank(alice);
+        vm.expectRevert("elite: locked");
+        elite.claim();
+
+        uint256 firstUnlock = elite.unlockAt(alice);
+        vm.warp(firstUnlock);
+        assertTrue(elite.isUnlocked(alice));
+        vm.prank(alice);
         elite.claim();
         assertEq(spcxb.balanceOf(alice), 500e18);
+        // claim-only extends lock another 24h from prior unlock boundary
+        assertFalse(elite.isUnlocked(alice));
+        assertEq(elite.unlockAt(alice), firstUnlock + 24 hours);
+    }
+
+    function test_elite_redeem_after_lock() public {
+        vm.prank(alice);
+        tree.bindReferrer(admin);
+        vm.startPrank(alice);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(4);
+        uint256 stakeAmt = 200e18;
+        token.approve(address(elite), stakeAmt);
+        elite.stake(stakeAmt);
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        spcxb.approve(address(elite), 500e18);
+        elite.notifyRelease(10_000e18);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 24 hours);
+        uint256 umBefore = token.balanceOf(alice);
+        uint256 spBefore = spcxb.balanceOf(alice);
+        vm.prank(alice);
+        elite.redeem();
+        assertEq(token.balanceOf(alice), umBefore + stakeAmt);
+        assertEq(spcxb.balanceOf(alice), spBefore + 500e18);
+        assertEq(elite.stakedOf(alice), 0);
+        assertEq(elite.unlockAt(alice), 0);
     }
 
     function test_broker_stub_receiveFee() public {
@@ -444,8 +491,8 @@ contract UmPlanTest is Test {
         vm.prank(alice);
         tree.bindReferrer(admin);
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
         assertTrue(dividends.isActivated(alice));
 

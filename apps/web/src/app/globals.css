@@ -773,6 +773,18 @@ code {
   background: linear-gradient(90deg, var(--theme-color), transparent);
 }
 
+.flat-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid rgba(46, 199, 214, 0.35);
+  color: var(--theme-color);
+  font-size: 0.58rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
 .flat-label {
   font-size: 0.75rem;
   color: var(--text-secondary);
@@ -1091,6 +1103,64 @@ code {
   background: rgba(217, 180, 92, 0.08);
   border-color: rgba(217, 180, 92, 0.3);
   color: #e6d3a0;
+}
+
+.fee-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--gold-warm);
+}
+
+.fee-row .fee-amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.agree-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.agree-row input {
+  margin-top: 0.15rem;
+  accent-color: var(--theme-color);
+}
+
+.pool-table {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.72rem;
+}
+
+.pool-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.6fr 0.6fr;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.pool-row.head {
+  border-top: none;
+  background: var(--card-sub);
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+}
+
+.pool-row.on {
+  background: rgba(46, 199, 214, 0.1);
+  color: var(--theme-color);
 }
 
 /* ——— Promo / 权重 ——— */

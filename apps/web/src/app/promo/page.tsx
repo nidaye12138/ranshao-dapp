@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useAccount,
   useReadContract,
@@ -10,24 +10,32 @@ import {
 import { formatUnits } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
-import { fmtToken, parseAmount } from "@/lib/format";
+import { fmtToken } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
+import { StakeDesk } from "@/components/StakeDesk";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
 const TIERS = [
-  { u: 100, label: "100U", sub: "档位一" },
-  { u: 500, label: "500U", sub: "档位二" },
-  { u: 800, label: "800U", sub: "档位三" },
-  { u: 1500, label: "1500U", sub: "档位四" },
+  { id: 1, u: 100, label: "100U", sub: "档位一" },
+  { id: 2, u: 500, label: "500U", sub: "档位二" },
+  { id: 3, u: 800, label: "800U", sub: "档位三" },
+  { id: 4, u: 1500, label: "1500U", sub: "解锁质押" },
+];
+
+const POOLS = [
+  { name: "分红池一 · 青铜池", tier: "100U", pct: "33.33%" },
+  { name: "分红池二 · 白银池", tier: "500U", pct: "25%" },
+  { name: "分红池三 · 黄金池", tier: "800U", pct: "25%" },
+  { name: "分红池四 · 钻石池", tier: "1500U", pct: "16.67%" },
 ];
 
 export default function PromoPage() {
   const mounted = useMounted();
   const { address, isConnected } = useAccount();
-  const [amount, setAmount] = useState("100");
-  const [selectedTier, setSelectedTier] = useState<number | null>(100);
+  const [selectedTierId, setSelectedTierId] = useState<number>(1);
+  const [agreed, setAgreed] = useState(false);
   const [nowSec, setNowSec] = useState(0);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
@@ -38,15 +46,19 @@ export default function PromoPage() {
     return () => clearInterval(t);
   }, []);
 
-  const parsed = useMemo(() => {
-    try {
-      return parseAmount(amount || "0", 18);
-    } catch {
-      return 0n;
-    }
-  }, [amount]);
-
+  const selected = TIERS.find((t) => t.id === selectedTierId) ?? TIERS[0];
   const enabled = mounted && isConfigured && !!address;
+
+  const { data: tokenAmount } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "quoteTokensForTier",
+    args: [selectedTierId],
+    chainId: appChainId,
+    query: { enabled: isConfigured && selectedTierId >= 1 },
+  });
+
+  const parsed = (tokenAmount as bigint | undefined) ?? 0n;
 
   const { data: quoteUsd } = useReadContract({
     address: addresses.burn,
@@ -57,19 +69,19 @@ export default function PromoPage() {
     query: { enabled: enabled && parsed > 0n },
   });
 
-  const { data: oneTokUsd } = useReadContract({
-    address: addresses.burn,
-    abi: BurnAbi,
-    functionName: "quoteBurnUsd",
-    args: [10n ** 18n],
-    chainId: appChainId,
-    query: { enabled: isConfigured },
-  });
-
   const { data: tier } = useReadContract({
     address: addresses.dividends,
     abi: DivAbi,
     functionName: "tierOf",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
+  const { data: buttonTier } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "buttonTierOf",
     args: [address!],
     chainId: appChainId,
     query: { enabled },
@@ -112,31 +124,18 @@ export default function PromoPage() {
   });
 
   const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
-  const price = (oneTokUsd as bigint | undefined) ?? 0n;
   const usdPreview =
-    quoteUsd != null
-      ? Number(formatUnits(quoteUsd as bigint, 18))
-      : selectedTier != null
-        ? selectedTier
-        : 0;
+    quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
   const splitFire = usdPreview * 0.7;
   const splitMarket = usdPreview * 0.2;
   const splitShare = usdPreview * 0.1;
-
-  function pickTier(u: number) {
-    setSelectedTier(u);
-    if (price === 0n) {
-      setAmount(String(u));
-      return;
-    }
-    const tokens = (BigInt(u) * 10n ** 36n) / price;
-    setAmount((Number(tokens) / 1e18).toFixed(6));
-  }
 
   const cooldownLeft =
     mounted && nowSec > 0 && nextClaim && typeof nextClaim === "bigint" && nextClaim > 0n
       ? Math.max(0, Number(nextClaim) - nowSec)
       : 0;
+
+  const myTier = tier != null ? Number(tier) : 0;
 
   return (
     <section className="panel">
@@ -145,17 +144,19 @@ export default function PromoPage() {
           <div className="burn-flame" aria-hidden>
             🔥
           </div>
-          <div className="bh-title">权重销毁 · 四档入场</div>
-          <div className="bh-sub">选择档位燃烧 UMplan（金本位 U），按合约比例销毁与分配</div>
+          <div className="bh-title">权重销毁 · 档位直扣</div>
+          <div className="bh-sub">
+            选择档位燃烧 UMplan（金本位 U），按合约约定比例自动销毁与分配。仅档位按钮计入档位权益。
+          </div>
         </div>
 
         <div className="presets">
           {TIERS.map((t) => (
             <button
-              key={t.u}
+              key={t.id}
               type="button"
-              className={selectedTier === t.u ? "preset-btn on" : "preset-btn"}
-              onClick={() => pickTier(t.u)}
+              className={selectedTierId === t.id ? "preset-btn on" : "preset-btn"}
+              onClick={() => setSelectedTierId(t.id)}
             >
               {t.label}
               <small>{t.sub}</small>
@@ -164,16 +165,12 @@ export default function PromoPage() {
         </div>
 
         <div className="input-box">
-          <div className="ib-label">燃烧数量（UMplan）</div>
+          <div className="ib-label">燃烧数量（UMplan · 由档位按钮锁定）</div>
           <div className="input-row">
             <input
-              value={amount}
-              onChange={(e) => {
-                setSelectedTier(null);
-                setAmount(e.target.value);
-              }}
-              inputMode="decimal"
-              placeholder="0.00"
+              value={parsed > 0n ? (Number(parsed) / 1e18).toFixed(6) : "—"}
+              readOnly
+              aria-readonly
             />
             <div className="token-chip">
               <i className="tc-dot tc-um" />
@@ -181,15 +178,21 @@ export default function PromoPage() {
             </div>
           </div>
         </div>
+        <p className="muted" style={{ marginTop: "-0.35rem", marginBottom: "0.75rem" }}>
+          手输金额不触发档位股东 / 质押解锁；须点选上方档位按钮并确认。
+        </p>
 
         <dl className="stats">
           <div>
             <dt>折合 U</dt>
-            <dd>{quoteUsd != null ? fmtToken(quoteUsd as bigint) : "—"}</dd>
+            <dd>{quoteUsd != null ? fmtToken(quoteUsd as bigint) : `${selected.u}`}</dd>
           </div>
           <div>
             <dt>我的档位</dt>
-            <dd>{tier != null ? `T${tier}` : "—"}</dd>
+            <dd>
+              {tier != null ? `T${tier}` : "—"}
+              {buttonTier != null ? ` · 按钮T${buttonTier}` : ""}
+            </dd>
           </div>
         </dl>
 
@@ -200,7 +203,7 @@ export default function PromoPage() {
         <div className="split-row">
           <div className="split-icon si-fire">🔥</div>
           <div className="split-name">
-            销毁
+            权重销毁
             <span className="pct">70% · 打入销毁地址</span>
           </div>
           <div className="split-amt">{splitFire.toFixed(2)} U</div>
@@ -208,7 +211,7 @@ export default function PromoPage() {
         <div className="split-row">
           <div className="split-icon si-promo">◎</div>
           <div className="split-name">
-            九层奖励
+            市场奖励（九层）
             <span className="pct">20% · 直推 / 间推 / 市场3…9</span>
           </div>
           <div className="split-amt">{splitMarket.toFixed(2)} U</div>
@@ -222,6 +225,13 @@ export default function PromoPage() {
           <div className="split-amt">{splitShare.toFixed(2)} U</div>
         </div>
 
+        <label className="agree-row">
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <span>
+            我已阅读并同意《权重销毁协议》，确认后从钱包扣除所选档位等值 UMplan 并调用合约，需在钱包中授权签名。资金按合约约定比例销毁与分配，不可撤回。
+          </span>
+        </label>
+
         {!mounted ? (
           <p className="muted">加载中…</p>
         ) : !isConnected ? (
@@ -234,7 +244,7 @@ export default function PromoPage() {
               <button
                 type="button"
                 className="btn"
-                disabled={isPending || confirming}
+                disabled={isPending || confirming || !agreed || parsed === 0n}
                 onClick={() =>
                   writeContract({
                     address: addresses.token,
@@ -252,18 +262,18 @@ export default function PromoPage() {
               type="button"
               className="btn primary burn"
               style={{ flex: 1 }}
-              disabled={isPending || confirming || needApprove || parsed === 0n}
+              disabled={isPending || confirming || needApprove || parsed === 0n || !agreed}
               onClick={() =>
                 writeContract({
                   address: addresses.burn,
                   abi: BurnAbi,
-                  functionName: "burn",
-                  args: [parsed],
+                  functionName: "burnTier",
+                  args: [selectedTierId],
                   chainId: appChainId,
                 })
               }
             >
-              {isPending || confirming ? "确认中…" : "确认权重销毁"}
+              {isPending || confirming ? "确认中…" : "确认权重"}
             </button>
           </div>
         )}
@@ -274,36 +284,62 @@ export default function PromoPage() {
         <div className="reward-item">
           <span className="r-l">直推</span>
           <span className="r-v" style={{ color: "var(--theme-color)" }}>
-            第 1 层
+            第 1 层 · 总额 4%
           </span>
         </div>
         <div className="reward-item">
           <span className="r-l">间推</span>
           <span className="r-v" style={{ color: "var(--theme-color)" }}>
-            仅第 2 层
+            仅第 2 层 · 总额 2%
           </span>
         </div>
         <div className="reward-item">
           <span className="r-l">市场</span>
           <span className="r-v" style={{ color: "var(--theme-color)" }}>
-            第 3–9 层合计
+            第 3–9 层 · 各 2% 总额
           </span>
         </div>
         <div className="doc-text" style={{ marginTop: "0.75rem" }}>
           <p>
-            燃烧额 <b>20%</b> 按九层发放：直推（L1）/ 间推（仅 L2）/ 市场总量（L3–9）。明细账本须标{" "}
-            <b>市场3…市场9</b>。
+            燃烧额 <b>20%</b> 按锁定九层发放：直推（L1=4%）/ 间推（L2=2%）/ 市场（L3–9 各
+            2%）。明细账本须标 <b>市场3…市场9</b>。不做文档 8%/4%/市场1%。
           </p>
-          <p>任意档燃烧且金本位 ≥100U 即视为已激活，解锁邀请链接（见「我的」）。</p>
+          <p>任意档位按钮燃烧（≥100U）即激活，解锁邀请链接（见「我的」）— 非累计买入。</p>
         </div>
       </div>
 
       <div className="card">
         <h2 className="card-title">
-          SPCXB 分红领取
-          <span className="muted">24h 冷却</span>
+          SPCXB 档位分红
+          <span className="muted">成为对应池的分红股东 · 24h 冷却</span>
         </h2>
-        <dl className="stats">
+        <p className="muted" style={{ marginTop: 0 }}>
+          {myTier > 0
+            ? `已达成档位 T${myTier}，成为对应池分红股东（最高档，不叠加）。`
+            : "完成权重销毁档位按钮后，即成为对应分红池股东；当前尚未达成任何档位。"}
+        </p>
+        <div className="pool-table" role="table" aria-label="SPCXB 四池占比">
+          <div className="pool-row head" role="row">
+            <span>分红池</span>
+            <span>档位</span>
+            <span>占比</span>
+          </div>
+          {POOLS.map((p, i) => (
+            <div
+              key={p.name}
+              className={myTier === i + 1 ? "pool-row on" : "pool-row"}
+              role="row"
+            >
+              <span>
+                {p.name}
+                {myTier === i + 1 ? " · 生效中" : ""}
+              </span>
+              <span>{p.tier}</span>
+              <span>{p.pct}</span>
+            </div>
+          ))}
+        </div>
+        <dl className="stats" style={{ marginTop: "0.85rem" }}>
           <div>
             <dt>可领 SPCXB</dt>
             <dd>{claimable != null ? fmtToken(claimable as bigint) : "—"}</dd>
@@ -322,9 +358,6 @@ export default function PromoPage() {
           </div>
         </dl>
         <p className="muted">每 24h 可领一次（链上强制）；也可累计不领。四档同档均分 SPCXB。</p>
-        <p className="muted" style={{ marginTop: "0.35rem" }}>
-          1500U 可选质押分息（EliteStake）入口待后续开放（C9），本页不做完整质押台。
-        </p>
         <button
           type="button"
           className="btn primary"
@@ -343,7 +376,9 @@ export default function PromoPage() {
         </button>
       </div>
 
-      {isSuccess && <p className="banner ok">交易已确认</p>}
+      <StakeDesk />
+
+      {isSuccess && <p className="banner ok">权重成功：已按合约比例销毁与分配</p>}
       {error && <p className="banner warn">{error.message}</p>}
     </section>
   );

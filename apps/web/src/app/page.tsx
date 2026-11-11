@@ -13,9 +13,9 @@ import { useAnnouncements, useLeaderboard, useStats } from "@/lib/api/client";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
 const FALLBACK_SLIDES = [
-  { id: "s1", title: "Umidor · 四档燃烧分红", subtitle: "燃烧入池后领取 SPCXB，每 24 小时可领一次", tone: "b1" },
-  { id: "s2", title: "买卖即时奖励", subtitle: "交易方与直推各 0.5%，即时到账钱包", tone: "b2" },
-  { id: "s3", title: "通缩模型 · 权重销毁", subtitle: "燃烧额 70% 打入销毁地址，永久移出流通", tone: "b3" },
+  { id: "s1", title: "四档分红 · 每日可领", subtitle: "持有对应权重档位后进入 SPCXB 分红池，24 小时可领一次", tone: "b1" },
+  { id: "s2", title: "推广奖励即时到账", subtitle: "买卖皆享交易方与直推各 0.5%，立刻到账钱包", tone: "b2" },
+  { id: "s3", title: "通缩模型 · 权重销毁", subtitle: "权重订单 70% 打入销毁地址，永久移出流通", tone: "b3" },
 ];
 
 export default function HomePage() {
@@ -128,23 +128,26 @@ function HomeInner() {
 
       <section className="flat-row">
         <div className="flat-card">
-          <div className="flat-label">实时币价</div>
+          <div className="flat-label">
+            实时币价
+            <span className="flat-badge">合约实时价</span>
+          </div>
           <div className="flat-value">{priceDisplay}</div>
           <div className="flat-extra">USDT</div>
         </div>
         <div className="flat-card">
-          <div className="flat-label">累计销毁</div>
+          <div className="flat-label">权重销毁总量</div>
           <div className="flat-value">{burnedDisplay}</div>
           <div className="flat-extra" style={{ color: "var(--text-secondary)" }}>
-            永久移出流通
+            UMplan 已永久销毁
           </div>
         </div>
       </section>
 
       <section className="card">
         <h2 className="card-title">
-          直推排行榜 Top 10
-          <span className="muted">按直推人数</span>
+          全网龙虎榜 TOP10
+          <span className="muted">按直推人数排行</span>
         </h2>
         <p className="muted" style={{ marginTop: 0 }}>
           {board?.source === "graph"
@@ -161,7 +164,7 @@ function HomeInner() {
               <li key={r.address}>
                 <span className="rank-n">{r.rank}</span>
                 <span className="rank-addr">{shortAddr(r.address)}</span>
-                <span className="rank-val">{r.directs} 人</span>
+                <span className="rank-val">{r.directs} 人直推</span>
               </li>
             ))}
           </ol>
@@ -169,7 +172,7 @@ function HomeInner() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">我的上级</h2>
+        <h2 className="card-title">我的邀请人</h2>
         {!mounted ? (
           <p className="muted">加载中…</p>
         ) : !isConnected ? (
@@ -180,8 +183,8 @@ function HomeInner() {
               ↑
             </div>
             <div>
-              <div className="ref-name">已绑定邀请人</div>
-              <div className="ref-addr">{shortAddr(myReferrer as string)}</div>
+              <div className="ref-name">邀请人 {shortAddr(myReferrer as string)}</div>
+              <div className="ref-addr">{myReferrer as string}</div>
             </div>
           </div>
         ) : (
