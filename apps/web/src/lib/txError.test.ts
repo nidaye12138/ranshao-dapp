@@ -14,7 +14,9 @@ describe("formatTxError", () => {
       name: "UnknownRpcError",
     });
     const msg = formatTxError(err);
-    assert.match(msg, /Gas 不足|测试 BNB/);
+    // Production default chain is mainnet (56) → ask for real BNB, not Chapel faucet.
+    assert.match(msg, /BNB|Gas/);
+    assert.doesNotMatch(msg, /Chapel|Testnet|测试 BNB/);
   });
 
   it("maps tree: referrer not in tree", () => {
