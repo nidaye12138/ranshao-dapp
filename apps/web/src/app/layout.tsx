@@ -27,7 +27,8 @@ const bodyFont = Noto_Sans_SC({
 
 export const metadata: Metadata = {
   title: "Umidor · BNB Chain DApp",
-  description: "Umidor — 首页 / Swap / 权重 / 我的 · 买卖即时奖 · 四档燃烧 · SPCXB 分红",
+  description:
+    "Umidor — Home / Swap / Weight / Mine · instant trade rewards · four-tier burn · SPCXB dividends",
   icons: {
     icon: "/umidor-logo.png",
   },
@@ -37,7 +38,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     // suppressHydrationWarning: browser extensions (e.g. minidam-root / theme-light) inject DOM
     // before React hydrates; wallet UI is also gated client-side via useMounted().
-    <html lang="zh-CN" suppressHydrationWarning>
+    // lang is updated client-side by LocaleProvider (zh-CN | en).
+    <html lang="en" suppressHydrationWarning>
       <body className={`${brandFont.variable} ${displayFont.variable} ${bodyFont.variable}`} suppressHydrationWarning>
         <Providers>
           <AppShell>{children}</AppShell>
