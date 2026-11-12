@@ -6,6 +6,7 @@ import {
   useAccount,
   useBalance,
   useConnect,
+  usePublicClient,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
@@ -14,6 +15,7 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
+import { preflightBindReferrer } from "@/lib/preflightBind";
 import { useOnboarding } from "@/components/OnboardingProvider";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 import { stashPendingRef } from "@/lib/onboardingStorage";
@@ -34,6 +36,7 @@ export function OnboardingGate() {
   const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: connecting } = useConnect();
+  const publicClient = usePublicClient({ chainId: appChainId });
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
   const { data: nativeBal } = useBalance({
@@ -42,10 +45,11 @@ export function OnboardingGate() {
     query: { enabled: !!address && isConnected },
   });
   const [localError, setLocalError] = useState<string | null>(null);
+  const [preflighting, setPreflighting] = useState(false);
 
   const validRef = isAddress(refDraft) && refDraft.toLowerCase() !== address?.toLowerCase();
   const fromInvite = isAddress(refDraft);
-  const displayError = localError || (error ? formatTxError(error, locale) : null);
+  const displayError = localError || (error ? formatTxError(error, locale, appChainId) : null);
 
   useEffect(() => {
     if (!isSuccess || !address) return;
@@ -55,7 +59,7 @@ export function OnboardingGate() {
 
   if (!showGate) return null;
 
-  function onPrimary() {
+  async function onPrimary() {
     setLocalError(null);
     if (!isConnected) {
       if (connectors[0]) connect({ connector: connectors[0] });
@@ -83,6 +87,25 @@ export function OnboardingGate() {
       return;
     }
     stashPendingRef(refDraft);
+    if (publicClient && address) {
+      setPreflighting(true);
+      try {
+        const preErr = await preflightBindReferrer({
+          client: publicClient,
+          tree: addresses.registry,
+          account: address,
+          referrer: refDraft as `0x${string}`,
+          chainId: appChainId,
+          locale,
+        });
+        if (preErr) {
+          setLocalError(preErr);
+          return;
+        }
+      } finally {
+        setPreflighting(false);
+      }
+    }
     writeContract({
       address: addresses.registry,
       abi: TreeAbi,
@@ -96,7 +119,7 @@ export function OnboardingGate() {
     ? connecting
       ? t("common.connecting")
       : t("onboarding.primaryConnect")
-    : isPending || confirming
+    : isPending || confirming || preflighting
       ? t("common.confirming")
       : bound
         ? t("onboarding.primaryEnter")
@@ -215,8 +238,10 @@ export function OnboardingGate() {
         <button
           type="button"
           className="btn primary ob-primary"
-          disabled={isPending || confirming || connecting || (isConnected && !validRef && !bound)}
-          onClick={onPrimary}
+          disabled={
+            isPending || confirming || preflighting || connecting || (isConnected && !validRef && !bound)
+          }
+          onClick={() => void onPrimary()}
         >
           {primaryLabel}
         </button>

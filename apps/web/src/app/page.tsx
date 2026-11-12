@@ -2,12 +2,19 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  usePublicClient,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { isAddress, zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
+import { preflightBindReferrer } from "@/lib/preflightBind";
 import { useMounted } from "@/lib/useMounted";
 import { useLeaderboard, useStats } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
@@ -36,7 +43,10 @@ function HomeInner() {
   const [annIndex, setAnnIndex] = useState(0);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [refInput, setRefInput] = useState("");
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const [bindError, setBindError] = useState<string | null>(null);
+  const [preflighting, setPreflighting] = useState(false);
+  const publicClient = usePublicClient({ chainId: appChainId });
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
   const { data: board } = useLeaderboard();
@@ -209,20 +219,46 @@ function HomeInner() {
             <button
               type="button"
               className="btn primary"
-              disabled={!isConfigured || isPending || confirming || !isAddress(refInput)}
-              onClick={() =>
-                writeContract({
-                  address: addresses.registry,
-                  abi: TreeAbi,
-                  functionName: "bindReferrer",
-                  args: [refInput as `0x${string}`],
-                  chainId: appChainId,
-                })
-              }
+              disabled={!isConfigured || isPending || confirming || preflighting || !isAddress(refInput)}
+              onClick={() => {
+                void (async () => {
+                  setBindError(null);
+                  reset();
+                  if (!address || !isAddress(refInput)) return;
+                  if (publicClient) {
+                    setPreflighting(true);
+                    try {
+                      const preErr = await preflightBindReferrer({
+                        client: publicClient,
+                        tree: addresses.registry,
+                        account: address,
+                        referrer: refInput as `0x${string}`,
+                        chainId: appChainId,
+                        locale,
+                      });
+                      if (preErr) {
+                        setBindError(preErr);
+                        return;
+                      }
+                    } finally {
+                      setPreflighting(false);
+                    }
+                  }
+                  writeContract({
+                    address: addresses.registry,
+                    abi: TreeAbi,
+                    functionName: "bindReferrer",
+                    args: [refInput as `0x${string}`],
+                    chainId: appChainId,
+                  });
+                })();
+              }}
             >
-              {isPending || confirming ? t("common.confirming") : t("home.bindReferrer")}
+              {isPending || confirming || preflighting ? t("common.confirming") : t("home.bindReferrer")}
             </button>
-            {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
+            {(bindError || error) && (
+              <p className="banner warn">{bindError || formatTxError(error, locale, appChainId)}</p>
+            )}
             {isSuccess && <p className="banner ok">{t("home.bindOk")}</p>}
           </>
         )}
