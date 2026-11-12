@@ -9,46 +9,28 @@ import { appChainId } from "@/lib/chain";
 import { shortAddr } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
-import { banners as fallbackBanners, dappRules as fallbackRules } from "@/lib/mockData";
-import { useAnnouncements, useLeaderboard, useStats } from "@/lib/api/client";
+import { useLeaderboard, useStats } from "@/lib/api/client";
+import { useI18n } from "@/lib/i18n";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
 const TOKEN_SUPPLY = 10_000_000;
 
-const FALLBACK_SLIDES = [
-  {
-    id: "s1",
-    title: "四档分红 · 每日可领",
-    subtitle: "持有对应权重档位后进入 SPCXB 分红池，24 小时可领一次",
-    tone: "b1",
-    cta: "查看规则",
-  },
-  {
-    id: "s2",
-    title: "推广奖励即时到账",
-    subtitle: "买卖皆享交易方与直推各 0.5%，立刻到账钱包",
-    tone: "b2",
-    cta: "查看规则",
-  },
-  {
-    id: "s3",
-    title: "通缩模型 · 权重销毁",
-    subtitle: "权重订单 70% 打入销毁地址；20% 市场奖励；10% 股东分红",
-    tone: "b3",
-    cta: "查看规则",
-  },
-];
-
 export default function HomePage() {
   return (
-    <Suspense fallback={<div className="panel">加载中…</div>}>
+    <Suspense fallback={<HomeSuspenseFallback />}>
       <HomeInner />
     </Suspense>
   );
 }
 
+function HomeSuspenseFallback() {
+  const { t } = useI18n();
+  return <div className="panel">{t("common.loading")}</div>;
+}
+
 function HomeInner() {
   const mounted = useMounted();
+  const { t, locale, messages } = useI18n();
   const { address, isConnected } = useAccount();
   const search = useSearchParams();
   const [annIndex, setAnnIndex] = useState(0);
@@ -57,43 +39,26 @@ function HomeInner() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
-  const { data: cms } = useAnnouncements();
   const { data: board } = useLeaderboard();
   const { data: stats } = useStats();
 
-  const announcements = cms?.announcements?.length ? cms.announcements : [{ id: "0", text: "加载公告…" }];
-  const cmsBanner = cms?.banners?.[0] ?? fallbackBanners[0];
-  const slides =
-    cms?.banners && cms.banners.length >= 2
-      ? cms.banners.map((b, i) => ({
-          id: b.id,
-          title: b.title,
-          subtitle: b.subtitle,
-          tone: (`b${(i % 3) + 1}` as "b1" | "b2" | "b3"),
-          cta: "查看规则",
-        }))
-      : [
-          {
-            id: cmsBanner.id,
-            title: cmsBanner.title,
-            subtitle: cmsBanner.subtitle,
-            tone: "b1" as const,
-            cta: "查看规则",
-          },
-          ...FALLBACK_SLIDES.slice(1),
-        ];
-  const dappRules = cms?.dappRules?.length ? cms.dappRules : fallbackRules;
+  const announcements = messages.home.announcements;
+  const slides = messages.home.slides.map((s) => ({
+    ...s,
+    cta: t("home.viewRules"),
+  }));
+  const dappRules = messages.home.rules;
 
   useEffect(() => {
     if (announcements.length === 0) return;
-    const t = setInterval(() => setAnnIndex((i) => (i + 1) % announcements.length), 4200);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setAnnIndex((i) => (i + 1) % announcements.length), 4200);
+    return () => clearInterval(timer);
   }, [announcements.length]);
 
   useEffect(() => {
     if (slides.length <= 1) return;
-    const t = setInterval(() => setBannerIndex((i) => (i + 1) % slides.length), 4000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setBannerIndex((i) => (i + 1) % slides.length), 4000);
+    return () => clearInterval(timer);
   }, [slides.length]);
 
   useEffect(() => {
@@ -164,9 +129,9 @@ function HomeInner() {
       </section>
 
       <section className="notice" aria-live="polite">
-        <span className="notice-tag">公告</span>
+        <span className="notice-tag">{t("home.noticeTag")}</span>
         <div className="notice-viewport">
-          <p key={ann.id} className="notice-text">
+          <p key={`${locale}-${ann.id}`} className="notice-text">
             {ann.text}
           </p>
         </div>
@@ -174,43 +139,43 @@ function HomeInner() {
 
       <section className="flat-row">
         <div className="flat-card">
-          <div className="flat-label">实时币价</div>
+          <div className="flat-label">{t("home.priceLabel")}</div>
           <div className="flat-value">
             {priceDisplay}
             <span className="flat-unit">USDT</span>
           </div>
-          <div className="flat-extra">约合约实时价</div>
+          <div className="flat-extra">{t("home.priceExtra")}</div>
         </div>
         <div className="flat-card">
-          <div className="flat-label">权重销毁总量</div>
+          <div className="flat-label">{t("home.burnedLabel")}</div>
           <div className="flat-value">{burnedDisplay}</div>
           <div className="flat-extra" style={{ color: "var(--text-secondary)" }}>
-            UMplan 已永久销毁
+            {t("home.burnedExtra")}
           </div>
         </div>
       </section>
 
       <section className="card card-dense">
         <h2 className="card-title">
-          全网龙虎榜 TOP10
-          <span className="muted">按直推人数排行</span>
+          {t("home.boardTitle")}
+          <span className="muted">{t("home.boardSub")}</span>
         </h2>
         <p className="muted source-line">
           {board?.source === "graph"
-            ? "按直推人数（索引）"
+            ? t("home.boardByDirects")
             : board?.source === "unconfigured"
-              ? "索引未配置（GRAPH_URL）— 暂无排行数据"
-              : "加载中…"}
+              ? t("home.boardUnconfigured")
+              : t("home.boardLoading")}
         </p>
         {!board || board.items.length === 0 ? (
-          <p className="muted">{board?.source === "unconfigured" ? "—" : "暂无数据"}</p>
+          <p className="muted">{board?.source === "unconfigured" ? "—" : t("home.noData")}</p>
         ) : (
           <ol className="rank-list">
             {board.items.map((r) => (
               <li key={r.address}>
                 <span className="rank-n">{r.rank}</span>
                 <span className="rank-addr">{shortAddr(r.address)}</span>
-                <span className="rank-val">{r.directs} 人直推</span>
+                <span className="rank-val">{t("home.directsCount", { n: r.directs })}</span>
               </li>
             ))}
           </ol>
@@ -218,25 +183,27 @@ function HomeInner() {
       </section>
 
       <section className="card card-dense">
-        <h2 className="card-title">我的邀请人</h2>
+        <h2 className="card-title">{t("home.myInviter")}</h2>
         {!mounted ? (
-          <p className="muted">加载中…</p>
+          <p className="muted">{t("common.loading")}</p>
         ) : !isConnected ? (
-          <p className="muted">连接钱包后查看 / 绑定</p>
+          <p className="muted">{t("home.connectToBind")}</p>
         ) : bound ? (
           <div className="referrer-row">
             <div className="avatar avatar-ring" aria-hidden>
               ↑
             </div>
             <div className="ref-meta">
-              <div className="ref-name">邀请人 {shortAddr(myReferrer as string)}</div>
+              <div className="ref-name">
+                {t("home.inviterPrefix")} {shortAddr(myReferrer as string)}
+              </div>
               <div className="ref-addr">{myReferrer as string}</div>
             </div>
           </div>
         ) : (
           <>
             <label className="field">
-              <span>推荐人地址</span>
+              <span>{t("home.referrerAddr")}</span>
               <input value={refInput} onChange={(e) => setRefInput(e.target.value)} placeholder="0x…" />
             </label>
             <button
@@ -253,41 +220,41 @@ function HomeInner() {
                 })
               }
             >
-              {isPending || confirming ? "确认中…" : "绑定推荐人"}
+              {isPending || confirming ? t("common.confirming") : t("home.bindReferrer")}
             </button>
-            {error && <p className="banner warn">{formatTxError(error)}</p>}
-            {isSuccess && <p className="banner ok">绑定成功</p>}
+            {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
+            {isSuccess && <p className="banner ok">{t("home.bindOk")}</p>}
           </>
         )}
       </section>
 
       <section className="card card-dense">
-        <h2 className="card-title">代币信息</h2>
-        <div className="info-quad" aria-label="代币信息四宫格">
+        <h2 className="card-title">{t("home.tokenInfo")}</h2>
+        <div className="info-quad" aria-label={t("home.tokenInfoAria")}>
           <div className="iq-cell">
             <div className="iq-val">{TOKEN_SUPPLY.toLocaleString("en-US")}</div>
-            <div className="iq-label">发行总量 UMplan</div>
+            <div className="iq-label">{t("home.supply")}</div>
           </div>
           <div className="iq-cell">
             <div className="iq-val">{circulating}</div>
-            <div className="iq-label">当前流通量</div>
+            <div className="iq-label">{t("home.circulating")}</div>
           </div>
           <div className="iq-cell">
             <div className="iq-val">BNB Chain</div>
-            <div className="iq-label">所属公链</div>
+            <div className="iq-label">{t("home.chain")}</div>
           </div>
           <div className="iq-cell">
-            <div className="iq-val">3.5% 默认</div>
-            <div className="iq-label">买卖手续费（≥3%）</div>
+            <div className="iq-val">{t("home.feeDefault")}</div>
+            <div className="iq-label">{t("home.feeLabel")}</div>
           </div>
         </div>
       </section>
 
       <section className="card card-dense" id="dapp-rules">
-        <h2 className="card-title">DApp 玩法规则</h2>
+        <h2 className="card-title">{t("home.rulesTitle")}</h2>
         <div className="doc-text rules-list">
-          {dappRules.map((r) => (
-            <p key={r}>{r}</p>
+          {dappRules.map((rule) => (
+            <p key={rule}>{rule}</p>
           ))}
         </div>
       </section>

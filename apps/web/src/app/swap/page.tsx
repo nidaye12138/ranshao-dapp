@@ -14,6 +14,7 @@ import { useMounted } from "@/lib/useMounted";
 import { StakeDesk } from "@/components/StakeDesk";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
+import { useI18n } from "@/lib/i18n";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
@@ -25,6 +26,7 @@ const FEE_FLOOR = 3;
 
 export default function SwapPage() {
   const mounted = useMounted();
+  const { t } = useI18n();
   const { address, isConnected } = useAccount();
   const gate = useOnboardingOptional();
   const featuresUnlocked = gate?.featuresUnlocked ?? true;
@@ -139,27 +141,27 @@ export default function SwapPage() {
 
   return (
     <section className="panel">
-      <FeatureGateBanner feature="买入" />
-      <div className="seg" role="tablist" aria-label="买卖切换">
+      <FeatureGateBanner feature="buy" />
+      <div className="seg" role="tablist" aria-label={t("swap.buySellAria")}>
         <button
           type="button"
           className={mode === "buy" ? "seg-btn on-buy" : "seg-btn"}
           onClick={() => setMode("buy")}
         >
-          买入
+          {t("swap.buy")}
         </button>
         <button
           type="button"
           className={mode === "sell" ? "seg-btn on-sell" : "seg-btn"}
           onClick={() => setMode("sell")}
         >
-          卖出
+          {t("swap.sell")}
         </button>
       </div>
 
       <div className={`card swap-card ${mode}`}>
         <div className="input-box">
-          <div className="ib-label">{mode === "buy" ? "支付 USDT" : "卖出 UMplan"}</div>
+          <div className="ib-label">{mode === "buy" ? t("swap.payUsdt") : t("swap.sellUmplan")}</div>
           <div className="input-row">
             <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00" />
             <div className="token-chip">
@@ -172,20 +174,18 @@ export default function SwapPage() {
         <div className="chips">
           {[25, 50, 75, 100].map((p) => (
             <button key={p} type="button" className="chip" onClick={() => setPct(p)} disabled={!bal}>
-              {p === 100 ? "最大" : `${p}%`}
+              {p === 100 ? t("common.max") : `${p}%`}
             </button>
           ))}
         </div>
 
         <div className="result-box">
-          <span>可得 {mode === "buy" ? "UMplan" : "USDT"}</span>
+          <span>{t("swap.receive", { token: mode === "buy" ? "UMplan" : "USDT" })}</span>
           <span className="rb-value">{outAmount != null ? fmtToken(outAmount) : "0.00"}</span>
         </div>
 
         <div className="fee-row">
-          <span>
-            交易手续费 {FEE_PCT}%（最低 {FEE_FLOOR}%）
-          </span>
+          <span>{t("swap.feeRow", { fee: FEE_PCT, floor: FEE_FLOOR })}</span>
           <span className="fee-amt">
             −{Number.isFinite(feePreview) ? feePreview.toFixed(2) : "0.00"}{" "}
             {mode === "buy" ? "USDT" : "UMplan"}
@@ -193,7 +193,7 @@ export default function SwapPage() {
         </div>
 
         <div className="slip-row">
-          <span>滑点</span>
+          <span>{t("swap.slip")}</span>
           <span>
             {SLIP_PRESETS.map((s) => (
               <button
@@ -209,32 +209,26 @@ export default function SwapPage() {
         </div>
 
         <div className="info-strip compact">
-          <span>
-            {mode === "buy"
-              ? "买入瞬间，你与你的邀请人各获得买入金额 0.5% 的奖励，立刻到账钱包。"
-              : "卖出瞬间，你与你的邀请人各获得卖出金额 0.5% 的奖励，立刻到账钱包。"}
-          </span>
+          <span>{mode === "buy" ? t("swap.buyInstant") : t("swap.sellInstant")}</span>
         </div>
 
         <div className="info-strip gold compact">
-          <span>
-            买入 / 卖出手续费按协议最低 {FEE_FLOOR}%、系统默认 {FEE_PCT}% 收取，直接从交易金额中扣除，属正常交易费用，不参与权重销毁分配。
-          </span>
+          <span>{t("swap.feeNote", { fee: FEE_PCT, floor: FEE_FLOOR })}</span>
         </div>
 
         {!mounted ? (
-          <p className="muted">加载中…</p>
+          <p className="muted">{t("common.loading")}</p>
         ) : !isConnected ? (
-          <p className="banner warn">请先连接钱包</p>
+          <p className="banner warn">{t("common.connectWalletFirst")}</p>
         ) : !featuresUnlocked ? (
-          <p className="banner warn">请先完成邀请人绑定后再买入 / 卖出</p>
+          <p className="banner warn">{t("swap.bindBeforeTrade")}</p>
         ) : !isConfigured ? (
-          <p className="banner warn">合约地址未配置</p>
+          <p className="banner warn">{t("common.contractsUnconfigured")}</p>
         ) : (
           <div className="cta-row">
             {needApprove && (
               <button type="button" className="btn" disabled={isPending || confirming} onClick={onApprove}>
-                授权
+                {t("common.approve")}
               </button>
             )}
             <button
@@ -244,45 +238,44 @@ export default function SwapPage() {
               disabled={isPending || confirming || needApprove || parsed === 0n || !featuresUnlocked}
               onClick={onSwap}
             >
-              {isPending || confirming ? "确认中…" : mode === "buy" ? "确认买入" : "确认卖出"}
+              {isPending || confirming
+                ? t("common.confirming")
+                : mode === "buy"
+                  ? t("swap.confirmBuy")
+                  : t("swap.confirmSell")}
             </button>
           </div>
         )}
 
         <dl className="stats" style={{ marginTop: "1rem" }}>
           <div>
-            <dt>折合 USD</dt>
+            <dt>{t("swap.usdEquiv")}</dt>
             <dd>{usdAmount != null ? fmtToken(usdAmount) : "—"}</dd>
           </div>
           <div>
-            <dt>自返 0.5%</dt>
+            <dt>{t("swap.selfRebate")}</dt>
             <dd>{fmtToken(selfReward)} USDT</dd>
           </div>
         </dl>
 
         {isSuccess && (
           <p className="banner ok">
-            {mode === "buy"
-              ? `买入成功，已按约 ${FEE_PCT}% 手续费口径展示，0.5% 奖励即时到账你与邀请人`
-              : `卖出已提交，按约 ${FEE_PCT}% 手续费口径展示，等待链上确认`}
+            {mode === "buy" ? t("swap.buyOk", { fee: FEE_PCT }) : t("swap.sellOk", { fee: FEE_PCT })}
           </p>
         )}
         {error && <p className="banner warn">{error.message}</p>}
       </div>
 
       <div className="card">
-        <h2 className="card-title">即时奖励说明</h2>
+        <h2 className="card-title">{t("swap.instantTitle")}</h2>
         <div className="doc-text">
           <p>
-            <b>仅即时奖：</b>买/卖 → 交易方 0.5% + 直推邀请人 0.5%（支付币种）到钱包。
+            <b>{t("swap.instantOnly")}</b>
           </p>
           <p>
-            <b>不做</b>累计买入业绩、级别或里程碑奖励。
+            <b>{t("swap.noMilestone")}</b>
           </p>
-          <p>
-            滑点展示预设（当前 {slippage}%）；报价为预言机固定价 MVP。手续费产品承诺{" "}
-            {FEE_PCT}%（最低 {FEE_FLOOR}%）。
-          </p>
+          <p>{t("swap.slipNote", { slip: slippage, fee: FEE_PCT, floor: FEE_FLOOR })}</p>
         </div>
       </div>
 

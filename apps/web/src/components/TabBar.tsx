@@ -2,27 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const tabs = [
-  { href: "/", label: "首页", icon: "⌂", weight: false },
-  { href: "/swap", label: "Swap", icon: "⇄", weight: false },
-  { href: "/promo", label: "权重", icon: "◎", weight: true },
-  { href: "/mine", label: "我的", icon: "☺", weight: false },
-];
+import { useI18n } from "@/lib/i18n";
 
 export function TabBar() {
   const pathname = usePathname();
+  const { t } = useI18n();
+  const tabs = [
+    { href: "/", label: t("nav.home"), icon: "⌂", weight: false },
+    { href: "/swap", label: t("nav.swap"), icon: "⇄", weight: false },
+    { href: "/promo", label: t("nav.weight"), icon: "◎", weight: true },
+    { href: "/mine", label: t("nav.mine"), icon: "☺", weight: false },
+  ];
   return (
-    <nav className="tab-bar" aria-label="主导航">
-      {tabs.map((t) => {
-        const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
-        const cls = [active ? "tab active" : "tab", t.weight ? "tab-weight" : ""].filter(Boolean).join(" ");
+    <nav className="tab-bar" aria-label={t("nav.aria")}>
+      {tabs.map((tab) => {
+        const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+        const cls = [active ? "tab active" : "tab", tab.weight ? "tab-weight" : ""].filter(Boolean).join(" ");
         return (
-          <Link key={t.href} href={t.href} className={cls}>
+          <Link key={tab.href} href={tab.href} className={cls}>
             <span className="tab-icon" aria-hidden>
-              {t.icon}
+              {tab.icon}
             </span>
-            <span className="tab-label">{t.label}</span>
+            <span className="tab-label">{tab.label}</span>
           </Link>
         );
       })}
