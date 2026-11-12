@@ -35,12 +35,18 @@ export function Header() {
         </span>
       </Link>
       <div className="header-actions">
-        <div className="locale-toggle" role="group" aria-label={t("header.localeAria")}>
+        <div
+          className="locale-toggle"
+          role="group"
+          aria-label={t("header.localeAria")}
+          data-locale-toggle="umidor"
+        >
           <button
             type="button"
             className={locale === "zh" ? "locale-btn on" : "locale-btn"}
             onClick={() => setLocale("zh")}
             aria-pressed={locale === "zh"}
+            data-locale="zh"
           >
             {t("header.localeZh")}
           </button>
@@ -49,6 +55,7 @@ export function Header() {
             className={locale === "en" ? "locale-btn on" : "locale-btn"}
             onClick={() => setLocale("en")}
             aria-pressed={locale === "en"}
+            data-locale="en"
           >
             {t("header.localeEn")}
           </button>
