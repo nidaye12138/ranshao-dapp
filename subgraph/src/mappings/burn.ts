@@ -14,6 +14,7 @@ export function handleBurned(event: Burned): void {
   burn.toSink = event.params.toSink;
   burn.toLayers = event.params.toLayers;
   burn.toShareholders = event.params.toShareholders;
+  burn.toPrecip = event.params.toPrecip;
   burn.tier = event.params.tier;
   burn.blockNumber = event.block.number;
   burn.timestamp = event.block.timestamp;

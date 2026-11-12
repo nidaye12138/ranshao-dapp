@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IShareholderPool} from "./interfaces/IShareholderPool.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Shareholder pool — 10% of burns, equal claim; seats cap 453 (Q7b admin whitelist).
+/// @title Shareholder pool — 15% of burns, equal claim; seats cap 453 (Q7b admin whitelist).
 contract ShareholderPool is IShareholderPool, Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 

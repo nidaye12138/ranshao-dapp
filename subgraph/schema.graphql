@@ -60,6 +60,7 @@ type Burn @entity(immutable: true) {
   toSink: BigInt!
   toLayers: BigInt!
   toShareholders: BigInt!
+  toPrecip: BigInt!
   tier: Int!
   blockNumber: BigInt!
   timestamp: BigInt!

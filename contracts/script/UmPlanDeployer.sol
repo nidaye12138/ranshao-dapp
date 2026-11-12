@@ -65,8 +65,10 @@ abstract contract UmPlanDeployer {
             )
         );
 
+        // Wire precip (5% 变异沉淀池) + reverse links after BurnRouter exists.
+        BurnRouter(a.burnRouter).setConfig(address(0), address(0), address(0), address(0), a.precip, address(0));
         LayerRewards(a.layers).setConfig(a.tree, a.precip, a.burnRouter);
-        PrecipitationPool(a.precip).setConfig(a.dividends, a.layers);
+        PrecipitationPool(a.precip).setConfig(a.dividends, a.layers, a.burnRouter);
         ShareholderPool(a.shareholders).setBurnRouter(a.burnRouter);
         DividendPools(a.dividends).setBurnRouter(a.burnRouter);
 
@@ -96,6 +98,7 @@ abstract contract UmPlanDeployer {
         Treasury(payable(a.treasury)).setModule(keccak256("BURN"), a.burnRouter);
         Treasury(payable(a.treasury)).setModule(keccak256("DIVIDENDS"), a.dividends);
         Treasury(payable(a.treasury)).setModule(keccak256("SHAREHOLDER"), a.shareholders);
+        Treasury(payable(a.treasury)).setModule(keccak256("PRECIP"), a.precip);
         Treasury(payable(a.treasury)).setModule(keccak256("ELITE"), a.elite);
         Treasury(payable(a.treasury)).setModule(keccak256("BROKER"), a.broker);
     }

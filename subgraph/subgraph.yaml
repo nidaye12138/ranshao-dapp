@@ -70,7 +70,7 @@ dataSources:
         - name: BurnRouter
           file: ./abis/BurnRouter.json
       eventHandlers:
-        - event: Burned(indexed address,uint256,uint256,uint256,uint256,uint256,uint256,uint8)
+        - event: Burned(indexed address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint8)
           handler: handleBurned
       file: ./src/mappings/burn.ts
 

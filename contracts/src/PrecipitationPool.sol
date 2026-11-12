@@ -10,7 +10,7 @@ import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
 import {IDividendPools} from "./interfaces/IDividendPools.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Missing-layer precipitation pool.
+/// @title UMplan 变异沉淀池 — missing-layer residue + 5% burn sedimentation.
 /// @dev Q4: equal among 1500U (tier 4) burners for 5% of lifetime deposits.
 ///      Q5: remaining 95% stays here; admin may withdraw later.
 contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyGuard {
@@ -19,19 +19,26 @@ contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyG
     IERC20 public immutable token;
     IDividendPools public dividends;
     address public layerRewards;
+    address public burnRouter;
 
     uint256 public totalDeposited;
     uint256 public allocatedTo1500;
     mapping(address => uint256) public claimable;
 
     event MissingLayerReceived(uint256 amount, uint256 totalDeposited);
+    event BurnSedimentationReceived(uint256 amount, uint256 totalDeposited);
     event Allocated1500(uint256 amount, uint256 perUser, uint256 members);
     event Claimed(address indexed user, uint256 amount);
     event AdminWithdraw(address indexed to, uint256 amount);
-    event ConfigUpdated(address dividends, address layerRewards);
+    event ConfigUpdated(address dividends, address layerRewards, address burnRouter);
 
     modifier onlyLayerRewards() {
         require(msg.sender == layerRewards, "precip: not layer");
+        _;
+    }
+
+    modifier onlyBurnRouter() {
+        require(msg.sender == burnRouter, "precip: not router");
         _;
     }
 
@@ -41,10 +48,11 @@ contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyG
         dividends = IDividendPools(dividends_);
     }
 
-    function setConfig(address dividends_, address layerRewards_) external onlyOwner {
+    function setConfig(address dividends_, address layerRewards_, address burnRouter_) external onlyOwner {
         if (dividends_ != address(0)) dividends = IDividendPools(dividends_);
         if (layerRewards_ != address(0)) layerRewards = layerRewards_;
-        emit ConfigUpdated(address(dividends), layerRewards);
+        if (burnRouter_ != address(0)) burnRouter = burnRouter_;
+        emit ConfigUpdated(address(dividends), layerRewards, burnRouter);
     }
 
     function pause() external onlyOwner {
@@ -61,6 +69,15 @@ contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyG
         require(amount > 0, "precip: zero");
         totalDeposited += amount;
         emit MissingLayerReceived(amount, totalDeposited);
+    }
+
+    /// @inheritdoc IPrecipitationPool
+    /// @dev Pulls `amount` from BurnRouter via transferFrom (5% 变异沉淀池 burn leg).
+    function receiveBurnSedimentation(uint256 amount) external onlyBurnRouter nonReentrant {
+        require(amount > 0, "precip: zero");
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        totalDeposited += amount;
+        emit BurnSedimentationReceived(amount, totalDeposited);
     }
 
     /// @notice Allocate remaining room under the 5%-of-lifetime cap equally to current T4 members.

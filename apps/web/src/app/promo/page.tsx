@@ -146,6 +146,22 @@ export default function PromoPage() {
           <dt>我的档位</dt>
           <dd>{tier != null ? `T${tier}` : "—"}</dd>
         </div>
+        <div>
+          <dt>销毁 30%</dt>
+          <dd>{parsed > 0n ? fmtToken((parsed * 3000n) / 10000n) : "—"}</dd>
+        </div>
+        <div>
+          <dt>市场桶 50%</dt>
+          <dd>{parsed > 0n ? fmtToken((parsed * 5000n) / 10000n) : "—"}</dd>
+        </div>
+        <div>
+          <dt>股东 15%</dt>
+          <dd>{parsed > 0n ? fmtToken((parsed * 1500n) / 10000n) : "—"}</dd>
+        </div>
+        <div>
+          <dt>变异沉淀 5%</dt>
+          <dd>{parsed > 0n ? fmtToken((parsed * 500n) / 10000n) : "—"}</dd>
+        </div>
       </dl>
 
       {!mounted ? (
@@ -193,12 +209,13 @@ export default function PromoPage() {
 
       <div className="rules-box">
         <h2>推广收益规则</h2>
+        <p className="muted">燃烧拆账：30% 销毁 / 50% 市场奖励桶 / 15% 股东 / 5% 变异沉淀池</p>
         <ul className="rules-list">
           <li>
-            <strong>直推</strong>：第 1 层（燃烧额 400 bps）
+            <strong>直推</strong>：第 1 层（市场奖励桶的 20%，= 订单 10%）
           </li>
           <li>
-            <strong>间推</strong>：仅第 2 层（200 bps）
+            <strong>间推</strong>：仅第 2 层（市场奖励桶的 10%，= 订单 5%）
           </li>
           <li>
             <strong>市场</strong>：第 3–9 层合计；明细标 <strong>市场3…市场9</strong>

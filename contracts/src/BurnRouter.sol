@@ -10,9 +10,10 @@ import {IPriceOracle} from "./interfaces/IPriceOracle.sol";
 import {ILayerRewards} from "./interfaces/ILayerRewards.sol";
 import {IShareholderPool} from "./interfaces/IShareholderPool.sol";
 import {IDividendPools} from "./interfaces/IDividendPools.sol";
+import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Burn entry — gold-peg U tiering + 70/20/10 split.
+/// @title Burn entry — gold-peg U tiering + 30/50/15/5 split.
 contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -21,6 +22,7 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
     ILayerRewards public layerRewards;
     IShareholderPool public shareholderPool;
     IDividendPools public dividendPools;
+    IPrecipitationPool public precipPool;
     address public burnSink;
 
     mapping(address => uint256) public burnedToken;
@@ -37,9 +39,12 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 toSink,
         uint256 toLayers,
         uint256 toShareholders,
+        uint256 toPrecip,
         uint8 tier
     );
-    event ConfigUpdated(address oracle, address layers, address shareholders, address dividends, address sink);
+    event ConfigUpdated(
+        address oracle, address layers, address shareholders, address dividends, address precip, address sink
+    );
 
     constructor(
         address admin,
@@ -70,15 +75,22 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         address layerRewards_,
         address shareholderPool_,
         address dividendPools_,
+        address precipPool_,
         address burnSink_
     ) external onlyOwner {
         if (oracle_ != address(0)) oracle = IPriceOracle(oracle_);
         if (layerRewards_ != address(0)) layerRewards = ILayerRewards(layerRewards_);
         if (shareholderPool_ != address(0)) shareholderPool = IShareholderPool(shareholderPool_);
         if (dividendPools_ != address(0)) dividendPools = IDividendPools(dividendPools_);
+        if (precipPool_ != address(0)) precipPool = IPrecipitationPool(precipPool_);
         if (burnSink_ != address(0)) burnSink = burnSink_;
         emit ConfigUpdated(
-            address(oracle), address(layerRewards), address(shareholderPool), address(dividendPools), burnSink
+            address(oracle),
+            address(layerRewards),
+            address(shareholderPool),
+            address(dividendPools),
+            address(precipPool),
+            burnSink
         );
     }
 
@@ -98,6 +110,7 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
 
     function burn(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "burn: zero");
+        require(address(precipPool) != address(0), "burn: no precip");
         address user = msg.sender;
 
         uint256 beforeBal = token.balanceOf(address(this));
@@ -117,6 +130,7 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 toSink = (received * Constants.BURN_BPS) / Constants.BPS_DENOM;
         uint256 toLayers = (received * Constants.LAYER_BPS) / Constants.BPS_DENOM;
         uint256 toShareholders = (received * Constants.SHAREHOLDER_BPS) / Constants.BPS_DENOM;
+        uint256 toPrecip = (received * Constants.PRECIP_BURN_BPS) / Constants.BPS_DENOM;
         // dust (if any) stays in router
 
         if (toSink > 0) token.safeTransfer(burnSink, toSink);
@@ -131,9 +145,14 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
             shareholderPool.receiveBurnShare(toShareholders);
         }
 
+        if (toPrecip > 0) {
+            token.forceApprove(address(precipPool), toPrecip);
+            precipPool.receiveBurnSedimentation(toPrecip);
+        }
+
         dividendPools.updateTier(user, burnedUsd[user]);
         uint8 tier = dividendPools.tierOf(user);
 
-        emit Burned(user, amount, received, usdValue, toSink, toLayers, toShareholders, tier);
+        emit Burned(user, amount, received, usdValue, toSink, toLayers, toShareholders, toPrecip, tier);
     }
 }
