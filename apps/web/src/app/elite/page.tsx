@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Elite stake desk merged into Swap / 权重. */
+/** Elite stake desk lives on Weight (`/promo`); keep legacy /elite route. */
 export default function EliteRedirect() {
-  redirect("/swap");
+  redirect("/promo");
 }
