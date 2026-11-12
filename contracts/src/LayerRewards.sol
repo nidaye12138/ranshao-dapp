@@ -10,10 +10,9 @@ import {ILayerRewards} from "./interfaces/ILayerRewards.sol";
 import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title 9-layer burn rewards — L1 400 bps of B, L2–L9 200 bps each; missing → precip.
-/// @dev `distribute` pulls `budget` (already 20% of B) from BurnRouter via allowance/balance.
-///      Layer shares are taken as fractions of full B reconstructed as budget * BPS / LAYER_BPS,
-///      equivalently: share_i = budget * layerBps(i) / LAYER_BPS.
+/// @title 9-layer burn rewards — L1 20% of market bucket, L2–L9 10% each; missing → precip.
+/// @dev `distribute` pulls `budget` (50% of B) from BurnRouter via allowance/balance.
+///      share_i = budget * layerBps(i) / LAYER_BPS (relative bucket shares unchanged).
 contract LayerRewards is ILayerRewards, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 

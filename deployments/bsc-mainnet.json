@@ -24,10 +24,11 @@
   "BrokerMarket": null,
   "lockedParams": {
     "instantRewardBps": 50,
-    "burnBps": 7000,
-    "layerBps": 2000,
-    "shareholderBps": 1000,
-    "layerOfB": [400, 200, 200, 200, 200, 200, 200, 200, 200],
+    "burnBps": 3000,
+    "layerBps": 5000,
+    "shareholderBps": 1500,
+    "precipBurnBps": 500,
+    "layerOfMarketBucket": [1000, 500, 500, 500, 500, 500, 500, 500, 500],
     "tierThresholdsU": [100, 500, 800, 1500],
     "poolWeightBps": [3333, 2500, 2500, 1667],
     "maxShareholderSeats": 453

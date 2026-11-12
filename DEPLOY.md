@@ -13,8 +13,8 @@ Product brand: **Umidor**. Authority: Project store `docs/dapp-design.md` + `doc
 ## Locked economic params
 
 - Swap: buyer **0.5%** + direct referrer **0.5%** (payment token); no-referrer → Treasury
-- Burn split: **70%** dead / **20%** 9-layer / **10%** shareholders
-- Layer bps of B: L1 **400**, L2–L9 **200** each
+- Burn split: **30%** dead / **50%** market-reward bucket / **15%** shareholders / **5%** 变异沉淀池 (`PrecipitationPool`)
+- Market-bucket relative layers: L1 **20%** of bucket (=10% of order), L2–L9 **10%** each of bucket (=5% of order each)
 - Tiers (U): **100 / 500 / 800 / 1500**; pool weights bps **[3333, 2500, 2500, 1667]**
 - Shareholder seats cap: **453**
 - Deprecated as primary path: 15d/30d stake yield, buy/stake milestones
@@ -79,9 +79,9 @@ Addresses → [`deployments/bsc-testnet.json`](deployments/bsc-testnet.json).
 | Treasury | Proceeds / module registry |
 | MockPriceOracle | BNB/USD + token/USD |
 | SwapFacade | Buy + 0.5%/0.5% |
-| BurnRouter | 70/20/10 + tier update |
+| BurnRouter | 30/50/15/5 + tier update |
 | LayerRewards | 9-layer + missing → precip |
-| PrecipitationPool | 5% to T4 / 95% admin |
+| PrecipitationPool | 变异沉淀池（missing layers + 5% burn）；5% to T4 / 95% admin |
 | DividendPools | 4 SPCXB pools |
 | ShareholderPool | 453 seats, admin whitelist |
 | EliteStake | Optional T4 stake |

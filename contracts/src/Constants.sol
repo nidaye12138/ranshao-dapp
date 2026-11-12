@@ -21,16 +21,18 @@ library Constants {
     // Swap instant rewards (payment token) — only retained overlap with initial design.
     uint16 internal constant INSTANT_REWARD_BPS = 50; // 0.5%
 
-    // Burn split of B
-    uint16 internal constant BURN_BPS = 7000; // 70% → burn address
-    uint16 internal constant LAYER_BPS = 2000; // 20% → 9-layer
-    uint16 internal constant SHAREHOLDER_BPS = 1000; // 10% → shareholders
+    // Burn split of B (sum = 10000): 30% sink / 50% market / 15% shareholders / 5% 变异沉淀池
+    uint16 internal constant BURN_BPS = 3000; // 30% → burn address
+    uint16 internal constant LAYER_BPS = 5000; // 50% → 9-layer market bucket
+    uint16 internal constant SHAREHOLDER_BPS = 1500; // 15% → shareholders
+    uint16 internal constant PRECIP_BURN_BPS = 500; // 5% → PrecipitationPool (变异沉淀池)
 
-    // 9-layer of B (sum = 2000 bps): L1 400, L2–L9 200 each
+    // 9-layer of market bucket (sum = LAYER_BPS = 5000): L1 1000, L2–L9 500 each
+    // Relative shares unchanged vs old 20% bucket: L1 20%, L2–L9 10% each of the bucket.
     // Indexed 0..8 for layers 1..9
     function layerBps(uint256 index) internal pure returns (uint16) {
-        if (index == 0) return 400;
-        return 200;
+        if (index == 0) return 1000;
+        return 500;
     }
 
     uint8 internal constant LAYER_COUNT = 9;

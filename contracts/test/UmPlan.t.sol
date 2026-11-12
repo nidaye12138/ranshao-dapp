@@ -69,8 +69,9 @@ contract UmPlanTest is Test {
             0
         );
 
+        burnRouter.setConfig(address(0), address(0), address(0), address(0), address(precip), address(0));
         layers.setConfig(address(tree), address(precip), address(burnRouter));
-        precip.setConfig(address(dividends), address(layers));
+        precip.setConfig(address(dividends), address(layers), address(burnRouter));
         shareholders.setBurnRouter(address(burnRouter));
         dividends.setBurnRouter(address(burnRouter));
 
@@ -186,7 +187,7 @@ contract UmPlanTest is Test {
         assertEq(admin.balance, adminBefore + 0.005 ether);
     }
 
-    // ---------- Burn 70/20/10 + layers + tiers ----------
+    // ---------- Burn 30/50/15/5 + layers + tiers ----------
 
     function _bindChain() internal {
         // admin <- alice <- bob <- carol (3 layers above carol for bob's burn from carol...)
@@ -202,7 +203,7 @@ contract UmPlanTest is Test {
 
     function test_burn_split_and_layers() public {
         _bindChain();
-        // Whitelist a shareholder so 10% is claimable
+        // Whitelist a shareholder so 15% is claimable
         vm.prank(admin);
         shareholders.addShareholder(admin);
 
@@ -216,26 +217,45 @@ contract UmPlanTest is Test {
         burnRouter.burn(amount);
         vm.stopPrank();
 
-        // 70% dead
-        assertEq(token.balanceOf(DEAD), 7_000e18);
-        // L1 (carol) 400 bps of B = 400
-        assertEq(token.balanceOf(carol), 1_000_000e18 + 400e18);
-        // L2 (bob) 200
-        assertEq(token.balanceOf(bob), bobBefore + 200e18);
-        // L3 (alice) 200
-        assertEq(token.balanceOf(alice), aliceBefore + 200e18);
-        // L4 (admin) 200
-        assertEq(token.balanceOf(admin), adminTokBefore + 200e18);
-        // L5-L9 missing → precip (5 * 200 = 1000)
-        assertEq(token.balanceOf(address(precip)), 1_000e18);
-        assertEq(precip.totalDeposited(), 1_000e18);
+        // 30% dead
+        assertEq(token.balanceOf(DEAD), 3_000e18);
+        // Market bucket 50% = 5000; L1 (carol) 20% of bucket = 1000
+        assertEq(token.balanceOf(carol), 1_000_000e18 + 1_000e18);
+        // L2 (bob) 10% of bucket = 500
+        assertEq(token.balanceOf(bob), bobBefore + 500e18);
+        // L3 (alice) 500
+        assertEq(token.balanceOf(alice), aliceBefore + 500e18);
+        // L4 (admin) 500
+        assertEq(token.balanceOf(admin), adminTokBefore + 500e18);
+        // L5-L9 missing → precip (5 * 500 = 2500) + 5% burn sedimentation (500) = 3000
+        assertEq(token.balanceOf(address(precip)), 3_000e18);
+        assertEq(precip.totalDeposited(), 3_000e18);
 
-        // 10% shareholders → admin claimable
-        assertEq(shareholders.claimable(admin), 1_000e18);
+        // 15% shareholders → admin claimable
+        assertEq(shareholders.claimable(admin), 1_500e18);
 
         // Dave burned $10k → tier 4
         assertEq(dividends.tierOf(dave), 4);
         assertEq(burnRouter.burnedUsd(dave), 10_000e18);
+    }
+
+    function test_burn_sedimentation_5pct_to_precip() public {
+        vm.prank(alice);
+        tree.bindReferrer(admin);
+
+        uint256 amount = 1_000e18;
+        vm.startPrank(alice);
+        token.approve(address(burnRouter), amount);
+        burnRouter.burn(amount);
+        vm.stopPrank();
+
+        // Direct 5% sedimentation only (L2–L9 missing also land in precip)
+        // Market 500: L1 admin 100; L2–L9 missing 400; sedimentation 50 → precip 450
+        assertEq(token.balanceOf(DEAD), 300e18);
+        assertEq(token.balanceOf(admin), 10_000_000e18 + 100e18);
+        assertEq(shareholders.claimable(admin), 0); // no seats
+        assertEq(token.balanceOf(address(precip)), 450e18);
+        assertEq(precip.totalDeposited(), 450e18);
     }
 
     function test_burn_tier_thresholds_highest_only() public {
@@ -324,13 +344,13 @@ contract UmPlanTest is Test {
         burnRouter.burn(1_000e18);
         vm.stopPrank();
 
-        // 10% = 100 split to 2 seats → 50 each
-        assertEq(shareholders.claimable(alice), 50e18);
-        assertEq(shareholders.claimable(bob), 50e18);
+        // 15% = 150 split to 2 seats → 75 each
+        assertEq(shareholders.claimable(alice), 75e18);
+        assertEq(shareholders.claimable(bob), 75e18);
 
         vm.prank(alice);
         shareholders.claim();
-        assertEq(token.balanceOf(alice), 1_000_000e18 + 50e18);
+        assertEq(token.balanceOf(alice), 1_000_000e18 + 75e18);
     }
 
     function test_shareholder_cap_453() public {
@@ -363,8 +383,11 @@ contract UmPlanTest is Test {
         vm.stopPrank();
         assertEq(dividends.tierOf(eve), 4);
 
-        // L2-L9 missing = 8 * 200 bps of 1500 = 8 * 30 = 240
-        uint256 expectedPrecip = (1_500e18 * 200 * 8) / 10_000;
+        // Market bucket 50% = 750; L2–L9 missing = 80% of bucket = 600; + 5% sedimentation = 75 → 675
+        uint256 marketBucket = (1_500e18 * 5000) / 10_000;
+        uint256 missingLayers = (marketBucket * 500 * 8) / 5000;
+        uint256 sedimentation = (1_500e18 * 500) / 10_000;
+        uint256 expectedPrecip = missingLayers + sedimentation;
         assertEq(precip.totalDeposited(), expectedPrecip);
 
         uint256 cap5 = (expectedPrecip * 500) / 10_000;
@@ -478,11 +501,16 @@ contract UmPlanTest is Test {
     }
 
     function test_constants_locked() public {
-        assertEq(Constants.BURN_BPS, 7000);
-        assertEq(Constants.LAYER_BPS, 2000);
-        assertEq(Constants.SHAREHOLDER_BPS, 1000);
-        assertEq(Constants.layerBps(0), 400);
-        assertEq(Constants.layerBps(1), 200);
+        assertEq(Constants.BURN_BPS, 3000);
+        assertEq(Constants.LAYER_BPS, 5000);
+        assertEq(Constants.SHAREHOLDER_BPS, 1500);
+        assertEq(Constants.PRECIP_BURN_BPS, 500);
+        assertEq(
+            uint256(Constants.BURN_BPS) + Constants.LAYER_BPS + Constants.SHAREHOLDER_BPS + Constants.PRECIP_BURN_BPS,
+            10_000
+        );
+        assertEq(Constants.layerBps(0), 1000);
+        assertEq(Constants.layerBps(1), 500);
         assertEq(Constants.poolWeightBps(1), 3333);
         assertEq(Constants.poolWeightBps(2), 2500);
         assertEq(Constants.poolWeightBps(3), 2500);
