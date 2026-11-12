@@ -79,7 +79,9 @@ export function OnboardingGate() {
       return;
     }
     if (nativeBal && nativeBal.value === 0n) {
-      setLocalError(t("onboarding.errZeroGas"));
+      setLocalError(
+        t(appChainId === 97 ? "onboarding.errZeroGasTestnet" : "onboarding.errZeroGas"),
+      );
       return;
     }
     stashPendingRef(refDraft);

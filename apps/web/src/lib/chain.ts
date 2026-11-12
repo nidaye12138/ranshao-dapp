@@ -10,14 +10,15 @@ export type ChainEnv = {
   [key: string]: string | undefined;
 };
 
-const DEFAULT_MAINNET_RPC = "https://bsc-dataseed.binance.org";
+/** Prefer publicnode — binance dataseed is often blocked from browsers / some VPS paths. */
+const DEFAULT_MAINNET_RPC = "https://bsc-rpc.publicnode.com";
 const DEFAULT_CHAPEL_RPC = "https://bsc-testnet-rpc.publicnode.com";
 const DEFAULT_LOCAL_RPC = "http://127.0.0.1:8545";
 
 /**
  * Resolve the dApp's single configured chain.
  * Defaults to BSC Chapel (97) so local/testnet deploys are not silently routed
- * to mainnet public RPCs (bsc-dataseed). Set NEXT_PUBLIC_CHAIN_ID=56 for mainnet.
+ * to mainnet. Set NEXT_PUBLIC_CHAIN_ID=56 for mainnet.
  */
 export function resolveAppChainId(env: ChainEnv = {}): AppChainId {
   const raw = (env.NEXT_PUBLIC_CHAIN_ID ?? "").trim();
@@ -33,11 +34,20 @@ export function resolveAppChainId(env: ChainEnv = {}): AppChainId {
   return bscTestnet.id;
 }
 
+function withHttpRpc(chain: Chain, rpcUrl: string): Chain {
+  return {
+    ...chain,
+    rpcUrls: {
+      ...chain.rpcUrls,
+      default: { http: [rpcUrl] },
+    },
+  };
+}
+
 export function resolveAppChain(env: ChainEnv = {}): Chain {
   const id = resolveAppChainId(env);
-  if (id === bsc.id) return bsc;
-  if (id === hardhat.id) return hardhat;
-  return bscTestnet;
+  const base = id === bsc.id ? bsc : id === hardhat.id ? hardhat : bscTestnet;
+  return withHttpRpc(base, resolveRpcUrl(id, env));
 }
 
 export function resolveRpcUrl(chainId: AppChainId, env: ChainEnv = {}): string {
@@ -53,11 +63,25 @@ export function resolveRpcUrl(chainId: AppChainId, env: ChainEnv = {}): string {
 /** Ordered wagmi/viem chains with the configured app chain first (default connector chain). */
 export function resolveWagmiChains(env: ChainEnv = {}): readonly [Chain, ...Chain[]] {
   const primary = resolveAppChain(env);
-  const rest = [bscTestnet, bsc, hardhat].filter((c) => c.id !== primary.id);
+  const rest = ([bscTestnet, bsc, hardhat] as const)
+    .filter((c) => c.id !== primary.id)
+    .map((c) => withHttpRpc(c, resolveRpcUrl(c.id as AppChainId, env)));
   return [primary, ...rest];
 }
 
-/** Runtime values baked from process.env at module load (client + server). */
-export const appChainId: AppChainId = resolveAppChainId(process.env);
-export const appChain: Chain = resolveAppChain(process.env);
-export const appRpcUrl: string = resolveRpcUrl(appChainId, process.env);
+/**
+ * Next.js only inlines `process.env.NEXT_PUBLIC_*` on static member access.
+ * Passing bare `process.env` into helpers leaves the client with an empty object,
+ * so resolveAppChainId falls through to Chapel (97) even when .env.local is 56.
+ */
+export const publicChainEnv: ChainEnv = {
+  NEXT_PUBLIC_CHAIN_ID: process.env.NEXT_PUBLIC_CHAIN_ID,
+  NEXT_PUBLIC_BSC_RPC_URL: process.env.NEXT_PUBLIC_BSC_RPC_URL,
+  NEXT_PUBLIC_BSC_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_BSC_TESTNET_RPC_URL,
+  FORCE_TESTNET: process.env.FORCE_TESTNET,
+};
+
+/** Runtime values baked from public env at module load (client + server). */
+export const appChainId: AppChainId = resolveAppChainId(publicChainEnv);
+export const appChain: Chain = resolveAppChain(publicChainEnv);
+export const appRpcUrl: string = resolveRpcUrl(appChainId, publicChainEnv);
