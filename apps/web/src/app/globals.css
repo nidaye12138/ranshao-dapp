@@ -180,6 +180,50 @@ a {
   color: var(--text-tertiary);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.locale-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 199, 214, 0.45);
+  background: rgba(8, 24, 40, 0.9);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.12);
+  z-index: 50;
+}
+
+.locale-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  min-width: 2.4rem;
+  transition:
+    color 180ms var(--ease-out),
+    background 180ms var(--ease-out);
+}
+
+.locale-btn.on {
+  color: var(--text-primary);
+  background: rgba(46, 199, 214, 0.28);
+}
+
 .wallet {
   display: flex;
   gap: 0.45rem;

@@ -9,6 +9,7 @@ import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useStats, useTeam } from "@/lib/api/client";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
+import { localizeLayerLabel, useI18n } from "@/lib/i18n";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
@@ -17,6 +18,7 @@ type IncomeTab = "swap" | "layer" | "div";
 
 export default function MinePage() {
   const mounted = useMounted();
+  const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
   const gate = useOnboardingOptional();
   const featuresUnlocked = gate?.featuresUnlocked ?? true;
@@ -99,14 +101,22 @@ export default function MinePage() {
     const um = umplan != null ? Number(umplan as bigint) / 1e18 : NaN;
     const u = usdt != null ? Number(usdt as bigint) / 1e18 : NaN;
     if (!Number.isFinite(price) || !Number.isFinite(um) || !Number.isFinite(u)) return null;
-    // UMplan×price + USDT；SPCXB/BNB 无可靠价时不计入，避免假估值
     return um * price + u;
   }, [stats?.priceUsd, umplan, usdt]);
 
   const incomeView = useMemo(() => {
-    if (!earnings) return { total: "—", unit: "UMplan", rows: [] as { id: string; label: string; amount: string; at: string }[] };
+    if (!earnings) {
+      return { total: "—", unit: "UMplan", rows: [] as { id: string; label: string; amount: string; at: string }[] };
+    }
     if (incomeTab === "swap") {
-      return { total: earnings.swapPromoTotal ?? "—", unit: "UMplan", rows: earnings.swapPromoRows ?? [] };
+      return {
+        total: earnings.swapPromoTotal ?? "—",
+        unit: "UMplan",
+        rows: (earnings.swapPromoRows ?? []).map((row) => ({
+          ...row,
+          label: localizeLayerLabel(row.label, locale),
+        })),
+      };
     }
     if (incomeTab === "layer") {
       const layerSum = [earnings.layerTotal?.直推, earnings.layerTotal?.间推, earnings.layerTotal?.市场]
@@ -115,11 +125,18 @@ export default function MinePage() {
       return {
         total: layerSum || "—",
         unit: "UMplan",
-        rows: earnings.layerRows ?? [],
+        rows: (earnings.layerRows ?? []).map((row) => ({
+          ...row,
+          label: localizeLayerLabel(row.label, locale),
+        })),
       };
     }
-    return { total: earnings.dividendTotal ?? "—", unit: "SPCXB", rows: earnings.dividendRows ?? [] };
-  }, [earnings, incomeTab]);
+    return {
+      total: earnings.dividendTotal ?? "—",
+      unit: "SPCXB",
+      rows: earnings.dividendRows ?? [],
+    };
+  }, [earnings, incomeTab, locale]);
 
   async function copyInvite() {
     if (!inviteDisplay || !activated) return;
@@ -134,20 +151,20 @@ export default function MinePage() {
 
   return (
     <section className="panel">
-      <FeatureGateBanner feature="收益" />
+      <FeatureGateBanner feature="earnings" />
       <div className="card">
-        <h2 className="card-title">我的钱包</h2>
+        <h2 className="card-title">{t("mine.walletTitle")}</h2>
         {!mounted ? (
-          <p className="muted">加载中…</p>
+          <p className="muted">{t("common.loading")}</p>
         ) : !isConnected ? (
-          <p className="banner warn">请先连接钱包</p>
+          <p className="banner warn">{t("common.connectWalletFirst")}</p>
         ) : (
           <p className="muted" style={{ marginTop: 0 }}>
             {shortAddr(address)}
           </p>
         )}
         <div className="asset-main">
-          <div className="am-sub">总资产估值（USDT）</div>
+          <div className="am-sub">{t("mine.totalVal")}</div>
           <div className="am-num">
             {totalUsdtValuation != null
               ? totalUsdtValuation.toLocaleString("en-US", {
@@ -156,7 +173,7 @@ export default function MinePage() {
                 })
               : "—"}
           </div>
-          <p className="am-note">含 UMplan×实时价 + USDT；SPCXB / BNB 暂未折算</p>
+          <p className="am-note">{t("mine.valNote")}</p>
         </div>
         <div className="asset-grid">
           <div className="asset-cell">
@@ -191,88 +208,86 @@ export default function MinePage() {
       </div>
 
       <div className="card">
-        <h2 className="card-title">我的团队</h2>
+        <h2 className="card-title">{t("mine.teamTitle")}</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           {team?.source === "graph"
-            ? "索引聚合"
+            ? t("mine.teamGraph")
             : team?.source === "unconfigured"
-              ? "索引未配置（GRAPH_URL）；直推可走链上"
+              ? t("mine.teamUnconfigured")
               : mounted && isConnected
-                ? "加载中…"
-                : "连接钱包后查看"}
+                ? t("mine.teamLoading")
+                : t("mine.teamConnect")}
         </p>
         <div className="team-grid">
           <div className="team-cell">
             <div className="t-num">{directsDisplay}</div>
-            <div className="t-label">直推人数</div>
+            <div className="t-label">{t("mine.directs")}</div>
           </div>
           <div className="team-cell">
             <div className="t-num">{mounted && team ? String(team.indirects) : "—"}</div>
-            <div className="t-label">间推人数</div>
+            <div className="t-label">{t("mine.indirects")}</div>
           </div>
           <div className="team-cell">
             <div className="t-num">{mounted && team ? `$${team.buyVolumeUsd}` : "—"}</div>
-            <div className="t-label">购买总量</div>
+            <div className="t-label">{t("mine.buyVolume")}</div>
           </div>
           <div className="team-cell">
             <div className="t-num">{mounted && team ? `$${team.umbrellaUsd}` : "—"}</div>
-            <div className="t-label">市场总业绩</div>
+            <div className="t-label">{t("mine.marketVolume")}</div>
           </div>
         </div>
       </div>
 
       <div className="card">
-        <h2 className="card-title">推广资格</h2>
+        <h2 className="card-title">{t("mine.qualTitle")}</h2>
         {!mounted ? (
           <p className="muted">…</p>
         ) : activated ? (
           <>
-            <div className="qual-on">已激活，可生成专属推广链接（权重档位按钮 · ≥100U）</div>
+            <div className="qual-on">{t("mine.qualOn")}</div>
             <div className="link-row">
               <div className="link-box">{inviteDisplay}</div>
               <button type="button" className="btn primary" onClick={copyInvite}>
-                {copied ? "已复制" : "复制"}
+                {copied ? t("mine.copied") : t("mine.copy")}
               </button>
             </div>
             <div className="invite-actions">
               <button type="button" className="btn" onClick={copyInvite}>
-                {copied ? "已复制" : "复制链接"}
+                {copied ? t("mine.copied") : t("mine.copyLink")}
               </button>
               <button type="button" className="btn" onClick={() => setShowQrStub((v) => !v)}>
-                我的二维码
+                {t("mine.myQr")}
               </button>
             </div>
             {showQrStub && (
               <div className="qr-stub" role="status">
                 <div className="qr-placeholder" aria-hidden />
-                <p>二维码占位 · 专属推广链接二维码即将接入</p>
+                <p>{t("mine.qrStub")}</p>
                 <p className="muted mono">{inviteDisplay}</p>
               </div>
             )}
           </>
         ) : (
-          <div className="qual-off">
-            需在「权重」完成任意档燃烧（最低 ≥100U，点选档位按钮）才可解锁推广资格并生成专属推广链接——不是累计买入。
-          </div>
+          <div className="qual-off">{t("mine.qualOff")}</div>
         )}
       </div>
 
       <div className="card">
         <h2 className="card-title">
-          我的收益
-          <span className="muted">质押分红=UMplan · 档位分红=SPCXB</span>
+          {t("mine.incomeTitle")}
+          <span className="muted">{t("mine.incomeSub")}</span>
         </h2>
         {!featuresUnlocked ? (
-          <p className="banner warn">请先完成邀请人绑定后查看收益明细</p>
+          <p className="banner warn">{t("mine.bindBeforeIncome")}</p>
         ) : (
           <>
             <p className="muted" style={{ marginTop: 0 }}>
               {earnings?.source === "graph"
-                ? "账本来自索引"
+                ? t("mine.incomeGraph")
                 : earnings?.source === "unconfigured"
-                  ? "索引未配置 — 明细为空"
+                  ? t("mine.incomeUnconfigured")
                   : mounted && isConnected
-                    ? "加载中…"
+                    ? t("common.loading")
                     : ""}
             </p>
             <div className="filters">
@@ -281,45 +296,50 @@ export default function MinePage() {
                 className={incomeTab === "swap" ? "filter-btn on" : "filter-btn"}
                 onClick={() => setIncomeTab("swap")}
               >
-                Swap 推广奖励
+                {t("mine.tabSwap")}
               </button>
               <button
                 type="button"
                 className={incomeTab === "layer" ? "filter-btn on" : "filter-btn"}
                 onClick={() => setIncomeTab("layer")}
               >
-                层奖励
+                {t("mine.tabLayer")}
               </button>
               <button
                 type="button"
                 className={incomeTab === "div" ? "filter-btn on" : "filter-btn"}
                 onClick={() => setIncomeTab("div")}
               >
-                分红
+                {t("mine.tabDiv")}
               </button>
             </div>
             <div className="detail-total">
               <span>
-                总量（{incomeView.unit}
-                {incomeTab === "layer" ? " · 直推/间推/市场" : ""}）
+                {t("mine.totalWithUnit", {
+                  unit: incomeView.unit,
+                  layerHint: incomeTab === "layer" ? t("mine.layerBreakdownHint") : "",
+                })}
               </span>
               <b>{incomeView.total}</b>
             </div>
             {incomeTab === "layer" && earnings?.layerTotal && (
               <p className="muted" style={{ marginBottom: "0.5rem" }}>
-                直推 {earnings.layerTotal.直推 ?? "—"} / 间推 {earnings.layerTotal.间推 ?? "—"} / 市场{" "}
-                {earnings.layerTotal.市场 ?? "—"}（明细须标市场3…市场9）
+                {t("mine.layerLine", {
+                  d: earnings.layerTotal.直推 ?? "—",
+                  i: earnings.layerTotal.间推 ?? "—",
+                  m: earnings.layerTotal.市场 ?? "—",
+                })}
               </p>
             )}
             {!incomeView.rows.length ? (
-              <p className="muted">暂无明细</p>
+              <p className="muted">{t("mine.noDetail")}</p>
             ) : (
               <ul className="ledger">
-                {incomeView.rows.map((r) => (
-                  <li key={r.id}>
-                    <span>{r.label}</span>
-                    <span className="d-amt">{r.amount}</span>
-                    <span className="muted">{r.at}</span>
+                {incomeView.rows.map((row) => (
+                  <li key={row.id}>
+                    <span>{row.label}</span>
+                    <span className="d-amt">{row.amount}</span>
+                    <span className="muted">{row.at}</span>
                   </li>
                 ))}
               </ul>

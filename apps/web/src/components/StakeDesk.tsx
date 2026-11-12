@@ -12,6 +12,7 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
+import { useI18n } from "@/lib/i18n";
 import EliteAbi from "@/lib/abi/EliteStake.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
@@ -22,6 +23,7 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
  */
 export function StakeDesk() {
   const mounted = useMounted();
+  const { t } = useI18n();
   const { address, isConnected } = useAccount();
   const [stakeAmount, setStakeAmount] = useState("");
   const [nowSec, setNowSec] = useState(0);
@@ -30,8 +32,8 @@ export function StakeDesk() {
 
   useEffect(() => {
     setNowSec(Math.floor(Date.now() / 1000));
-    const t = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 5_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 5_000);
+    return () => clearInterval(timer);
   }, []);
 
   const eliteReady = addresses.elite !== zeroAddress;
@@ -146,10 +148,9 @@ export function StakeDesk() {
         ? "SPCXB"
         : rewardToken.toLowerCase() === addresses.token.toLowerCase()
           ? "UMplan"
-          : "奖励币"
-      : "奖励币";
+          : t("common.rewardTokenFallback")
+      : t("common.rewardTokenFallback");
 
-  // Readonly estimate: pending when already staked; else — (no invented notifyRelease size).
   const estimateDisplay =
     stakedBn > 0n ? `${fmtToken(pendingBn)} ${rewardLabel}` : "—";
 
@@ -170,55 +171,38 @@ export function StakeDesk() {
   return (
     <div className="card stake-desk">
       <h2 className="card-title">
-        质押分红权益
-        <span className="muted">1500U 档按钮解锁 · 最短 24h</span>
+        {t("stake.title")}
+        <span className="muted">{t("stake.subtitle")}</span>
       </h2>
 
       <div className="doc-text stake-rules" style={{ marginBottom: "0.75rem" }}>
-        <p>
-          分红公式：百 5 的总释放量 ÷ 全网总质押量 = 每个质押币的分红（合约{" "}
-          <code>notifyRelease</code> × 5% / totalStaked）。
-        </p>
-        <p>
-          计算示例：本期百 5 释放 500,000 UMplan，全网总质押 25,000,000 UMplan → 每币分红 =
-          0.02 UMplan；质押 100,000 UMplan 即得 2,000 UMplan。
-        </p>
-        <p>币种说明：质押分红以 UMplan 币量发放（本金与分红均为 UMplan）。</p>
-        <p>
-          赎回规则：质押最短期限 24 小时，到期后本金与分红可随时取回；可「本金 +
-          分红」一起领，也可仅领分红继续质押；忘记领取则自动顺延 24
-          小时并持续计息，想起来时只要历史上已满 24 小时即可随时领取。
-        </p>
-        <p>
-          分红池来源：池内 UMplan 来自市场进单——每笔进单只按直推、间推、市场三档发放奖励；邀请链路中超出这三档范围、无对应奖励档次的应付部分，统一注入本池，按质押配额分配。
-        </p>
+        <p>{t("stake.ruleFormula")}</p>
+        <p>{t("stake.ruleExample")}</p>
+        <p>{t("stake.ruleAsset")}</p>
+        <p>{t("stake.ruleRedeem")}</p>
+        <p>{t("stake.rulePool")}</p>
       </div>
 
       {!eliteReady ? (
-        <p className="stake-gate warn">
-          EliteStake 地址未配置（NEXT_PUBLIC_ELITE_ADDRESS）。UI 已就绪，待部署后接线。
-        </p>
+        <p className="stake-gate warn">{t("stake.eliteMissing")}</p>
       ) : !unlocked ? (
         <p className="stake-gate locked">
           <span className="sg-ico" aria-hidden>
             🔒
           </span>
-          <span>
-            质押权益仅对完成 <b>1500U</b>
-            档位权重销毁的用户开放；当前未达成，下方质押按钮为灰色不可用，达成后自动点亮。手输金额不计入档位。
-          </span>
+          <span>{t("stake.locked")}</span>
         </p>
       ) : (
         <p className="stake-gate open">
           <span className="sg-ico" aria-hidden>
             ✓
           </span>
-          <span>1500U 档位已达成，质押权益已解锁，可自由选择质押数量。</span>
+          <span>{t("stake.unlocked")}</span>
         </p>
       )}
 
       <div className="input-box">
-        <div className="ib-label">质押数量（UMplan · 可自由选择）</div>
+        <div className="ib-label">{t("stake.amountLabel")}</div>
         <div className="input-row">
           <input
             value={stakeAmount}
@@ -243,14 +227,14 @@ export function StakeDesk() {
             onClick={() => setPct(p)}
             disabled={!unlocked || !eliteReady || !tokenBal}
           >
-            {p === 100 ? "全部" : `${p}%`}
+            {p === 100 ? t("common.all") : `${p}%`}
           </button>
         ))}
       </div>
 
-      <div className="quota-card" aria-label="分红配额与预估">
+      <div className="quota-card" aria-label={t("stake.quotaAria")}>
         <div className="quota-row">
-          <span>我的分红配额（占总质押）</span>
+          <span>{t("stake.shareLabel")}</span>
           <b className="quota-pct">{sharePct > 0 ? `${sharePct.toFixed(4)}%` : "0.0000%"}</b>
         </div>
         <div className="quota-row estimate">
@@ -258,24 +242,23 @@ export function StakeDesk() {
             <i className="est-gem" aria-hidden>
               ◆
             </i>
-            预估每期分红（UMplan{rewardLabel !== "UMplan" ? ` · 链上 ${rewardLabel}` : ""}）
+            {rewardLabel !== "UMplan"
+              ? t("stake.estimateOnChain", { token: rewardLabel })
+              : t("stake.estimateLabel")}
           </span>
           <b className="quota-est">{estimateDisplay}</b>
         </div>
-        <p className="quota-note">
-          预估取自链上已累计未领；新一期数值随 <code>notifyRelease</code> × 5% × 配额更新。分红以
-          UMplan 计。
-        </p>
+        <p className="quota-note">{t("stake.estimateNote")}</p>
         <div className="quota-row muted-row">
-          <span>全网总质押</span>
+          <span>{t("stake.totalStaked")}</span>
           <span>{totalStaked != null ? fmtToken(totalBn) : "—"}</span>
         </div>
       </div>
 
       {!mounted ? (
-        <p className="muted">加载中…</p>
+        <p className="muted">{t("common.loading")}</p>
       ) : !isConnected ? (
-        <p className="banner warn">请先连接钱包</p>
+        <p className="banner warn">{t("common.connectWalletFirst")}</p>
       ) : (
         <div className="cta-row" style={{ marginTop: "0.65rem" }}>
           {needApprove && (
@@ -293,7 +276,7 @@ export function StakeDesk() {
                 })
               }
             >
-              授权
+              {t("common.approve")}
             </button>
           )}
           <button
@@ -313,7 +296,7 @@ export function StakeDesk() {
               })
             }
           >
-            {isPending || confirming ? "确认中…" : "确认质押"}
+            {isPending || confirming ? t("common.confirming") : t("stake.confirmStake")}
           </button>
         </div>
       )}
@@ -321,22 +304,22 @@ export function StakeDesk() {
       {stakedBn > 0n && (
         <div className="stake-panel" style={{ marginTop: "1rem" }}>
           <h3 className="card-title" style={{ fontSize: "0.95rem" }}>
-            我的质押 · 赎回
-            <span className="muted">{isStakeUnlocked ? "可赎回 · 随时领取" : "质押期中"}</span>
+            {t("stake.myStake")}
+            <span className="muted">{isStakeUnlocked ? t("stake.redeemable") : t("stake.locking")}</span>
           </h3>
           <dl className="stats redeem-stats">
             <div>
-              <dt>质押本金</dt>
+              <dt>{t("stake.principal")}</dt>
               <dd>{fmtToken(stakedBn)} UMplan</dd>
             </div>
             <div>
-              <dt>本期到期倒计时（最短 24h）</dt>
+              <dt>{t("stake.countdown")}</dt>
               <dd className={lockLeft > 0 ? "cd-live" : "cd-done"}>
-                {lockLeft > 0 ? fmtCountdown(lockLeft) : isStakeUnlocked ? "00:00:00 · 已到期" : "—"}
+                {lockLeft > 0 ? fmtCountdown(lockLeft) : isStakeUnlocked ? t("stake.matured") : "—"}
               </dd>
             </div>
             <div>
-              <dt>累计未领分红</dt>
+              <dt>{t("stake.pendingDiv")}</dt>
               <dd>
                 {fmtToken(pendingBn)} {rewardLabel}
               </dd>
@@ -357,7 +340,7 @@ export function StakeDesk() {
                 })
               }
             >
-              领本金 + 分红
+              {t("stake.redeemBoth")}
             </button>
             <button
               type="button"
@@ -373,13 +356,13 @@ export function StakeDesk() {
                 })
               }
             >
-              仅领分红 · 顺延
+              {t("stake.claimOnly")}
             </button>
           </div>
         </div>
       )}
 
-      {isSuccess && <p className="banner ok">质押操作已确认</p>}
+      {isSuccess && <p className="banner ok">{t("stake.success")}</p>}
       {error && <p className="banner warn">{error.message}</p>}
     </div>
   );
