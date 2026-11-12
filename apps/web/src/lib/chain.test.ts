@@ -60,4 +60,14 @@ describe("resolveWagmiChains", () => {
     const chains = resolveWagmiChains({ NEXT_PUBLIC_CHAIN_ID: "56" });
     assert.equal(chains[0].id, bsc.id);
   });
+
+  it("overrides mainnet rpcUrls to publicnode (not binance dataseed)", () => {
+    const chains = resolveWagmiChains({
+      NEXT_PUBLIC_CHAIN_ID: "56",
+      NEXT_PUBLIC_BSC_RPC_URL: "https://bsc-rpc.publicnode.com",
+    });
+    assert.deepEqual(chains[0].rpcUrls.default.http, ["https://bsc-rpc.publicnode.com"]);
+    assert.equal(resolveRpcUrl(bsc.id, {}), "https://bsc-rpc.publicnode.com");
+    assert.doesNotMatch(resolveRpcUrl(bsc.id, {}), /binance\.org|dataseed/);
+  });
 });

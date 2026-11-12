@@ -13,12 +13,13 @@ import {
 
 const chains = resolveWagmiChains(publicChainEnv);
 
+/** Explicit HTTP transports only — never fall through to viem/chain default hosts. */
 export const config = createConfig({
   chains,
   connectors: [injected()],
   transports: {
-    [bsc.id]: http(resolveRpcUrl(bsc.id, publicChainEnv)),
-    [bscTestnet.id]: http(resolveRpcUrl(bscTestnet.id, publicChainEnv)),
+    [bsc.id]: http(resolveRpcUrl(bsc.id, publicChainEnv), { batch: true }),
+    [bscTestnet.id]: http(resolveRpcUrl(bscTestnet.id, publicChainEnv), { batch: true }),
     [hardhat.id]: http(resolveRpcUrl(hardhat.id, publicChainEnv)),
   },
   ssr: true,
