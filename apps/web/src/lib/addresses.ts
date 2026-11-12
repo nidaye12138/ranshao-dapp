@@ -1,4 +1,6 @@
 import { type Address, zeroAddress } from "viem";
+import { bsc } from "viem/chains";
+import { appChainId } from "@/lib/chain";
 
 /** BSC mainnet UMplan — owner-confirmed project token (external, not minted by this dApp). */
 export const UMPLAN_MAINNET = "0xad09D287327C383283820CfCEe7AC0e6C7De7777" as const satisfies Address;
@@ -14,14 +16,17 @@ function addr(envValue: string | undefined, fallback: Address = zeroAddress): Ad
   return fallback;
 }
 
+const mainnetFallbacks = appChainId === bsc.id;
+
 /**
  * UM-plan module addresses.
- * Token / SPCXB / USDT default to mainnet; modules require deploy + NEXT_PUBLIC_*.
+ * On mainnet (CHAIN_ID=56), token/SPCXB/USDT may fall back to known mainnet addresses.
+ * On Chapel / local, require NEXT_PUBLIC_* so we never approve/read against mainnet tokens by mistake.
  */
 export const addresses = {
-  token: addr(process.env.NEXT_PUBLIC_TOKEN_ADDRESS, UMPLAN_MAINNET),
-  spcxb: addr(process.env.NEXT_PUBLIC_SPCXB_ADDRESS, SPCXB_MAINNET),
-  usdt: addr(process.env.NEXT_PUBLIC_USDT_ADDRESS, USDT_MAINNET),
+  token: addr(process.env.NEXT_PUBLIC_TOKEN_ADDRESS, mainnetFallbacks ? UMPLAN_MAINNET : zeroAddress),
+  spcxb: addr(process.env.NEXT_PUBLIC_SPCXB_ADDRESS, mainnetFallbacks ? SPCXB_MAINNET : zeroAddress),
+  usdt: addr(process.env.NEXT_PUBLIC_USDT_ADDRESS, mainnetFallbacks ? USDT_MAINNET : zeroAddress),
   registry: addr(process.env.NEXT_PUBLIC_REGISTRY_ADDRESS), // ReferralTree
   swap: addr(process.env.NEXT_PUBLIC_SWAP_ADDRESS),
   burn: addr(process.env.NEXT_PUBLIC_BURN_ADDRESS),
@@ -34,6 +39,7 @@ export const addresses = {
 
 /** True when core 4-tab MVP modules are configured. */
 export const isConfigured =
+  addresses.token !== zeroAddress &&
   addresses.registry !== zeroAddress &&
   addresses.swap !== zeroAddress &&
   addresses.burn !== zeroAddress &&

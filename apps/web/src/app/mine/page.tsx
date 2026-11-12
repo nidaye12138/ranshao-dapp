@@ -1,27 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
+import { appChainId } from "@/lib/chain";
 import { fmtToken, shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import { useEarnings, useTeam } from "@/lib/api/client";
+import { useEarnings, useStats, useTeam } from "@/lib/api/client";
+import { FeatureGateBanner } from "@/components/FeatureGateBanner";
+import { useOnboardingOptional } from "@/components/OnboardingProvider";
+import { localizeLayerLabel, useI18n } from "@/lib/i18n";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
+type IncomeTab = "swap" | "layer" | "div";
+
 export default function MinePage() {
   const mounted = useMounted();
+  const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
+  const gate = useOnboardingOptional();
+  const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const ready = mounted && isConfigured && !!address;
   const [inviteOrigin, setInviteOrigin] = useState("");
+  const [incomeTab, setIncomeTab] = useState<IncomeTab>("swap");
+  const [copied, setCopied] = useState(false);
+  const [showQrStub, setShowQrStub] = useState(false);
 
   useEffect(() => {
     setInviteOrigin(window.location.origin);
   }, []);
 
+  const { data: stats } = useStats();
+
   const { data: bnbBal } = useBalance({
     address,
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -30,6 +45,7 @@ export default function MinePage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
   const { data: usdt } = useReadContract({
@@ -37,6 +53,7 @@ export default function MinePage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
   const { data: spcxb } = useReadContract({
@@ -44,6 +61,7 @@ export default function MinePage() {
     abi: ERC20Abi,
     functionName: "balanceOf",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -52,6 +70,7 @@ export default function MinePage() {
     abi: DivAbi,
     functionName: "isActivated",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -60,6 +79,7 @@ export default function MinePage() {
     abi: TreeAbi,
     functionName: "directRefCount",
     args: [address!],
+    chainId: appChainId,
     query: { enabled: ready },
   });
 
@@ -76,139 +96,255 @@ export default function MinePage() {
         ? String(team.directs)
         : "—";
 
+  const totalUsdtValuation = useMemo(() => {
+    const price = stats?.priceUsd != null ? Number(stats.priceUsd) : NaN;
+    const um = umplan != null ? Number(umplan as bigint) / 1e18 : NaN;
+    const u = usdt != null ? Number(usdt as bigint) / 1e18 : NaN;
+    if (!Number.isFinite(price) || !Number.isFinite(um) || !Number.isFinite(u)) return null;
+    return um * price + u;
+  }, [stats?.priceUsd, umplan, usdt]);
+
+  const incomeView = useMemo(() => {
+    if (!earnings) {
+      return { total: "—", unit: "UMplan", rows: [] as { id: string; label: string; amount: string; at: string }[] };
+    }
+    if (incomeTab === "swap") {
+      return {
+        total: earnings.swapPromoTotal ?? "—",
+        unit: "UMplan",
+        rows: (earnings.swapPromoRows ?? []).map((row) => ({
+          ...row,
+          label: localizeLayerLabel(row.label, locale),
+        })),
+      };
+    }
+    if (incomeTab === "layer") {
+      const layerSum = [earnings.layerTotal?.直推, earnings.layerTotal?.间推, earnings.layerTotal?.市场]
+        .filter(Boolean)
+        .join(" / ");
+      return {
+        total: layerSum || "—",
+        unit: "UMplan",
+        rows: (earnings.layerRows ?? []).map((row) => ({
+          ...row,
+          label: localizeLayerLabel(row.label, locale),
+        })),
+      };
+    }
+    return {
+      total: earnings.dividendTotal ?? "—",
+      unit: "SPCXB",
+      rows: earnings.dividendRows ?? [],
+    };
+  }, [earnings, incomeTab, locale]);
+
+  async function copyInvite() {
+    if (!inviteDisplay || !activated) return;
+    try {
+      await navigator.clipboard.writeText(inviteDisplay);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <section className="panel">
-      <h1>我的</h1>
-      {!mounted ? (
-        <p className="muted">加载中…</p>
-      ) : !isConnected ? (
-        <p className="banner warn">请先连接钱包</p>
-      ) : (
-        <p className="muted">{shortAddr(address)}</p>
-      )}
-
-      <h2>钱包余额</h2>
-      <dl className="stats">
-        <div>
-          <dt>UMplan</dt>
-          <dd>{mounted && umplan != null ? fmtToken(umplan as bigint) : "—"}</dd>
-        </div>
-        <div>
-          <dt>USDT</dt>
-          <dd>{mounted && usdt != null ? fmtToken(usdt as bigint) : "—"}</dd>
-        </div>
-        <div>
-          <dt>SPCXB</dt>
-          <dd>{mounted && spcxb != null ? fmtToken(spcxb as bigint) : "—"}</dd>
-        </div>
-        <div>
-          <dt>BNB</dt>
-          <dd>{mounted && bnbBal ? fmtToken(bnbBal.value, bnbBal.decimals) : "—"}</dd>
-        </div>
-      </dl>
-
-      <h2>我的团队</h2>
-      <p className="muted">
-        {team?.source === "graph"
-          ? "索引聚合"
-          : team?.source === "unconfigured"
-            ? "索引未配置（GRAPH_URL）；直推可走链上"
-            : mounted && isConnected
-              ? "加载中…"
-              : "连接钱包后查看"}
-      </p>
-      <dl className="stats">
-        <div>
-          <dt>直推</dt>
-          <dd>{directsDisplay}</dd>
-        </div>
-        <div>
-          <dt>间推</dt>
-          <dd>{mounted && team ? String(team.indirects) : "—"}</dd>
-        </div>
-        <div>
-          <dt>购买总量</dt>
-          <dd>{mounted && team ? `$${team.buyVolumeUsd}` : "—"}</dd>
-        </div>
-        <div>
-          <dt>伞下总业绩</dt>
-          <dd>{mounted && team ? `$${team.umbrellaUsd}` : "—"}</dd>
-        </div>
-      </dl>
-
-      <h2>推广资格</h2>
-      {!mounted ? (
-        <p className="muted">…</p>
-      ) : activated ? (
-        <div className="rules-box">
-          <p className="banner ok">已激活（任意档 ≥100U）</p>
-          <p>
-            邀请链接：<code>{inviteDisplay}</code>
+      <FeatureGateBanner feature="earnings" />
+      <div className="card">
+        <h2 className="card-title">{t("mine.walletTitle")}</h2>
+        {!mounted ? (
+          <p className="muted">{t("common.loading")}</p>
+        ) : !isConnected ? (
+          <p className="banner warn">{t("common.connectWalletFirst")}</p>
+        ) : (
+          <p className="muted" style={{ marginTop: 0 }}>
+            {shortAddr(address)}
           </p>
+        )}
+        <div className="asset-main">
+          <div className="am-sub">{t("mine.totalVal")}</div>
+          <div className="am-num">
+            {totalUsdtValuation != null
+              ? totalUsdtValuation.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })
+              : "—"}
+          </div>
+          <p className="am-note">{t("mine.valNote")}</p>
         </div>
-      ) : (
-        <p className="banner warn">请先在「权重」燃烧任意档（最低 100U）以解锁邀请链接</p>
-      )}
+        <div className="asset-grid">
+          <div className="asset-cell">
+            <div className="ac-num">{mounted && umplan != null ? fmtToken(umplan as bigint) : "—"}</div>
+            <div className="ac-label">
+              <i className="tc-dot tc-um" />
+              UMplan
+            </div>
+          </div>
+          <div className="asset-cell">
+            <div className="ac-num">{mounted && usdt != null ? fmtToken(usdt as bigint) : "—"}</div>
+            <div className="ac-label">
+              <i className="tc-dot tc-usdt" />
+              USDT
+            </div>
+          </div>
+          <div className="asset-cell">
+            <div className="ac-num">{mounted && spcxb != null ? fmtToken(spcxb as bigint) : "—"}</div>
+            <div className="ac-label">
+              <i className="tc-dot tc-spcxb" />
+              SPCXB
+            </div>
+          </div>
+          <div className="asset-cell">
+            <div className="ac-num">{mounted && bnbBal ? fmtToken(bnbBal.value, bnbBal.decimals) : "—"}</div>
+            <div className="ac-label">
+              <i className="tc-dot tc-bnb" />
+              BNB
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <h2>我的收益</h2>
-      <p className="muted">
-        {earnings?.source === "graph"
-          ? "账本来自索引"
-          : earnings?.source === "unconfigured"
-            ? "索引未配置 — 明细为空"
-            : mounted && isConnected
-              ? "加载中…"
-              : ""}
-      </p>
-      <div className="panel-block">
-        <h3>Swap 推广 · 总量 {earnings?.swapPromoTotal ?? "—"}</h3>
-        {!earnings?.swapPromoRows?.length ? (
-          <p className="muted">暂无明细</p>
+      <div className="card">
+        <h2 className="card-title">{t("mine.teamTitle")}</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          {team?.source === "graph"
+            ? t("mine.teamGraph")
+            : team?.source === "unconfigured"
+              ? t("mine.teamUnconfigured")
+              : mounted && isConnected
+                ? t("mine.teamLoading")
+                : t("mine.teamConnect")}
+        </p>
+        <div className="team-grid">
+          <div className="team-cell">
+            <div className="t-num">{directsDisplay}</div>
+            <div className="t-label">{t("mine.directs")}</div>
+          </div>
+          <div className="team-cell">
+            <div className="t-num">{mounted && team ? String(team.indirects) : "—"}</div>
+            <div className="t-label">{t("mine.indirects")}</div>
+          </div>
+          <div className="team-cell">
+            <div className="t-num">{mounted && team ? `$${team.buyVolumeUsd}` : "—"}</div>
+            <div className="t-label">{t("mine.buyVolume")}</div>
+          </div>
+          <div className="team-cell">
+            <div className="t-num">{mounted && team ? `$${team.umbrellaUsd}` : "—"}</div>
+            <div className="t-label">{t("mine.marketVolume")}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="card-title">{t("mine.qualTitle")}</h2>
+        {!mounted ? (
+          <p className="muted">…</p>
+        ) : activated ? (
+          <>
+            <div className="qual-on">{t("mine.qualOn")}</div>
+            <div className="link-row">
+              <div className="link-box">{inviteDisplay}</div>
+              <button type="button" className="btn primary" onClick={copyInvite}>
+                {copied ? t("mine.copied") : t("mine.copy")}
+              </button>
+            </div>
+            <div className="invite-actions">
+              <button type="button" className="btn" onClick={copyInvite}>
+                {copied ? t("mine.copied") : t("mine.copyLink")}
+              </button>
+              <button type="button" className="btn" onClick={() => setShowQrStub((v) => !v)}>
+                {t("mine.myQr")}
+              </button>
+            </div>
+            {showQrStub && (
+              <div className="qr-stub" role="status">
+                <div className="qr-placeholder" aria-hidden />
+                <p>{t("mine.qrStub")}</p>
+                <p className="muted mono">{inviteDisplay}</p>
+              </div>
+            )}
+          </>
         ) : (
-          <ul className="ledger">
-            {earnings.swapPromoRows.map((r) => (
-              <li key={r.id}>
-                <span>{r.label}</span>
-                <span>{r.amount}</span>
-                <span className="muted">{r.at}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="qual-off">{t("mine.qualOff")}</div>
         )}
       </div>
-      <div className="panel-block">
-        <h3>
-          层奖励 · 直推 {earnings?.layerTotal.直推 ?? "—"} / 间推 {earnings?.layerTotal.间推 ?? "—"} / 市场{" "}
-          {earnings?.layerTotal.市场 ?? "—"}
-        </h3>
-        {!earnings?.layerRows?.length ? (
-          <p className="muted">暂无明细</p>
+
+      <div className="card">
+        <h2 className="card-title">
+          {t("mine.incomeTitle")}
+          <span className="muted">{t("mine.incomeSub")}</span>
+        </h2>
+        {!featuresUnlocked ? (
+          <p className="banner warn">{t("mine.bindBeforeIncome")}</p>
         ) : (
-          <ul className="ledger">
-            {earnings.layerRows.map((r) => (
-              <li key={r.id}>
-                <span>{r.label}</span>
-                <span>{r.amount}</span>
-                <span className="muted">{r.at}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <div className="panel-block">
-        <h3>分红 · 总量 {earnings?.dividendTotal ?? "—"}</h3>
-        {!earnings?.dividendRows?.length ? (
-          <p className="muted">暂无明细（领取后由索引写入）</p>
-        ) : (
-          <ul className="ledger">
-            {earnings.dividendRows.map((r) => (
-              <li key={r.id}>
-                <span>{r.label}</span>
-                <span>{r.amount}</span>
-                <span className="muted">{r.at}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="muted" style={{ marginTop: 0 }}>
+              {earnings?.source === "graph"
+                ? t("mine.incomeGraph")
+                : earnings?.source === "unconfigured"
+                  ? t("mine.incomeUnconfigured")
+                  : mounted && isConnected
+                    ? t("common.loading")
+                    : ""}
+            </p>
+            <div className="filters">
+              <button
+                type="button"
+                className={incomeTab === "swap" ? "filter-btn on" : "filter-btn"}
+                onClick={() => setIncomeTab("swap")}
+              >
+                {t("mine.tabSwap")}
+              </button>
+              <button
+                type="button"
+                className={incomeTab === "layer" ? "filter-btn on" : "filter-btn"}
+                onClick={() => setIncomeTab("layer")}
+              >
+                {t("mine.tabLayer")}
+              </button>
+              <button
+                type="button"
+                className={incomeTab === "div" ? "filter-btn on" : "filter-btn"}
+                onClick={() => setIncomeTab("div")}
+              >
+                {t("mine.tabDiv")}
+              </button>
+            </div>
+            <div className="detail-total">
+              <span>
+                {t("mine.totalWithUnit", {
+                  unit: incomeView.unit,
+                  layerHint: incomeTab === "layer" ? t("mine.layerBreakdownHint") : "",
+                })}
+              </span>
+              <b>{incomeView.total}</b>
+            </div>
+            {incomeTab === "layer" && earnings?.layerTotal && (
+              <p className="muted" style={{ marginBottom: "0.5rem" }}>
+                {t("mine.layerLine", {
+                  d: earnings.layerTotal.直推 ?? "—",
+                  i: earnings.layerTotal.间推 ?? "—",
+                  m: earnings.layerTotal.市场 ?? "—",
+                })}
+              </p>
+            )}
+            {!incomeView.rows.length ? (
+              <p className="muted">{t("mine.noDetail")}</p>
+            ) : (
+              <ul className="ledger">
+                {incomeView.rows.map((row) => (
+                  <li key={row.id}>
+                    <span>{row.label}</span>
+                    <span className="d-amt">{row.amount}</span>
+                    <span className="muted">{row.at}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
     </section>
