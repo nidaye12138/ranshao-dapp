@@ -122,7 +122,7 @@ export default function PromoPage() {
 
   return (
     <section className="panel">
-      <h1>推广</h1>
+      <h1>权重</h1>
       <p className="muted">四档燃烧入场 · 层奖励规则 · SPCXB 分红领取（24h 冷却）</p>
 
       <h2>燃烧入场</h2>

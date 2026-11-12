@@ -147,7 +147,7 @@ export default function MinePage() {
           </p>
         </div>
       ) : (
-        <p className="banner warn">请先在「推广」燃烧任意档（最低 100U）以解锁邀请链接</p>
+        <p className="banner warn">请先在「权重」燃烧任意档（最低 100U）以解锁邀请链接</p>
       )}
 
       <h2>我的收益</h2>

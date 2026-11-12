@@ -788,6 +788,14 @@ code {
   color: var(--teal);
 }
 
+.tab-weight .tab-label {
+  letter-spacing: 0.08em;
+}
+
+.tab-weight.active {
+  color: var(--gold, #c9a227);
+}
+
 /* ——— Home board ——— */
 .home-board {
   display: grid;

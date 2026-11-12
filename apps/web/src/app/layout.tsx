@@ -27,7 +27,7 @@ const bodyFont = Noto_Sans_SC({
 
 export const metadata: Metadata = {
   title: "Umidor · BNB Chain DApp",
-  description: "Umidor — 首页 / Swap / 推广 / 我的 · 买卖即时奖 · 四档燃烧 · SPCXB 分红",
+  description: "Umidor — 首页 / Swap / 权重 / 我的 · 买卖即时奖 · 四档燃烧 · SPCXB 分红",
   icons: {
     icon: "/umidor-logo.png",
   },
