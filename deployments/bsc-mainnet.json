@@ -5,7 +5,7 @@
   "tokenMode": "external-umplan",
   "deployedAt": "2026-11-12",
   "deployTx": "0xed28299afe4c2c16ffc7d4a88d6f6d164375e2f68530fe3c21b621b0ae368e05",
-  "note": "UM-plan modules deployed via DeployBscMainnet.s.sol (inventory SwapFacade, external UMplan + SPCXB). Post-deploy: depositInventory / inject / whitelist seats.",
+  "note": "Live SwapFacade 0x188c… is inventory-mode (pre-DEX). Next deploy: DEX mode payment=SPCXB via Pancake V2 pair UMplan/SPCXB 0xc3118CCc0bE00E7FA39AC8041694e09F52178D6f. Do not redeploy without owner confirm. Post-deploy: inject / whitelist; update NEXT_PUBLIC_SWAP_ADDRESS; pause+rescue old swap.",
   "UMplan": "0xad09D287327C383283820CfCEe7AC0e6C7De7777",
   "SPCXB": "0xbe9D156892E55e7154BcD3cB0FEA677F9D3103E1",
   "tokenSymbol": "UMplan",

@@ -84,7 +84,8 @@ contract UmPlanTest is Test {
             address(tree),
             payable(address(treasury)),
             true,
-            0
+            0,
+            address(0)
         );
         token.setMinter(address(swap), true);
 
