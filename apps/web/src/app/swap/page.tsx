@@ -11,7 +11,6 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
-import { StakeDesk } from "@/components/StakeDesk";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import { useI18n } from "@/lib/i18n";
@@ -278,8 +277,6 @@ export default function SwapPage() {
           <p>{t("swap.slipNote", { slip: slippage, fee: FEE_PCT, floor: FEE_FLOOR })}</p>
         </div>
       </div>
-
-      <StakeDesk />
     </section>
   );
 }
