@@ -14,8 +14,8 @@ import {IPancakeV3SwapRouter} from "./interfaces/IPancakeV3SwapRouter.sol";
 import {IPancakeV3QuoterV2} from "./interfaces/IPancakeV3QuoterV2.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Swap facade — buy/sell project token with 0.5%/0.5% instant rewards (UI IA C1/C2).
-/// @dev Q10: no-referrer 0.5% → Treasury. Q11: rewards in payment token. Q12: Ownable+Pausable.
+/// @title Swap facade — buy/sell project token with 0.5%/0.5% instant UMplan rewards (UI IA C1/C2).
+/// @dev Q10: no-referrer 0.5% → Treasury. Q11: rewards in project token. Q12: Ownable+Pausable.
 ///      Inventory mode (`pancakeRouter == 0`): mintMode or depositInventory; sell needs payment liquidity.
 ///      DEX direct (`pancakeRouter != 0`, `hopToken == 0`): V2 path payment↔token (e.g. SPCXB↔UMplan).
 ///      DEX hop (`hopToken != 0`): pay USDT; V3 USDT↔SPCXB then V2 SPCXB↔UMplan. ABI keeps `usdt`/`*USDT` names.
@@ -209,7 +209,7 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         tokenOut = _tokensForUsd(usdAmount);
     }
 
-    /// @notice Quote sell: tokens → payment token (gross before 0.5%+0.5% rewards).
+    /// @notice Quote sell: tokens → payment (gross for full amount; execution withholds 1% UMplan rewards).
     function quoteSellUsdt(uint256 tokenAmount) public view returns (uint256 usdtOut, uint256 usdAmount) {
         if (dexMode()) {
             if (hopMode()) {
@@ -231,35 +231,26 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         (uint256 tokenOut, uint256 usdAmount) = quoteUsdt(usdtAmount);
         require(tokenOut > 0, "swap: zero tokens");
 
-        uint256 reward = (usdtAmount * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-        address referrer = tree.referrerOf(buyer);
-
         usdt.safeTransferFrom(buyer, address(this), usdtAmount);
-
-        uint256 paidToRef = 0;
-        usdt.safeTransfer(buyer, reward);
-        if (referrer != address(0)) {
-            usdt.safeTransfer(referrer, reward);
-            paidToRef = reward;
-        } else {
-            usdt.safeTransfer(treasury, reward);
-        }
 
         uint256 delivered;
         if (dexMode()) {
             uint256 swapIn = usdt.balanceOf(address(this));
             require(swapIn > 0, "swap: nothing to swap");
             if (hopMode()) {
-                delivered = _buyViaHop(swapIn, buyer);
+                delivered = _buyViaHop(swapIn, address(this));
             } else {
                 uint256 minOut = (tokenOut * swapSlippageBps) / Constants.BPS_DENOM;
-                delivered = _swapPaymentForToken(swapIn, minOut, buyer);
+                delivered = _swapPaymentForToken(swapIn, minOut, address(this));
             }
         } else {
-            delivered = _deliverTokens(buyer, tokenOut);
+            delivered = _deliverTokens(address(this), tokenOut);
             uint256 remainder = usdt.balanceOf(address(this));
             if (remainder > 0) usdt.safeTransfer(treasury, remainder);
         }
+
+        (uint256 buyerKeep, uint256 reward, uint256 paidToRef) = _payTokenRewards(buyer, delivered);
+        token.safeTransfer(buyer, buyerKeep);
 
         emit Bought(buyer, address(usdt), usdtAmount, usdAmount, tokenOut, delivered, reward, paidToRef);
     }
@@ -272,19 +263,9 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         (uint256 tokenOut, uint256 usdAmount) = quoteBnb(bnbAmount);
         require(tokenOut > 0, "swap: zero tokens");
 
-        uint256 reward = (bnbAmount * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-        address referrer = tree.referrerOf(buyer);
-
-        uint256 delivered = _deliverTokens(buyer, tokenOut);
-        _sendBnb(payable(buyer), reward);
-
-        uint256 paidToRef = 0;
-        if (referrer != address(0)) {
-            _sendBnb(payable(referrer), reward);
-            paidToRef = reward;
-        } else {
-            _sendBnb(treasury, reward);
-        }
+        uint256 delivered = _deliverTokens(address(this), tokenOut);
+        (uint256 buyerKeep, uint256 reward, uint256 paidToRef) = _payTokenRewards(buyer, delivered);
+        token.safeTransfer(buyer, buyerKeep);
 
         uint256 remainder = address(this).balance;
         if (remainder > 0) _sendBnb(treasury, remainder);
@@ -292,16 +273,10 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         emit Bought(buyer, address(0), bnbAmount, usdAmount, tokenOut, delivered, reward, paidToRef);
     }
 
-    /// @notice In-app sell (UI IA C1): tokens → payment; seller 99.5% + referrer/treasury 0.5%.
+    /// @notice In-app sell: payment for 99% tokens; 0.5% UMplan self + 0.5% UMplan referrer/treasury.
     function sellForUSDT(uint256 tokenAmount) external nonReentrant whenNotPaused {
         require(tokenAmount > 0, "swap: zero");
         address seller = msg.sender;
-        (uint256 usdtOut, uint256 usdAmount) = quoteSellUsdt(tokenAmount);
-        require(usdtOut > 0, "swap: zero out");
-
-        uint256 reward = (usdtOut * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-        require(usdtOut >= reward * 2, "swap: dust");
-        address referrer = tree.referrerOf(seller);
 
         uint256 beforeTok = token.balanceOf(address(this));
         token.safeTransferFrom(seller, address(this), tokenAmount);
@@ -311,48 +286,59 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
             "swap: fot too high"
         );
 
+        uint256 reward = (received * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
+        require(received >= reward * 2, "swap: dust");
+        uint256 swapAmount = received - (reward * 2);
+
         uint256 paymentGross;
+        uint256 usdtOut;
+        uint256 usdAmount;
         if (dexMode()) {
             if (hopMode()) {
-                paymentGross = _sellViaHop(received);
+                paymentGross = _sellViaHop(swapAmount);
             } else {
-                if (received != tokenAmount) {
-                    usdtOut = _routerAmountOut(received, _sellPath());
-                    usdAmount = _paymentToUsd(usdtOut);
-                    reward = (usdtOut * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-                    require(usdtOut >= reward * 2, "swap: dust");
-                }
+                usdtOut = _routerAmountOut(swapAmount, _sellPath());
                 uint256 minOut = (usdtOut * swapSlippageBps) / Constants.BPS_DENOM;
-                paymentGross = _swapTokenForPayment(received, minOut);
+                paymentGross = _swapTokenForPayment(swapAmount, minOut);
             }
-            // Recompute rewards from actual proceeds (FOT / pool impact).
-            reward = (paymentGross * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-            require(paymentGross >= reward * 2, "swap: dust");
             usdtOut = paymentGross;
             usdAmount = _paymentToUsd(paymentGross);
         } else {
-            if (received != tokenAmount) {
-                (usdtOut, usdAmount) = quoteSellUsdt(received);
-                reward = (usdtOut * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-                require(usdtOut >= reward * 2, "swap: dust");
-            }
+            (usdtOut, usdAmount) = quoteSellUsdt(swapAmount);
             require(usdt.balanceOf(address(this)) >= usdtOut, "swap: no usdt liq");
             paymentGross = usdtOut;
         }
 
-        uint256 sellerPrincipal = paymentGross - (reward * 2);
-        uint256 sellerTotal = sellerPrincipal + reward;
-        usdt.safeTransfer(seller, sellerTotal);
+        usdt.safeTransfer(seller, paymentGross);
+        token.safeTransfer(seller, reward);
 
         uint256 paidToRef = 0;
+        address referrer = tree.referrerOf(seller);
         if (referrer != address(0)) {
-            usdt.safeTransfer(referrer, reward);
+            token.safeTransfer(referrer, reward);
             paidToRef = reward;
         } else {
-            usdt.safeTransfer(treasury, reward);
+            token.safeTransfer(treasury, reward);
         }
 
-        emit Sold(seller, address(usdt), received, usdtOut, sellerTotal, usdAmount, reward, paidToRef);
+        emit Sold(seller, address(usdt), received, usdtOut, paymentGross, usdAmount, reward, paidToRef);
+    }
+
+    /// @dev From `delivered` project tokens held by this contract: keep 99.5% for trader, 0.5% to ref/treasury.
+    function _payTokenRewards(address trader, uint256 delivered)
+        private
+        returns (uint256 traderKeep, uint256 reward, uint256 paidToRef)
+    {
+        reward = (delivered * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
+        require(delivered >= reward * 2, "swap: dust");
+        traderKeep = delivered - reward;
+        address referrer = tree.referrerOf(trader);
+        if (referrer != address(0)) {
+            token.safeTransfer(referrer, reward);
+            paidToRef = reward;
+        } else {
+            token.safeTransfer(treasury, reward);
+        }
     }
 
     function _buyPath() private view returns (address[] memory path) {

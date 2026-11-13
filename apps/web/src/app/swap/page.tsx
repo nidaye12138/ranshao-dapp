@@ -192,8 +192,10 @@ export default function SwapPage() {
       ? parsed
       : hopOut
     : quote?.[1];
-  const rewardBase = hopMode && mode === "sell" && hopOut != null ? hopOut : parsed;
+  // Instant rebate is 0.5% UMplan: buy → of tokens out; sell → of tokens sold.
+  const rewardBase = mode === "buy" ? (outAmount ?? 0n) : parsed;
   const selfReward = (rewardBase * 50n) / 10_000n;
+  const rewardLabel = "UMplan";
   const allowanceReady = allowance !== undefined;
   const allowanceBi = (allowance as bigint | undefined) ?? 0n;
   /** Only require approve after allowance has loaded — never treat "loading" as 0 allowance. */
@@ -308,8 +310,8 @@ export default function SwapPage() {
       pendingAction === "approve"
         ? t("swap.approveOk")
         : pendingAction === "buy"
-          ? t("swap.buyOkDetail", { reward: rewardHint, token: paymentLabel })
-          : t("swap.sellOkDetail", { reward: rewardHint, token: paymentLabel });
+          ? t("swap.buyOkDetail", { reward: rewardHint, token: rewardLabel })
+          : t("swap.sellOkDetail", { reward: rewardHint, token: rewardLabel });
 
     if (receipt?.logs?.length) {
       try {
@@ -323,11 +325,11 @@ export default function SwapPage() {
             if (rw > 0n) {
               text = t("swap.buyOkDetail", {
                 reward: formatUnits(rw, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
-                token: paymentLabel,
+                token: rewardLabel,
               });
             }
           } else if (pendingAction === "sell") {
-            // Sold: tokenAmount, paymentQuoted, paymentDelivered(=sellerTotal), usd, sellerReward, referrerReward
+            // Sold: tokenAmount, paymentQuoted, paymentDelivered, usd, sellerReward(UMplan), referrerReward
             const got = word(2);
             const rw = word(4);
             text = t("swap.sellOkReceived", {
@@ -356,6 +358,7 @@ export default function SwapPage() {
     receipt,
     selfReward,
     paymentLabel,
+    rewardLabel,
     t,
     refetchPayAllowance,
     refetchTokenAllowance,
@@ -550,7 +553,7 @@ export default function SwapPage() {
           <div>
             <dt>{t("swap.selfRebate")}</dt>
             <dd>
-              {fmtToken(selfReward)} {paymentLabel}
+              {fmtToken(selfReward)} {rewardLabel}
             </dd>
           </div>
         </dl>

@@ -107,7 +107,7 @@ function decodeBought(log: Log): Omit<SwapHistoryRow, "at"> | null {
       side: "BUY",
       paymentAmount: fmtAmt(a.paymentAmount, "USDT"),
       tokenAmount: fmtAmt(a.tokenAmountDelivered ?? 0n, "UMplan"),
-      selfReward: fmtAmt(a.buyerReward, "USDT"),
+      selfReward: fmtAmt(a.buyerReward, "UMplan"),
       txHash: log.transactionHash,
       blockNumber: (log.blockNumber ?? 0n).toString(),
       explorerUrl: explorerTx(log.transactionHash),
@@ -136,7 +136,7 @@ function decodeSold(log: Log): Omit<SwapHistoryRow, "at"> | null {
       side: "SELL",
       paymentAmount: fmtAmt(a.paymentDelivered ?? 0n, "USDT"),
       tokenAmount: fmtAmt(a.tokenAmount, "UMplan"),
-      selfReward: fmtAmt(a.sellerReward, "USDT"),
+      selfReward: fmtAmt(a.sellerReward, "UMplan"),
       txHash: log.transactionHash,
       blockNumber: (log.blockNumber ?? 0n).toString(),
       explorerUrl: explorerTx(log.transactionHash),
@@ -233,7 +233,7 @@ export async function fetchSwapHistory(address: string): Promise<SwapHistoryResp
     source: "chain",
     address: addr,
     buyVolumeUsdt: formatUnits(buyVol, 18),
-    selfRewardTotal: formatTokenRaw(rewardSum, "USDT"),
+    selfRewardTotal: formatTokenRaw(rewardSum, "UMplan"),
     rows: rows.slice(0, 50),
   };
 }

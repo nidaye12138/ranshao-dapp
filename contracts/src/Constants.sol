@@ -13,12 +13,12 @@ pragma solidity ^0.8.24;
 /// - Q7b: admin whitelist seats up to 453
 /// - Q8: BrokerMarket stub / Phase 2 only
 /// - Q10: no-referrer 0.5% → Treasury
-/// - Q11: rewards in payment token
+/// - Q11: swap instant rewards paid in project token (UMplan)
 /// - Q12: no UUPS for MVP (Ownable + Pausable)
 library Constants {
     uint16 internal constant BPS_DENOM = 10_000;
 
-    // Swap instant rewards (payment token) — only retained overlap with initial design.
+    // Swap instant rewards in project token (UMplan): trader 0.5% + referrer/treasury 0.5%.
     uint16 internal constant INSTANT_REWARD_BPS = 50; // 0.5%
 
     // Burn split of B (sum = 10000): 30% sink / 50% market / 15% shareholders / 5% 变异沉淀池

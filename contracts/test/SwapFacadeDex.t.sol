@@ -96,18 +96,23 @@ contract SwapFacadeDexTest is Test {
         hopSwap.buyWithUSDT(pay);
         vm.stopPrank();
 
-        // rewards 0.5%+0.5% in USDT; 990 swapped 1:1 through V3→V2 → tokens
-        assertEq(usdt.balanceOf(alice), aliceUsdtBefore - pay + 5e18);
-        assertEq(token.balanceOf(alice), aliceTokBefore + 990e18);
+        // Full USDT swapped 1:1 → tokens; 0.5% UMplan to ref, buyer keeps 99.5%
+        assertEq(usdt.balanceOf(alice), aliceUsdtBefore - pay);
+        assertEq(token.balanceOf(alice), aliceTokBefore + 995e18);
+        assertEq(token.balanceOf(admin), 5e18);
 
         uint256 sellAmt = 500e18;
         uint256 usdtBeforeSell = usdt.balanceOf(alice);
+        uint256 tokBeforeSell = token.balanceOf(alice);
+        uint256 adminTokBefore = token.balanceOf(admin);
         vm.startPrank(alice);
         token.approve(address(hopSwap), sellAmt);
         hopSwap.sellForUSDT(sellAmt);
         vm.stopPrank();
-        // sellerTotal = gross - referrerReward = 500 - 2.5 = 497.5 (self 0.5% kept in sellerTotal)
-        assertEq(usdt.balanceOf(alice), usdtBeforeSell + 497.5e18);
+        // Swap 99% tokens → USDT; self 0.5% UMplan back + ref 0.5% UMplan
+        assertEq(usdt.balanceOf(alice), usdtBeforeSell + 495e18);
+        assertEq(token.balanceOf(alice), tokBeforeSell - sellAmt + 2.5e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 2.5e18);
     }
 
     function test_dexMode_true() public view {
@@ -130,10 +135,11 @@ contract SwapFacadeDexTest is Test {
         swap.buyWithUSDT(pay);
         vm.stopPrank();
 
-        // 0.5% self + 0.5% ref; 99% swapped 1:1 → tokens
-        assertEq(spcxb.balanceOf(alice), alicePayBefore - pay + 5e18);
-        assertEq(spcxb.balanceOf(admin), adminPayBefore + 5e18);
-        assertEq(token.balanceOf(alice), aliceTokBefore + 990e18);
+        // Full payment swapped 1:1 → tokens; ref 0.5% UMplan, buyer 99.5%
+        assertEq(spcxb.balanceOf(alice), alicePayBefore - pay);
+        assertEq(spcxb.balanceOf(admin), adminPayBefore);
+        assertEq(token.balanceOf(alice), aliceTokBefore + 995e18);
+        assertEq(token.balanceOf(admin), 5e18);
         assertEq(spcxb.balanceOf(address(swap)), 0);
     }
 
@@ -143,16 +149,18 @@ contract SwapFacadeDexTest is Test {
 
         uint256 sellAmt = 1_000e18;
         uint256 alicePayBefore = spcxb.balanceOf(alice);
-        uint256 adminPayBefore = spcxb.balanceOf(admin);
+        uint256 aliceTokBefore = token.balanceOf(alice);
+        uint256 adminTokBefore = token.balanceOf(admin);
 
         vm.startPrank(alice);
         token.approve(address(swap), sellAmt);
         swap.sellForUSDT(sellAmt);
         vm.stopPrank();
 
-        // 1:1 swap → 1000 payment; seller 995, ref 5
-        assertEq(spcxb.balanceOf(alice), alicePayBefore + 995e18);
-        assertEq(spcxb.balanceOf(admin), adminPayBefore + 5e18);
+        // Swap 99% → payment; self/ref each 0.5% UMplan
+        assertEq(spcxb.balanceOf(alice), alicePayBefore + 990e18);
+        assertEq(token.balanceOf(alice), aliceTokBefore - sellAmt + 5e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 5e18);
     }
 
     function test_inventoryDeposit_blockedInDex() public {

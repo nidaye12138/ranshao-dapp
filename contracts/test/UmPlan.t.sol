@@ -148,6 +148,7 @@ contract UmPlanTest is Test {
         uint256 pay = 1_000e18;
         uint256 aliceBefore = usdt.balanceOf(alice);
         uint256 adminBefore = usdt.balanceOf(admin);
+        uint256 adminTokBefore = token.balanceOf(admin);
         uint256 treasuryBefore = usdt.balanceOf(address(treasury));
 
         vm.startPrank(alice);
@@ -155,37 +156,44 @@ contract UmPlanTest is Test {
         swap.buyWithUSDT(pay);
         vm.stopPrank();
 
-        // $1000 / $1 = 1000 tokens
-        assertEq(token.balanceOf(alice), 1_000_000e18 + 1_000e18);
-        assertEq(usdt.balanceOf(alice), aliceBefore - pay + 5e18);
-        assertEq(usdt.balanceOf(admin), adminBefore + 5e18);
-        assertEq(usdt.balanceOf(address(treasury)), treasuryBefore + 990e18);
+        // $1000 / $1 = 1000 tokens; buyer 995 UMplan, ref 5 UMplan; full USDT to treasury
+        assertEq(token.balanceOf(alice), 1_000_000e18 + 995e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 5e18);
+        assertEq(usdt.balanceOf(alice), aliceBefore - pay);
+        assertEq(usdt.balanceOf(admin), adminBefore);
+        assertEq(usdt.balanceOf(address(treasury)), treasuryBefore + pay);
     }
 
     function test_buyUSDT_noReferrer_rewardToTreasury() public {
         uint256 pay = 1_000e18;
-        uint256 treasuryBefore = usdt.balanceOf(address(treasury));
+        uint256 treasuryUsdtBefore = usdt.balanceOf(address(treasury));
+        uint256 treasuryTokBefore = token.balanceOf(address(treasury));
+        uint256 bobTokBefore = token.balanceOf(bob);
 
         vm.startPrank(bob);
         usdt.approve(address(swap), pay);
         swap.buyWithUSDT(pay);
         vm.stopPrank();
 
-        // buyer 5 + no-ref 5 + remainder 990 = 995 to treasury path; buyer keeps 5
-        assertEq(usdt.balanceOf(address(treasury)), treasuryBefore + 995e18);
+        // Full USDT to treasury; no-ref 0.5% UMplan to treasury; buyer keeps 99.5%
+        assertEq(usdt.balanceOf(address(treasury)), treasuryUsdtBefore + pay);
+        assertEq(token.balanceOf(bob), bobTokBefore + 995e18);
+        assertEq(token.balanceOf(address(treasury)), treasuryTokBefore + 5e18);
     }
 
     function test_buyBNB_withReferrer() public {
         vm.prank(alice);
         tree.bindReferrer(admin);
 
-        uint256 adminBefore = admin.balance;
+        uint256 adminBnbBefore = admin.balance;
+        uint256 adminTokBefore = token.balanceOf(admin);
         vm.prank(alice);
         swap.buyWithBNB{value: 1 ether}();
 
-        // 600 tokens at $1
-        assertEq(token.balanceOf(alice), 1_000_000e18 + 600e18);
-        assertEq(admin.balance, adminBefore + 0.005 ether);
+        // 600 tokens at $1 → buyer 597, ref 3 UMplan; BNB rewards removed
+        assertEq(token.balanceOf(alice), 1_000_000e18 + 597e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 3e18);
+        assertEq(admin.balance, adminBnbBefore);
     }
 
     // ---------- Burn 30/50/15/5 + layers + tiers ----------
@@ -453,15 +461,19 @@ contract UmPlanTest is Test {
         uint256 sellAmt = 1_000e18; // $1000 at $1
         uint256 aliceUsdtBefore = usdt.balanceOf(alice);
         uint256 adminUsdtBefore = usdt.balanceOf(admin);
+        uint256 adminTokBefore = token.balanceOf(admin);
+        uint256 aliceTokBefore = token.balanceOf(alice);
 
         vm.startPrank(alice);
         token.approve(address(swap), sellAmt);
         swap.sellForUSDT(sellAmt);
         vm.stopPrank();
 
-        // seller 99.5% = 995; ref 0.5% = 5
-        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 995e18);
-        assertEq(usdt.balanceOf(admin), adminUsdtBefore + 5e18);
+        // Swap 99% → 990 USDT to seller; self/ref each 5 UMplan
+        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 990e18);
+        assertEq(usdt.balanceOf(admin), adminUsdtBefore);
+        assertEq(token.balanceOf(alice), aliceTokBefore - sellAmt + 5e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 5e18);
     }
 
     function test_dividend_claim_24h_cooldown() public {
