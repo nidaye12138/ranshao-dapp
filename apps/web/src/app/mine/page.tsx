@@ -115,7 +115,7 @@ export default function MinePage() {
     if (incomeTab === "swap") {
       return {
         total: earnings.swapPromoTotal ?? "—",
-        unit: "UMplan",
+        unit: "USDT",
         rows: (earnings.swapPromoRows ?? []).map((row) => ({
           ...row,
           label: localizeLayerLabel(row.label, locale),
@@ -290,17 +290,19 @@ export default function MinePage() {
         ) : (
           <>
             <p className="muted" style={{ marginTop: 0 }}>
-              {earnings?.source === "graph"
+              {earnings?.source === "graph" || earnings?.source === "mixed"
                 ? t("mine.incomeGraph")
-                : earnings?.source === "unconfigured"
-                  ? t("mine.incomeUnconfigured")
-                  : earningsLoading && mounted && isConnected
-                    ? t("common.loading")
-                    : earningsError
-                      ? earningsError
-                      : mounted && isConnected
-                        ? t("mine.incomeUnconfigured")
-                        : ""}
+                : earnings?.source === "chain"
+                  ? t("mine.incomeChain")
+                  : earnings?.source === "unconfigured"
+                    ? t("mine.incomeUnconfigured")
+                    : earningsLoading && mounted && isConnected
+                      ? t("common.loading")
+                      : earningsError
+                        ? earningsError
+                        : mounted && isConnected
+                          ? t("mine.incomeUnconfigured")
+                          : ""}
             </p>
             <div className="filters">
               <button

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
+import { fetchSwapHistory } from "@/lib/api/swapHistory";
 import type { TeamResponse } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,22 @@ function empty(address: string): TeamResponse {
   };
 }
 
+async function withChainBuyVolume(address: string, base: TeamResponse): Promise<TeamResponse> {
+  try {
+    const history = await fetchSwapHistory(address);
+    if ("error" in history) return base;
+    const vol = Number(history.buyVolumeUsdt);
+    if (!Number.isFinite(vol) || vol <= 0) return { ...base, source: base.source === "unconfigured" ? "chain" : base.source };
+    return {
+      ...base,
+      source: base.source === "graph" ? "mixed" : "chain",
+      buyVolumeUsd: vol.toFixed(4).replace(/\.?0+$/, ""),
+    };
+  } catch {
+    return base;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const address = (req.nextUrl.searchParams.get("address") || "").toLowerCase();
   if (!address || !isAddress(address)) {
@@ -35,7 +52,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!graphUrl()) {
-    return NextResponse.json(empty(address));
+    return NextResponse.json(await withChainBuyVolume(address, empty(address)));
   }
 
   const result = await graphQuery<{

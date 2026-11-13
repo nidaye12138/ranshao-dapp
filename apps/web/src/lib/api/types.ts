@@ -47,6 +47,7 @@ export type EarningsResponse = {
   layerRows: EarningsRow[];
   dividendTotal: string;
   dividendRows: EarningsRow[];
+  error?: string;
 };
 
 export type AnnouncementsResponse = {

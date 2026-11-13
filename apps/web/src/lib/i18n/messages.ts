@@ -132,6 +132,17 @@ export type MessageTree = {
     buyOk: string;
     sellOk: string;
     approveOk: string;
+    buyOkDetail: string;
+    sellOkDetail: string;
+    waitWalletApprove: string;
+    waitWalletBuy: string;
+    waitWalletSell: string;
+    waitingWallet: string;
+    confirmingOnChain: string;
+    viewTx: string;
+    historyTitle: string;
+    historyNote: string;
+    historyEmpty: string;
     insufficientBal: string;
     needApproveFirst: string;
     enterAmount: string;
@@ -266,6 +277,7 @@ export type MessageTree = {
     bindBeforeIncome: string;
     incomeGraph: string;
     incomeUnconfigured: string;
+    incomeChain: string;
     tabSwap: string;
     tabLayer: string;
     tabDiv: string;
@@ -468,10 +480,21 @@ export const messages: Record<Locale, MessageTree> = {
       selfRebate: "自返 0.5%",
       buyOk: "买入成功（经 Pancake 多跳），0.5% 奖励即时到账你与邀请人",
       sellOk: "卖出已提交（经 Pancake 多跳），等待链上确认",
-      approveOk: "授权成功（一次即可，之后买卖一般不用再授权）。请再点确认完成交易。",
+      approveOk: "授权成功（一次即可，之后买卖一般不用再授权）。请再点「确认买入/卖出」完成交易。",
+      buyOkDetail: "买入成功！自返 0.5% 已到钱包：{reward} {token}（邀请人同步到账）。可在下方「成交记录」查看。",
+      sellOkDetail: "卖出成功！自返 0.5% 已到钱包：{reward} {token}。可在下方「成交记录」查看。",
+      waitWalletApprove: "请在钱包弹窗中确认「授权」（Approve）。未弹窗请检查钱包 App / 浏览器插件。",
+      waitWalletBuy: "请在钱包弹窗中确认「买入」交易。未弹窗请检查钱包，勿重复狂点。",
+      waitWalletSell: "请在钱包弹窗中确认「卖出」交易。未弹窗请检查钱包，勿重复狂点。",
+      waitingWallet: "等待钱包确认…",
+      confirmingOnChain: "已提交，正在等待链上确认…",
+      viewTx: "在 BscScan 查看交易 →",
+      historyTitle: "成交记录（链上）",
+      historyNote: "直接读取 Swap 合约事件，不依赖索引。自返 0.5% USDT 已打入钱包余额。",
+      historyEmpty: "暂无成交。买入成功后会出现在这里。",
       insufficientBal: "余额不足：买入需钱包持有足够 USDT；当前余额不够支付金额",
       needApproveFirst:
-        "首次需授权：允许 Swap 合约扣 USDT/UMplan（链上 ERC-20 规则，无法省略）。本次按「无限额」授权，之后通常不用再点。",
+        "首次需授权：允许 Swap 合约扣 USDT/UMplan（链上 ERC-20 规则，无法省略）。请先点下方红色「授权」，钱包确认后再点确认买卖。",
       enterAmount: "请先输入大于 0 的数量",
       instantTitle: "即时奖励说明",
       instantOnly: "仅即时奖：买/卖 → 交易方 0.5% + 直推邀请人 0.5%（USDT）到钱包。",
@@ -616,7 +639,8 @@ export const messages: Record<Locale, MessageTree> = {
       incomeSub: "质押分红=UMplan · 档位分红=SPCXB",
       bindBeforeIncome: "请先完成邀请人绑定后查看收益明细",
       incomeGraph: "账本来自索引",
-      incomeUnconfigured: "索引未配置 — 明细为空",
+      incomeUnconfigured: "索引未配置 — 层奖励/分红明细暂空；Swap 自返可走链上成交",
+      incomeChain: "Swap 自返来自链上成交（即时 0.5% USDT 已进钱包）",
       tabSwap: "Swap 推广奖励",
       tabLayer: "层奖励",
       tabDiv: "分红",
@@ -819,10 +843,21 @@ export const messages: Record<Locale, MessageTree> = {
       selfRebate: "Self rebate 0.5%",
       buyOk: "Buy submitted via Pancake multi-hop; 0.5% rewards go to you and your referrer",
       sellOk: "Sell submitted via Pancake multi-hop; awaiting confirmation",
-      approveOk: "Approved (usually once). Tap Confirm to finish the trade.",
+      approveOk: "Approved (usually once). Tap Confirm buy/sell to finish the trade.",
+      buyOkDetail: "Buy succeeded! 0.5% self rebate in wallet: {reward} {token} (referrer paid too). See Trade history below.",
+      sellOkDetail: "Sell succeeded! 0.5% self rebate in wallet: {reward} {token}. See Trade history below.",
+      waitWalletApprove: "Confirm Approve in your wallet popup. If none appears, check the wallet app/extension.",
+      waitWalletBuy: "Confirm the buy in your wallet. If no popup, check the wallet — don’t spam-tap.",
+      waitWalletSell: "Confirm the sell in your wallet. If no popup, check the wallet — don’t spam-tap.",
+      waitingWallet: "Waiting for wallet…",
+      confirmingOnChain: "Submitted — waiting for on-chain confirmation…",
+      viewTx: "View on BscScan →",
+      historyTitle: "Trade history (on-chain)",
+      historyNote: "Read from Swap events (no indexer). 0.5% USDT rebate is already in your wallet balance.",
+      historyEmpty: "No trades yet. Successful buys appear here.",
       insufficientBal: "Insufficient balance: buy needs enough USDT in your wallet",
       needApproveFirst:
-        "First-time approve lets the Swap contract move USDT/UMplan (required by ERC-20). We request unlimited allowance so later trades skip this.",
+        "First-time approve lets Swap move USDT/UMplan (ERC-20). Tap Approve below, confirm in wallet, then Confirm trade.",
       enterAmount: "Enter an amount greater than 0",
       instantTitle: "Instant rewards",
       instantOnly: "Instant only: buy/sell → trader 0.5% + direct referrer 0.5% (USDT) to wallets.",
@@ -972,7 +1007,8 @@ export const messages: Record<Locale, MessageTree> = {
       incomeSub: "Stake dividends = UMplan · tier dividends = SPCXB",
       bindBeforeIncome: "Bind a referrer before viewing earnings detail",
       incomeGraph: "Ledger from indexer",
-      incomeUnconfigured: "Indexer not configured — empty detail",
+      incomeUnconfigured: "Indexer not configured — layer/dividend detail empty; Swap rebate can use on-chain trades",
+      incomeChain: "Swap rebate from on-chain trades (0.5% USDT already in wallet)",
       tabSwap: "Swap promo",
       tabLayer: "Layer rewards",
       tabDiv: "Dividends",
