@@ -10,9 +10,41 @@ import {
   formatTokenUsd,
   PANCAKE_V2_ROUTER,
   PancakeRouterAbi,
+  spotUsdFromPoolMid,
 } from "@/lib/tokenPrice";
+import {
+  PANCAKE_V3_QUOTER_V2,
+  PancakeV3QuoterAbi,
+  SPCXB_USDT_V3_FEE,
+  quoteUmplanToUsdt,
+} from "@/lib/dexQuote";
 
 export const dynamic = "force-dynamic";
+
+/** Mainnet UMplan/SPCXB Pancake V2 pair (Ave / DexScreener pool). */
+const UMPLAN_SPCXB_PAIR =
+  "0xC3118CCC0be00E7FA39aC8041694e09F52178d6F" as const satisfies Address;
+
+const PairAbi = [
+  {
+    type: "function",
+    name: "getReserves",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "reserve0", type: "uint112" },
+      { name: "reserve1", type: "uint112" },
+      { name: "blockTimestampLast", type: "uint32" },
+    ],
+  },
+  {
+    type: "function",
+    name: "token0",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+] as const;
 
 const STATS_QUERY = `
   query ProtocolStats {
@@ -34,12 +66,89 @@ const OracleAbi = [
   },
 ] as const;
 
+async function readV3UsdtPerSpcxb(
+  client: ReturnType<typeof createPublicClient>,
+  spcxb: Address,
+  usdt: Address,
+): Promise<bigint | null> {
+  try {
+    const quoted = (await client.readContract({
+      address: PANCAKE_V3_QUOTER_V2,
+      abi: PancakeV3QuoterAbi,
+      functionName: "quoteExactInputSingle",
+      args: [
+        {
+          tokenIn: spcxb,
+          tokenOut: usdt,
+          amountIn: parseUnits("1", 18),
+          fee: SPCXB_USDT_V3_FEE,
+          sqrtPriceLimitX96: 0n,
+        },
+      ],
+    })) as [bigint, bigint, number, bigint];
+    return quoted[0] > 0n ? quoted[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Homepage spot: UMplan/SPCXB V2 mid × SPCXB→USDT V3 (deep pool).
+ * Pure V2 UMplan→SPCXB→USDT is wrong — V2 SPCXB/USDT is thin (~$0.04 vs ~$140 on V3).
+ */
 async function readDexTokenUsd(
   client: ReturnType<typeof createPublicClient>,
 ): Promise<string | null> {
   const { token, spcxb, usdt } = addresses;
   if (token === zeroAddress || spcxb === zeroAddress || usdt === zeroAddress) return null;
-  // Primary market: UMplan → SPCXB → USDT on Pancake V2 (matches Ave / DEX spot).
+
+  try {
+    const [token0, reserves, usdtPerSpcxb] = await Promise.all([
+      client.readContract({
+        address: UMPLAN_SPCXB_PAIR,
+        abi: PairAbi,
+        functionName: "token0",
+      }) as Promise<Address>,
+      client.readContract({
+        address: UMPLAN_SPCXB_PAIR,
+        abi: PairAbi,
+        functionName: "getReserves",
+      }) as Promise<readonly [bigint, bigint, number]>,
+      readV3UsdtPerSpcxb(client, spcxb, usdt),
+    ]);
+
+    if (usdtPerSpcxb) {
+      const tokenIs0 = token0.toLowerCase() === token.toLowerCase();
+      const reserveToken = tokenIs0 ? reserves[0] : reserves[1];
+      const reserveSpcxb = tokenIs0 ? reserves[1] : reserves[0];
+      const mid = spotUsdFromPoolMid({
+        reserveToken,
+        reserveSpcxb,
+        usdtPerSpcxb18: usdtPerSpcxb,
+      });
+      const formatted = mid ? formatTokenUsd(mid) : null;
+      if (formatted) return formatted;
+    }
+  } catch {
+    // fall through
+  }
+
+  // Execution-aligned fallback (same hop as SwapFacade sell path).
+  try {
+    const out = await quoteUmplanToUsdt({
+      client: client as never,
+      usdt,
+      spcxb,
+      umplan: token,
+      amountIn: parseUnits("1", 18),
+    });
+    const formatted = formatTokenUsd(out);
+    if (formatted) return formatted;
+  } catch {
+    // fall through
+  }
+
+  // Last resort: full V2 path (may underprice if SPCXB/USDT V2 is thin).
   try {
     const amounts = (await client.readContract({
       address: PANCAKE_V2_ROUTER,

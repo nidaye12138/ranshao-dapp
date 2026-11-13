@@ -17,6 +17,21 @@ export const PancakeRouterAbi = [
   },
 ] as const;
 
+/**
+ * Spot USD (1e18) from UMplan/SPCXB pool mid × SPCXB/USDT quote.
+ * Used so homepage "实时币价" matches Ave / DexScreener mark (not a thin V2 hop).
+ */
+export function spotUsdFromPoolMid(opts: {
+  reserveToken: bigint;
+  reserveSpcxb: bigint;
+  usdtPerSpcxb18: bigint;
+}): bigint | null {
+  const { reserveToken, reserveSpcxb, usdtPerSpcxb18 } = opts;
+  if (reserveToken <= 0n || reserveSpcxb <= 0n || usdtPerSpcxb18 <= 0n) return null;
+  // (reserveSpcxb / reserveToken) * usdtPerSpcxb18, all 1e18-scaled.
+  return (reserveSpcxb * usdtPerSpcxb18) / reserveToken;
+}
+
 /** Format a 1e18 USD quote for homepage / stats (enough digits for sub-cent tokens). */
 export function formatTokenUsd(amountUsd18: bigint): string | null {
   if (amountUsd18 <= 0n) return null;
