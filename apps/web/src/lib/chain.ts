@@ -57,7 +57,20 @@ export function resolveWagmiChains(env: ChainEnv = {}): readonly [Chain, ...Chai
   return [primary, ...rest];
 }
 
+/**
+ * Next.js only inlines *static* `process.env.NEXT_PUBLIC_*` member access into the
+ * client bundle. Passing whole `process.env` into helpers leaves CHAIN_ID/RPC blank
+ * in the browser (defaults to Chapel 97) while addresses may still bake — balances
+ * then read mainnet tokens on the wrong chain and show "—".
+ */
+export const publicChainEnv: ChainEnv = {
+  NEXT_PUBLIC_CHAIN_ID: process.env.NEXT_PUBLIC_CHAIN_ID,
+  NEXT_PUBLIC_BSC_RPC_URL: process.env.NEXT_PUBLIC_BSC_RPC_URL,
+  NEXT_PUBLIC_BSC_TESTNET_RPC_URL: process.env.NEXT_PUBLIC_BSC_TESTNET_RPC_URL,
+  FORCE_TESTNET: process.env.FORCE_TESTNET,
+};
+
 /** Runtime values baked from process.env at module load (client + server). */
-export const appChainId: AppChainId = resolveAppChainId(process.env);
-export const appChain: Chain = resolveAppChain(process.env);
-export const appRpcUrl: string = resolveRpcUrl(appChainId, process.env);
+export const appChainId: AppChainId = resolveAppChainId(publicChainEnv);
+export const appChain: Chain = resolveAppChain(publicChainEnv);
+export const appRpcUrl: string = resolveRpcUrl(appChainId, publicChainEnv);

@@ -4,8 +4,8 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChain, appRpcUrl } from "@/lib/chain";
 import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
 import type { StatsResponse } from "@/lib/api/types";
+import { type Address } from "viem";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
-import SwapAbi from "@/lib/abi/SwapFacade.json";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,17 @@ const STATS_QUERY = `
     }
   }
 `;
+
+/** Minimal oracle surface — DEX Swap quotes are in SPCXB, not USDT, so do not invert quoteUsdt. */
+const OracleAbi = [
+  {
+    type: "function",
+    name: "tokenUsd",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
 
 export async function GET() {
   let source: StatsResponse["source"] = "unconfigured";
@@ -35,7 +46,7 @@ export async function GET() {
     }
   }
 
-  // Prefer live chain reads when modules are configured (burn totals + 1 USDT quote stub).
+  // Prefer live chain reads when modules are configured (burn totals + oracle token USD).
   if (isConfigured && appRpcUrl) {
     try {
       const client = createPublicClient({
@@ -43,30 +54,39 @@ export async function GET() {
         transport: http(appRpcUrl),
       });
 
-      const [burnedTok, burnedUsd, quote] = await Promise.all([
+      const oracleAddr = (process.env.NEXT_PUBLIC_ORACLE_ADDRESS || "").trim() as Address;
+      const reads: Promise<unknown>[] = [
         client.readContract({
           address: addresses.burn,
           abi: BurnAbi,
           functionName: "totalBurnedToken",
-        }) as Promise<bigint>,
+        }),
         client.readContract({
           address: addresses.burn,
           abi: BurnAbi,
           functionName: "totalBurnedUsd",
-        }) as Promise<bigint>,
-        client.readContract({
-          address: addresses.swap,
-          abi: SwapAbi,
-          functionName: "quoteUsdt",
-          args: [10n ** 18n],
-        }) as Promise<[bigint, bigint]>,
-      ]);
+        }),
+      ];
+      if (oracleAddr.startsWith("0x") && oracleAddr.length === 42) {
+        reads.push(
+          client.readContract({
+            address: oracleAddr,
+            abi: OracleAbi,
+            functionName: "tokenUsd",
+          }),
+        );
+      }
 
+      const settled = await Promise.all(reads);
+      const burnedTok = settled[0] as bigint;
+      const burnedUsd = settled[1] as bigint;
       totalBurnedToken = formatUsdRaw(burnedTok);
       totalBurnedUsd = formatUsdRaw(burnedUsd);
-      const tokensPerUsdt = quote?.[0];
-      if (tokensPerUsdt && tokensPerUsdt > 0n) {
-        priceUsd = (1 / Number(formatUnits(tokensPerUsdt, 18))).toFixed(4);
+      if (settled.length > 2) {
+        const tokenUsd = settled[2] as bigint;
+        if (tokenUsd > 0n) {
+          priceUsd = Number(formatUnits(tokenUsd, 18)).toFixed(4);
+        }
       }
       source = source === "graph" ? "mixed" : "chain";
     } catch {

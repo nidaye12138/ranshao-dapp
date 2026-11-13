@@ -83,8 +83,12 @@ export default function MinePage() {
     query: { enabled: ready },
   });
 
-  const { data: team } = useTeam(mounted && address ? address : undefined);
-  const { data: earnings } = useEarnings(mounted && address ? address : undefined);
+  const { data: team, loading: teamLoading, error: teamError } = useTeam(
+    mounted && address ? address : undefined,
+  );
+  const { data: earnings, loading: earningsLoading, error: earningsError } = useEarnings(
+    mounted && address ? address : undefined,
+  );
 
   const inviteDisplay =
     mounted && address ? (inviteOrigin ? `${inviteOrigin}/?ref=${address}` : `/?ref=${address}`) : "";
@@ -214,9 +218,13 @@ export default function MinePage() {
             ? t("mine.teamGraph")
             : team?.source === "unconfigured"
               ? t("mine.teamUnconfigured")
-              : mounted && isConnected
+              : teamLoading && mounted && isConnected
                 ? t("mine.teamLoading")
-                : t("mine.teamConnect")}
+                : teamError
+                  ? teamError
+                  : mounted && isConnected
+                    ? t("mine.teamUnconfigured")
+                    : t("mine.teamConnect")}
         </p>
         <div className="team-grid">
           <div className="team-cell">
@@ -286,9 +294,13 @@ export default function MinePage() {
                 ? t("mine.incomeGraph")
                 : earnings?.source === "unconfigured"
                   ? t("mine.incomeUnconfigured")
-                  : mounted && isConnected
+                  : earningsLoading && mounted && isConnected
                     ? t("common.loading")
-                    : ""}
+                    : earningsError
+                      ? earningsError
+                      : mounted && isConnected
+                        ? t("mine.incomeUnconfigured")
+                        : ""}
             </p>
             <div className="filters">
               <button
