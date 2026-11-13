@@ -122,5 +122,9 @@ export async function GET() {
   }
 
   const body: StatsResponse = { source, priceUsd, totalBurnedToken, totalBurnedUsd };
-  return NextResponse.json(body);
+  return NextResponse.json(body, {
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
 }

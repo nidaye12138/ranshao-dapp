@@ -24,5 +24,6 @@ export function formatTokenUsd(amountUsd18: bigint): string | null {
   if (!Number.isFinite(n) || n <= 0) return null;
   if (n >= 1) return n.toFixed(2);
   if (n >= 0.01) return n.toFixed(4);
-  return n.toFixed(5);
+  // Six decimals so 0.001974 vs 0.001984 stay distinguishable (Ave-style).
+  return n.toFixed(6);
 }

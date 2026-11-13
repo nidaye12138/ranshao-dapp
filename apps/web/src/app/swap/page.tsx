@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAccount,
+  usePublicClient,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
+import { zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
+import { quoteUmplanToUsdt, quoteUsdtToUmplan } from "@/lib/dexQuote";
 import { fmtToken, parseAmount } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
@@ -23,23 +26,20 @@ type PendingAction = "approve" | "buy" | "sell" | null;
 const SLIP_PRESETS = [3.5, 5, 10];
 const FEE_PCT = 3.5;
 const FEE_FLOOR = 3;
-/** Mainnet DEX payment leg = SPCXB (UMplan/SPCXB Pancake V2). ABI names still say *USDT*. */
-const PAYMENT = "SPCXB" as const;
-
 export default function SwapPage() {
   const mounted = useMounted();
   const { t } = useI18n();
   const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient({ chainId: appChainId });
   const gate = useOnboardingOptional();
   const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("100");
   const [slippage, setSlippage] = useState(3.5);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [hopOut, setHopOut] = useState<bigint | null>(null);
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
-
-  const paymentToken = addresses.spcxb;
 
   const parsed = useMemo(() => {
     try {
@@ -48,6 +48,18 @@ export default function SwapPage() {
       return 0n;
     }
   }, [amount]);
+
+  const { data: hopToken } = useReadContract({
+    address: addresses.swap,
+    abi: SwapAbi,
+    functionName: "hopToken",
+    chainId: appChainId,
+    query: { enabled: isConfigured },
+  });
+  const hopMode = !!hopToken && (hopToken as string).toLowerCase() !== zeroAddress.toLowerCase();
+  /** Hop deploy pays USDT; legacy direct DEX pays SPCXB. */
+  const paymentToken = hopMode ? addresses.usdt : addresses.spcxb;
+  const paymentLabel = hopMode ? "USDT" : "SPCXB";
 
   const { data: tokenBal } = useReadContract({
     address: addresses.token,
@@ -64,7 +76,7 @@ export default function SwapPage() {
     functionName: "balanceOf",
     args: [address!],
     chainId: appChainId,
-    query: { enabled: mounted && !!address && isConfigured && paymentToken !== undefined },
+    query: { enabled: mounted && !!address && isConfigured },
   });
 
   const { data: buyQuote } = useReadContract({
@@ -73,7 +85,7 @@ export default function SwapPage() {
     functionName: "quoteUsdt",
     args: [parsed],
     chainId: appChainId,
-    query: { enabled: isConfigured && mode === "buy" && parsed > 0n },
+    query: { enabled: isConfigured && !hopMode && mode === "buy" && parsed > 0n },
   });
 
   const { data: sellQuote } = useReadContract({
@@ -82,8 +94,43 @@ export default function SwapPage() {
     functionName: "quoteSellUsdt",
     args: [parsed],
     chainId: appChainId,
-    query: { enabled: isConfigured && mode === "sell" && parsed > 0n },
+    query: { enabled: isConfigured && !hopMode && mode === "sell" && parsed > 0n },
   });
+
+  useEffect(() => {
+    if (!hopMode || !publicClient || !isConfigured || parsed <= 0n) {
+      setHopOut(null);
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const out =
+          mode === "buy"
+            ? await quoteUsdtToUmplan({
+                client: publicClient,
+                usdt: addresses.usdt,
+                spcxb: addresses.spcxb,
+                umplan: addresses.token,
+                amountIn: parsed,
+              })
+            : await quoteUmplanToUsdt({
+                client: publicClient,
+                usdt: addresses.usdt,
+                spcxb: addresses.spcxb,
+                umplan: addresses.token,
+                amountIn: parsed,
+              });
+        if (!cancelled) setHopOut(out);
+      } catch {
+        if (!cancelled) setHopOut(null);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [hopMode, publicClient, mode, parsed]);
 
   const spendToken = mode === "buy" ? paymentToken : addresses.token;
   const { data: allowance } = useReadContract({
@@ -96,8 +143,8 @@ export default function SwapPage() {
   });
 
   const quote = mode === "buy" ? (buyQuote as [bigint, bigint] | undefined) : (sellQuote as [bigint, bigint] | undefined);
-  const outAmount = quote?.[0];
-  const usdAmount = quote?.[1];
+  const outAmount = hopMode ? hopOut : quote?.[0];
+  const usdAmount = hopMode ? parsed : quote?.[1];
   const selfReward = (parsed * 50n) / 10_000n;
   const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
   const feePreview = Number(amount || "0") * (FEE_PCT / 100);
@@ -189,12 +236,14 @@ export default function SwapPage() {
 
       <div className={`card swap-card ${mode}`}>
         <div className="input-box">
-          <div className="ib-label">{mode === "buy" ? t("swap.payUsdt") : t("swap.sellUmplan")}</div>
+          <div className="ib-label">
+            {mode === "buy" ? (hopMode ? t("swap.payUsdt") : `支付 ${paymentLabel}`) : t("swap.sellUmplan")}
+          </div>
           <div className="input-row">
             <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00" />
             <div className="token-chip">
               <i className={`tc-dot ${mode === "buy" ? "tc-usdt" : "tc-um"}`} />
-              {mode === "buy" ? PAYMENT : "UMplan"}
+              {mode === "buy" ? paymentLabel : "UMplan"}
             </div>
           </div>
         </div>
@@ -208,7 +257,7 @@ export default function SwapPage() {
         </div>
 
         <div className="result-box">
-          <span>{t("swap.receive", { token: mode === "buy" ? "UMplan" : PAYMENT })}</span>
+          <span>{t("swap.receive", { token: mode === "buy" ? "UMplan" : paymentLabel })}</span>
           <span className="rb-value">{outAmount != null ? fmtToken(outAmount) : "0.00"}</span>
         </div>
 
@@ -216,7 +265,7 @@ export default function SwapPage() {
           <span>{t("swap.feeRow", { fee: FEE_PCT, floor: FEE_FLOOR })}</span>
           <span className="fee-amt">
             −{Number.isFinite(feePreview) ? feePreview.toFixed(2) : "0.00"}{" "}
-            {mode === "buy" ? PAYMENT : "UMplan"}
+            {mode === "buy" ? paymentLabel : "UMplan"}
           </span>
         </div>
 
@@ -290,7 +339,7 @@ export default function SwapPage() {
           <div>
             <dt>{t("swap.selfRebate")}</dt>
             <dd>
-              {fmtToken(selfReward)} {PAYMENT}
+              {fmtToken(selfReward)} {paymentLabel}
             </dd>
           </div>
         </dl>

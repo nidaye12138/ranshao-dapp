@@ -7,10 +7,11 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
+import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useStats } from "@/lib/api/client";
 import { StakeDesk } from "@/components/StakeDesk";
@@ -28,6 +29,16 @@ const TIERS = [
   { id: 4, u: 1500, label: "1500U" },
 ];
 
+/** Match on-chain DividendPools / Constants tier USD thresholds (1e18). */
+function tierFromBurnedUsd(burnedUsd: bigint | undefined): number {
+  if (burnedUsd == null) return 0;
+  if (burnedUsd >= parseUnits("1500", 18)) return 4;
+  if (burnedUsd >= parseUnits("800", 18)) return 3;
+  if (burnedUsd >= parseUnits("500", 18)) return 2;
+  if (burnedUsd >= parseUnits("100", 18)) return 1;
+  return 0;
+}
+
 const POOL_META = [
   { key: "pool1" as const, tier: "100U", pct: "33.33%", tierId: 1 },
   { key: "pool2" as const, tier: "500U", pct: "25%", tierId: 2 },
@@ -37,14 +48,15 @@ const POOL_META = [
 
 export default function PromoPage() {
   const mounted = useMounted();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
   const gate = useOnboardingOptional();
   const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const [selectedTierId, setSelectedTierId] = useState<number>(1);
   const [agreed, setAgreed] = useState(false);
   const [nowSec, setNowSec] = useState(0);
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const [pendingAction, setPendingAction] = useState<"approve" | "burn" | null>(null);
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
   const { data: stats } = useStats();
   const { data: earnings } = useEarnings(address);
@@ -58,16 +70,20 @@ export default function PromoPage() {
   const selected = TIERS.find((tier) => tier.id === selectedTierId) ?? TIERS[0];
   const enabled = mounted && isConfigured && !!address;
 
-  const { data: tokenAmount } = useReadContract({
+  // Deployed BurnRouter only has burn(uint256) + quoteBurnUsd — no burnTier helpers.
+  const { data: oneTokenUsd } = useReadContract({
     address: addresses.burn,
     abi: BurnAbi,
-    functionName: "quoteTokensForTier",
-    args: [selectedTierId],
+    functionName: "quoteBurnUsd",
+    args: [parseUnits("1", 18)],
     chainId: appChainId,
-    query: { enabled: isConfigured && selectedTierId >= 1 },
+    query: { enabled: isConfigured },
   });
 
-  const parsed = (tokenAmount as bigint | undefined) ?? 0n;
+  const parsed =
+    oneTokenUsd != null && (oneTokenUsd as bigint) > 0n
+      ? (BigInt(selected.u) * parseUnits("1", 18) * parseUnits("1", 18)) / (oneTokenUsd as bigint)
+      : 0n;
 
   const { data: quoteUsd } = useReadContract({
     address: addresses.burn,
@@ -87,15 +103,6 @@ export default function PromoPage() {
     query: { enabled },
   });
 
-  const { data: buttonTier } = useReadContract({
-    address: addresses.burn,
-    abi: BurnAbi,
-    functionName: "buttonTierOf",
-    args: [address!],
-    chainId: appChainId,
-    query: { enabled },
-  });
-
   const { data: myBurnedUsd } = useReadContract({
     address: addresses.burn,
     abi: BurnAbi,
@@ -104,6 +111,8 @@ export default function PromoPage() {
     chainId: appChainId,
     query: { enabled },
   });
+
+  const buttonTier = tierFromBurnedUsd(myBurnedUsd as bigint | undefined);
 
   const { data: claimable } = useReadContract({
     address: addresses.dividends,
@@ -260,7 +269,7 @@ export default function PromoPage() {
             <dt>{t("promo.myTier")}</dt>
             <dd>
               {tier != null ? `T${tier}` : "—"}
-              {buttonTier != null ? ` · ${t("promo.buttonTier", { n: String(buttonTier) })}` : ""}
+              {buttonTier > 0 ? ` · ${t("promo.buttonTier", { n: String(buttonTier) })}` : ""}
             </dd>
           </div>
         </dl>
@@ -316,45 +325,68 @@ export default function PromoPage() {
         ) : !isConfigured ? (
           <p className="banner warn">{t("common.contractsUnconfigured")}</p>
         ) : (
-          <div className="cta-row" style={{ marginTop: "0.75rem" }}>
-            {needApprove && (
+          <>
+            {!agreed && <p className="muted tip-line">{t("promo.needAgree")}</p>}
+            {agreed && parsed === 0n && <p className="banner warn">{t("promo.quoteFailed")}</p>}
+            {agreed && parsed > 0n && needApprove && (
+              <p className="muted tip-line">{t("promo.needApproveFirst")}</p>
+            )}
+            <div className="cta-row" style={{ marginTop: "0.75rem" }}>
+              {needApprove && (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={isPending || confirming || !agreed || parsed === 0n || !featuresUnlocked}
+                  onClick={() => {
+                    reset();
+                    setPendingAction("approve");
+                    writeContract({
+                      address: addresses.token,
+                      abi: ERC20Abi,
+                      functionName: "approve",
+                      args: [addresses.burn, parsed],
+                      chainId: appChainId,
+                    });
+                  }}
+                >
+                  {isPending || confirming
+                    ? pendingAction === "approve"
+                      ? t("common.confirming")
+                      : t("common.approve")
+                    : t("common.approve")}
+                </button>
+              )}
               <button
                 type="button"
-                className="btn"
-                disabled={isPending || confirming || !agreed || parsed === 0n || !featuresUnlocked}
-                onClick={() =>
-                  writeContract({
-                    address: addresses.token,
-                    abi: ERC20Abi,
-                    functionName: "approve",
-                    args: [addresses.burn, parsed],
-                    chainId: appChainId,
-                  })
+                className="btn primary burn"
+                style={{ flex: 1 }}
+                disabled={
+                  isPending || confirming || needApprove || parsed === 0n || !agreed || !featuresUnlocked
                 }
+                onClick={() => {
+                  reset();
+                  setPendingAction("burn");
+                  writeContract({
+                    address: addresses.burn,
+                    abi: BurnAbi,
+                    functionName: "burn",
+                    args: [parsed],
+                    chainId: appChainId,
+                  });
+                }}
               >
-                {isPending || confirming ? t("common.confirming") : t("common.approve")}
+                {isPending || confirming
+                  ? pendingAction === "burn"
+                    ? t("common.confirming")
+                    : t("promo.confirmWeight")
+                  : t("promo.confirmWeight")}
               </button>
+            </div>
+            {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
+            {isSuccess && pendingAction === "burn" && (
+              <p className="banner ok">{t("promo.success")}</p>
             )}
-            <button
-              type="button"
-              className="btn primary burn"
-              style={{ flex: 1 }}
-              disabled={
-                isPending || confirming || needApprove || parsed === 0n || !agreed || !featuresUnlocked
-              }
-              onClick={() =>
-                writeContract({
-                  address: addresses.burn,
-                  abi: BurnAbi,
-                  functionName: "burnTier",
-                  args: [selectedTierId],
-                  chainId: appChainId,
-                })
-              }
-            >
-              {isPending || confirming ? t("common.confirming") : t("promo.confirmWeight")}
-            </button>
-          </div>
+          </>
         )}
       </div>
 

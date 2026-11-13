@@ -8,6 +8,7 @@ import {Treasury} from "../src/Treasury.sol";
 import {MockPriceOracle} from "../src/mocks/MockPriceOracle.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 import {MockPancakeRouter} from "../src/mocks/MockPancakeRouter.sol";
+import {MockPancakeV3Router} from "../src/mocks/MockPancakeV3Router.sol";
 import {SwapFacade} from "../src/SwapFacade.sol";
 
 contract SwapFacadeDexTest is Test {
@@ -17,11 +18,14 @@ contract SwapFacadeDexTest is Test {
 
     RanshaoToken token;
     MockERC20 spcxb;
+    MockERC20 usdt;
     ReferralTree tree;
     Treasury treasury;
     MockPriceOracle oracle;
     MockPancakeRouter router;
+    MockPancakeV3Router v3;
     SwapFacade swap;
+    SwapFacade hopSwap;
 
     function setUp() public {
         vm.startPrank(admin);
@@ -31,6 +35,9 @@ contract SwapFacadeDexTest is Test {
         treasury = new Treasury(admin);
         oracle = new MockPriceOracle(600e18, 1e16);
         router = new MockPancakeRouter();
+
+        usdt = new MockERC20("USDT", "USDT", 18);
+        v3 = new MockPancakeV3Router();
 
         swap = new SwapFacade(
             admin,
@@ -45,14 +52,62 @@ contract SwapFacadeDexTest is Test {
             address(router)
         );
 
+        hopSwap = new SwapFacade(
+            admin,
+            address(token),
+            address(usdt),
+            18,
+            address(oracle),
+            address(tree),
+            payable(address(treasury)),
+            false,
+            300,
+            address(router)
+        );
+        hopSwap.setHopRoute(address(spcxb), address(v3), address(v3), 2500);
+
         // Seed router inventory for 1:1 swaps out
         token.mint(address(router), 10_000_000e18);
         spcxb.mint(address(router), 10_000_000e18);
+        spcxb.mint(address(v3), 10_000_000e18);
+        usdt.mint(address(v3), 10_000_000e18);
 
         spcxb.mint(alice, 1_000_000e18);
+        usdt.mint(alice, 1_000_000e18);
         token.mint(alice, 1_000_000e18);
         token.mint(bob, 1_000_000e18);
         vm.stopPrank();
+    }
+
+    function test_hopMode_buySell_usdt() public {
+        assertTrue(hopSwap.hopMode());
+        assertEq(address(hopSwap.usdt()), address(usdt));
+        assertEq(address(hopSwap.hopToken()), address(spcxb));
+
+        vm.prank(alice);
+        tree.bindReferrer(admin);
+
+        uint256 pay = 1_000e18;
+        uint256 aliceTokBefore = token.balanceOf(alice);
+        uint256 aliceUsdtBefore = usdt.balanceOf(alice);
+
+        vm.startPrank(alice);
+        usdt.approve(address(hopSwap), pay);
+        hopSwap.buyWithUSDT(pay);
+        vm.stopPrank();
+
+        // rewards 0.5%+0.5% in USDT; 990 swapped 1:1 through V3→V2 → tokens
+        assertEq(usdt.balanceOf(alice), aliceUsdtBefore - pay + 5e18);
+        assertEq(token.balanceOf(alice), aliceTokBefore + 990e18);
+
+        uint256 sellAmt = 500e18;
+        uint256 usdtBeforeSell = usdt.balanceOf(alice);
+        vm.startPrank(alice);
+        token.approve(address(hopSwap), sellAmt);
+        hopSwap.sellForUSDT(sellAmt);
+        vm.stopPrank();
+        // sellerTotal = gross - referrerReward = 500 - 2.5 = 497.5 (self 0.5% kept in sellerTotal)
+        assertEq(usdt.balanceOf(alice), usdtBeforeSell + 497.5e18);
     }
 
     function test_dexMode_true() public view {
