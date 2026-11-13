@@ -69,6 +69,6 @@ library Constants {
     address internal constant SPCXB_MAINNET = 0xbe9D156892E55e7154BcD3cB0FEA677F9D3103E1;
     address internal constant PANCAKE_V2_ROUTER = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
     /// @dev Pancake V2 pair UMplan/SPCXB (primary liquidity ~0.25% fee).
-    address internal constant UMPLAN_SPCXB_PAIR = 0xc3118CCc0bE00E7FA39AC8041694e09F52178D6f;
+    address internal constant UMPLAN_SPCXB_PAIR = 0xC3118CCC0be00E7FA39aC8041694e09F52178d6F;
     address internal constant DEAD = 0x000000000000000000000000000000000000dEaD;
 }
