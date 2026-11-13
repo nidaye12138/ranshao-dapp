@@ -18,6 +18,7 @@ import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
 type Mode = "buy" | "sell";
+type PendingAction = "approve" | "buy" | "sell" | null;
 
 const SLIP_PRESETS = [3.5, 5, 10];
 const FEE_PCT = 3.5;
@@ -34,7 +35,8 @@ export default function SwapPage() {
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("100");
   const [slippage, setSlippage] = useState(3.5);
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
   const paymentToken = addresses.spcxb;
@@ -101,6 +103,7 @@ export default function SwapPage() {
   const feePreview = Number(amount || "0") * (FEE_PCT / 100);
 
   const bal = mode === "buy" ? (paymentBal as bigint | undefined) : (tokenBal as bigint | undefined);
+  const insufficientBal = bal != null && parsed > 0n && bal < parsed;
 
   function setPct(pct: number) {
     if (!bal) return;
@@ -113,6 +116,8 @@ export default function SwapPage() {
   }
 
   async function onApprove() {
+    reset();
+    setPendingAction("approve");
     writeContract({
       address: spendToken,
       abi: ERC20Abi,
@@ -123,6 +128,9 @@ export default function SwapPage() {
   }
 
   async function onSwap() {
+    if (insufficientBal) return;
+    reset();
+    setPendingAction(mode === "buy" ? "buy" : "sell");
     if (mode === "buy") {
       writeContract({
         address: addresses.swap,
@@ -142,6 +150,15 @@ export default function SwapPage() {
     }
   }
 
+  const successBanner =
+    isSuccess && pendingAction === "approve"
+      ? t("swap.approveOk")
+      : isSuccess && pendingAction === "buy"
+        ? t("swap.buyOk", { fee: FEE_PCT })
+        : isSuccess && pendingAction === "sell"
+          ? t("swap.sellOk", { fee: FEE_PCT })
+          : null;
+
   return (
     <section className="panel">
       <FeatureGateBanner feature="buy" />
@@ -149,14 +166,22 @@ export default function SwapPage() {
         <button
           type="button"
           className={mode === "buy" ? "seg-btn on-buy" : "seg-btn"}
-          onClick={() => setMode("buy")}
+          onClick={() => {
+            setMode("buy");
+            setPendingAction(null);
+            reset();
+          }}
         >
           {t("swap.buy")}
         </button>
         <button
           type="button"
           className={mode === "sell" ? "seg-btn on-sell" : "seg-btn"}
-          onClick={() => setMode("sell")}
+          onClick={() => {
+            setMode("sell");
+            setPendingAction(null);
+            reset();
+          }}
         >
           {t("swap.sell")}
         </button>
@@ -238,7 +263,14 @@ export default function SwapPage() {
               type="button"
               className={mode === "sell" ? "btn primary sell" : "btn primary"}
               style={{ flex: 1 }}
-              disabled={isPending || confirming || needApprove || parsed === 0n || !featuresUnlocked}
+              disabled={
+                isPending ||
+                confirming ||
+                needApprove ||
+                parsed === 0n ||
+                !featuresUnlocked ||
+                insufficientBal
+              }
               onClick={onSwap}
             >
               {isPending || confirming
@@ -263,11 +295,8 @@ export default function SwapPage() {
           </div>
         </dl>
 
-        {isSuccess && (
-          <p className="banner ok">
-            {mode === "buy" ? t("swap.buyOk", { fee: FEE_PCT }) : t("swap.sellOk", { fee: FEE_PCT })}
-          </p>
-        )}
+        {insufficientBal && <p className="banner warn">{t("swap.insufficientBal")}</p>}
+        {successBanner && <p className="banner ok">{successBanner}</p>}
         {error && <p className="banner warn">{error.message}</p>}
       </div>
 

@@ -10,7 +10,8 @@ export type ChainEnv = {
   [key: string]: string | undefined;
 };
 
-const DEFAULT_MAINNET_RPC = "https://bsc-dataseed.binance.org";
+/** Prefer BNB Chain public seeds — publicnode often returns -32602 "Archive requests require a personal token" for receipt polls. */
+const DEFAULT_MAINNET_RPC = "https://bsc-dataseed1.bnbchain.org";
 const DEFAULT_CHAPEL_RPC = "https://bsc-testnet-rpc.publicnode.com";
 const DEFAULT_LOCAL_RPC = "http://127.0.0.1:8545";
 

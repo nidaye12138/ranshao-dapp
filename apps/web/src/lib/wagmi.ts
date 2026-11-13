@@ -21,8 +21,13 @@ export const config = createConfig({
   chains,
   connectors: [injected()],
   transports: {
-    // Prefer env RPC; keep a second public seed so mobile clients survive one endpoint failing.
-    [bsc.id]: fallback([http(mainnetRpc), http("https://bsc-dataseed1.bnbchain.org")]),
+    // Prefer env RPC, then BNB Chain seeds. Avoid relying solely on publicnode (archive-token errors on receipts).
+    [bsc.id]: fallback([
+      http(mainnetRpc),
+      http("https://bsc-dataseed1.bnbchain.org"),
+      http("https://bsc-dataseed2.bnbchain.org"),
+      http("https://bsc-dataseed.binance.org"),
+    ]),
     [bscTestnet.id]: http(chapelRpc),
     [hardhat.id]: http(localRpc),
   },

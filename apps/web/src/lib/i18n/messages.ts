@@ -131,6 +131,8 @@ export type MessageTree = {
     selfRebate: string;
     buyOk: string;
     sellOk: string;
+    approveOk: string;
+    insufficientBal: string;
     instantTitle: string;
     instantOnly: string;
     noMilestone: string;
@@ -461,6 +463,8 @@ export const messages: Record<Locale, MessageTree> = {
       selfRebate: "自返 0.5%",
       buyOk: "买入成功（经 Pancake），0.5% 奖励即时到账你与邀请人",
       sellOk: "卖出已提交（经 Pancake），等待链上确认",
+      approveOk: "授权成功，请再点「确认买入 / 卖出」完成交易（授权≠买入）",
+      insufficientBal: "余额不足：买入需钱包持有足够 SPCXB；当前余额不够支付金额",
       instantTitle: "即时奖励说明",
       instantOnly: "仅即时奖：买/卖 → 交易方 0.5% + 直推邀请人 0.5%（支付币 SPCXB）到钱包。",
       noMilestone: "不做累计买入业绩、级别或里程碑奖励。",
@@ -804,6 +808,8 @@ export const messages: Record<Locale, MessageTree> = {
       selfRebate: "Self rebate 0.5%",
       buyOk: "Buy submitted via Pancake; 0.5% rewards go to you and your referrer",
       sellOk: "Sell submitted via Pancake; awaiting confirmation",
+      approveOk: "Approval confirmed — tap Confirm buy/sell to trade (approve ≠ buy)",
+      insufficientBal: "Insufficient balance: buy needs enough SPCXB in your wallet",
       instantTitle: "Instant rewards",
       instantOnly: "Instant only: buy/sell → trader 0.5% + direct referrer 0.5% (SPCXB) to wallets.",
       noMilestone: "No cumulative buy volume, level, or milestone rewards.",
