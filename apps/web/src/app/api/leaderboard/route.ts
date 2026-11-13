@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { graphQuery, graphUrl } from "@/lib/api/graph";
+import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
 import { fetchLeaderboardFromChain } from "@/lib/api/leaderboardChain";
 import type { LeaderboardResponse } from "@/lib/api/types";
 
@@ -10,6 +10,7 @@ const QUERY = `
     accounts(first: $first, orderBy: directCount, orderDirection: desc, where: { directCount_gt: 0 }) {
       id
       directCount
+      umbrellaVolumeUsd
     }
   }
 `;
@@ -18,7 +19,9 @@ export async function GET() {
   const updatedAt = new Date().toISOString();
 
   if (graphUrl()) {
-    const result = await graphQuery<{ accounts: { id: string; directCount: string }[] }>(QUERY, {
+    const result = await graphQuery<{
+      accounts: { id: string; directCount: string; umbrellaVolumeUsd: string }[];
+    }>(QUERY, {
       first: 10,
     });
 
@@ -27,6 +30,7 @@ export async function GET() {
         rank: i + 1,
         address: a.id,
         directs: Number(a.directCount),
+        umbrellaUsd: formatUsdRaw(a.umbrellaVolumeUsd),
       }));
       const body: LeaderboardResponse = { source: "graph", updatedAt, items };
       return NextResponse.json(body);

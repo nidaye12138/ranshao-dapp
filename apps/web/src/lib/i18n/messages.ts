@@ -100,6 +100,7 @@ export type MessageTree = {
     boardLoading: string;
     noData: string;
     directsCount: string;
+    umbrellaVolume: string;
     myInviter: string;
     connectToBind: string;
     inviterPrefix: string;
@@ -411,12 +412,13 @@ export const messages: Record<Locale, MessageTree> = {
       burnedLabel: "权重销毁总量",
       burnedExtra: "UMplan 已永久销毁",
       boardTitle: "全网龙虎榜 TOP10",
-      boardSub: "按直推人数排行（销毁不上榜）",
-      boardByDirects: "按直推人数（链上/索引）",
+      boardSub: "按直推人数排行 · 显示伞下买入币量",
+      boardByDirects: "直推人数 + 伞下 UMplan 业绩（链上/索引）",
       boardUnconfigured: "暂无法读取排行数据，请稍后刷新",
       boardLoading: "加载中…",
       noData: "暂无数据",
-      directsCount: "{n} 人直推",
+      directsCount: "{n} 直推",
+      umbrellaVolume: "业绩 {amount}",
       myInviter: "我的邀请人",
       connectToBind: "连接钱包后查看 / 绑定",
       inviterPrefix: "邀请人",
@@ -785,12 +787,13 @@ export const messages: Record<Locale, MessageTree> = {
       burnedLabel: "Weight burned total",
       burnedExtra: "UMplan permanently burned",
       boardTitle: "Leaderboard TOP10",
-      boardSub: "Ranked by directs (burns do not rank)",
-      boardByDirects: "By directs (chain / indexer)",
+      boardSub: "Ranked by directs · shows downline buy volume",
+      boardByDirects: "Directs + downline UMplan volume (chain / indexer)",
       boardUnconfigured: "Leaderboard unavailable — refresh shortly",
       boardLoading: "Loading…",
       noData: "No data yet",
       directsCount: "{n} directs",
+      umbrellaVolume: "Vol {amount}",
       myInviter: "My referrer",
       connectToBind: "Connect wallet to view / bind",
       inviterPrefix: "Referrer",

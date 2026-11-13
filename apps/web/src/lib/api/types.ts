@@ -13,6 +13,10 @@ export type LeaderboardRow = {
   rank: number;
   address: string;
   directs: number;
+  /** Downline buy volume in UMplan (18-dec string, no symbol). */
+  umbrellaToken?: string;
+  /** Downline buy volume in USD when sourced from the indexer. */
+  umbrellaUsd?: string;
 };
 
 export type LeaderboardResponse = {

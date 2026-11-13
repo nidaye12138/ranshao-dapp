@@ -172,13 +172,24 @@ function HomeInner() {
           <p className="muted">{board?.source === "unconfigured" ? "—" : t("home.noData")}</p>
         ) : (
           <ol className="rank-list">
-            {board.items.map((r) => (
-              <li key={r.address}>
-                <span className="rank-n">{r.rank}</span>
-                <span className="rank-addr">{shortAddr(r.address)}</span>
-                <span className="rank-val">{t("home.directsCount", { n: r.directs })}</span>
-              </li>
-            ))}
+            {board.items.map((r) => {
+              const vol =
+                r.umbrellaToken != null
+                  ? t("home.umbrellaVolume", { amount: `${r.umbrellaToken} UMplan` })
+                  : r.umbrellaUsd != null
+                    ? t("home.umbrellaVolume", { amount: `$${r.umbrellaUsd}` })
+                    : null;
+              return (
+                <li key={r.address}>
+                  <span className="rank-n">{r.rank}</span>
+                  <span className="rank-addr">{shortAddr(r.address)}</span>
+                  <span className="rank-meta">
+                    <span className="rank-val">{t("home.directsCount", { n: r.directs })}</span>
+                    {vol && <span className="rank-vol">{vol}</span>}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>

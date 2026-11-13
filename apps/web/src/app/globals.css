@@ -921,7 +921,7 @@ code {
 
 .rank-list li {
   display: grid;
-  grid-template-columns: 1.5rem 1fr auto;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
   gap: 0.55rem;
   align-items: center;
   padding: 0.42rem 0;
@@ -968,11 +968,29 @@ code {
   color: var(--text-primary);
 }
 
+.rank-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  text-align: right;
+}
+
 .rank-val {
   font-family: var(--font-display);
   font-weight: 650;
   color: var(--theme-color);
   font-size: 0.75rem;
+}
+
+.rank-vol {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .referrer-row {
