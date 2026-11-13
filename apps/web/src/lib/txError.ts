@@ -98,6 +98,12 @@ export function formatTxError(err: unknown, locale: Locale = "zh"): string {
     return tx.rejected;
   }
 
+  if (/burn:\s*tier used|tier used/.test(lower)) {
+    return locale === "zh"
+      ? "该档位已购买过（同钱包不可复购同档/低档），请选择更高档位。"
+      : "This tier was already used for this wallet (no same/lower rebuy). Pick a higher tier.";
+  }
+
   if (/tree:\s*already bound|already bound/.test(lower)) {
     return tx.alreadyBound;
   }

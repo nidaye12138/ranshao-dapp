@@ -212,12 +212,16 @@ export type MessageTree = {
     amountLabel: string;
     tipManual: string;
     notStakeTip: string;
+    tierOnceTip: string;
     walletBal: string;
     insufficientBal: string;
+    tierUsed: string;
+    allTiersDone: string;
     approveOk: string;
     usdEquiv: string;
     myTier: string;
     buttonTier: string;
+    tierOwned: string;
     splitTitle: string;
     contractTag: string;
     splitBurn: string;
@@ -598,13 +602,18 @@ export const messages: Record<Locale, MessageTree> = {
       tipManual: "数量由所选档位 ÷ Pancake 现货价自动折算（与首页实时币价同源）；须点选档位、勾选协议后授权并确认。",
       notStakeTip:
         "这是「权重销毁」（BurnRouter），不是下方的「质押」。质押仅在完成 1500U 档位销毁后解锁；钱包弹窗「权重确认」= 销毁。",
+      tierOnceTip:
+        "同一钱包每个档位只能购买一次，且只能升档（不可复购同档或低档）。买入更高档后，低档 SPCXB 分红权自动作废，只保留最高档。",
       walletBal: "钱包 UMplan",
       insufficientBal:
         "余额不足本档：需约 {need} UMplan，钱包约 {have}。现货约 0.0018 时 500U 约需 27 万枚；请先去 Swap 买入，或先点较低档位。",
+      tierUsed: "本档已购买过，同一钱包不可复购；请选择更高档位。",
+      allTiersDone: "四个档位均已达成，无需再购。",
       approveOk: "授权成功。请再点「确认权重」完成销毁（不是质押）。",
       usdEquiv: "折合 U",
       myTier: "我的档位",
       buttonTier: "按钮T{n}",
+      tierOwned: "已购",
       splitTitle: "扣除后资金分配预览",
       contractTag: "比例以合约参数为准",
       splitBurn: "权重销毁",
@@ -640,7 +649,7 @@ export const messages: Record<Locale, MessageTree> = {
       earnActivate: "任意档位按钮燃烧（≥100U）即激活，解锁邀请链接（见「我的」）— 非累计买入。",
       poolsTitle: "SPCXB 档位分红",
       poolsSub: "成为对应池的分红股东 · 24h 冷却",
-      poolOpen: "已达成档位 T{n}，成为对应池分红股东（最高档，不叠加）。",
+      poolOpen: "已达成档位 T{n}，成为对应池分红股东（最高档，不叠加；升档后低档分红权作废）。",
       poolLocked:
         "完成权重销毁后，即成为对应分红池的分红股东，按该池占比与同池人数分配 SPCXB；当前尚未达成任何档位。",
       poolCaption: "四池合计 100% · 人数来自链上；人均待释放量索引后填入",
@@ -658,7 +667,7 @@ export const messages: Record<Locale, MessageTree> = {
       poolPctDoc:
         "池占比：四个分红池合计分配总释放的 100% —— 100U 档池占 33.33%，500U 档池与 800U 档池各占 25%，1500U 档池占 16.67%。",
       poolShareDoc:
-        "个人实得：你所在池的占比额度 ÷ 同池股东人数。达成哪档权重销毁，就成为哪档池的分红股东，仅计入最高已达档位，不叠加。",
+        "个人实得：你所在池的占比额度 ÷ 同池股东人数。达成哪档权重销毁，就成为哪档池的分红股东；同一钱包每档只能买一次，仅计入最高已达档位，升档后低档分红权作废、不叠加。",
       poolFairDoc:
         "公平性体现：能分多少不只看你在哪个池，更看和你同池的人有多少。青铜池占比最高（33.33%），但门槛最低、可能有几百甚至几千人一起平分，人均反而少；钻石池占比最低（16.67%），但门槛高、同池可能只有几个人，人均反而拿得更多。门槛与人数天然对冲，各档实际收益趋于均衡。",
       poolClaimDoc: "24 小时可领取一次 SPCXB，不领取自动叠加计入下期；同池人数每日随达成情况变动，人均随之实时重算。",
@@ -993,13 +1002,18 @@ export const messages: Record<Locale, MessageTree> = {
       tipManual: "Amount = selected tier ÷ Pancake spot (same source as homepage price). Pick a tier, agree, approve, then confirm.",
       notStakeTip:
         "This is a weight burn (BurnRouter), not Stake below. Stake unlocks only after the 1500U tier burn; wallet「Weight confirm」= burn.",
+      tierOnceTip:
+        "Each wallet may buy each tier only once, and only as an upgrade (no same/lower rebuy). Buying a higher tier voids lower SPCXB pool rights — highest tier only.",
       walletBal: "Wallet UMplan",
       insufficientBal:
         "Not enough for this tier: need ~{need} UMplan, wallet ~{have}. At ~0.0018 spot, 500U needs ~270k tokens — buy on Swap or pick a lower tier.",
+      tierUsed: "This tier was already purchased for this wallet; pick a higher tier.",
+      allTiersDone: "All four tiers already reached — nothing left to buy.",
       approveOk: "Approved. Tap Confirm weight to burn (this is not staking).",
       usdEquiv: "USD equiv.",
       myTier: "My tier",
       buttonTier: "Button T{n}",
+      tierOwned: "Owned",
       splitTitle: "Post-deduction allocation preview",
       contractTag: "Shares follow contract params",
       splitBurn: "Weight burn",
@@ -1038,7 +1052,8 @@ export const messages: Record<Locale, MessageTree> = {
       earnActivate: "Any tier-button burn (≥100U) activates and unlocks invite links in Mine — not cumulative buys.",
       poolsTitle: "SPCXB tier dividends",
       poolsSub: "Become a pool shareholder · 24h cooldown",
-      poolOpen: "Reached tier T{n} — you are a shareholder of that pool (highest tier only, no stacking).",
+      poolOpen:
+        "Reached tier T{n} — you are a shareholder of that pool (highest tier only; upgrading voids lower pool rights).",
       poolLocked:
         "After a weight burn you join the matching SPCXB pool and share by pool weight ÷ members. No tier yet.",
       poolCaption: "Four pools sum to 100% · member counts on-chain; per-capita TBD from indexer",
@@ -1056,7 +1071,7 @@ export const messages: Record<Locale, MessageTree> = {
       poolPctDoc:
         "Pool weights sum to 100% of release — 100U pool 33.33%, 500U and 800U pools 25% each, 1500U pool 16.67%.",
       poolShareDoc:
-        "Your payout = your pool’s share ÷ members in that pool. Highest reached weight tier only — no stacking.",
+        "Your payout = your pool’s share ÷ members in that pool. Each wallet buys each tier once; highest reached only — upgrading voids lower rights, no stacking.",
       poolFairDoc:
         "Fairness: payout depends on both pool weight and how many people share it. Bronze has the largest weight (33.33%) but the lowest bar and many members; Diamond has the smallest weight (16.67%) but fewer members, so per-capita can be higher. Threshold and headcount offset each other.",
       poolClaimDoc:

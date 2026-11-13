@@ -7,7 +7,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { formatUnits, maxUint256, parseUnits } from "viem";
+import { formatUnits, maxUint256 } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
@@ -31,16 +31,6 @@ const TIERS = [
   { id: 3, u: 800, label: "800U" },
   { id: 4, u: 1500, label: "1500U" },
 ];
-
-/** Match on-chain DividendPools / Constants tier USD thresholds (1e18). */
-function tierFromBurnedUsd(burnedUsd: bigint | undefined): number {
-  if (burnedUsd == null) return 0;
-  if (burnedUsd >= parseUnits("1500", 18)) return 4;
-  if (burnedUsd >= parseUnits("800", 18)) return 3;
-  if (burnedUsd >= parseUnits("500", 18)) return 2;
-  if (burnedUsd >= parseUnits("100", 18)) return 1;
-  return 0;
-}
 
 const POOL_META = [
   { key: "pool1" as const, tier: "100U", pct: "33.33%", tierId: 1 },
@@ -70,23 +60,63 @@ export default function PromoPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const selected = TIERS.find((tier) => tier.id === selectedTierId) ?? TIERS[0];
   const enabled = mounted && isConfigured && !!address;
 
-  // Deployed BurnRouter only has burn(uint256) + quoteBurnUsd — no burnTier helpers.
-  const { data: oneTokenUsd } = useReadContract({
-    address: addresses.burn,
-    abi: BurnAbi,
-    functionName: "quoteBurnUsd",
-    args: [parseUnits("1", 18)],
+  const { data: tier, refetch: refetchTier } = useReadContract({
+    address: addresses.dividends,
+    abi: DivAbi,
+    functionName: "tierOf",
+    args: [address!],
     chainId: appChainId,
-    query: { enabled: isConfigured },
+    query: { enabled },
   });
 
-  const parsed =
-    oneTokenUsd != null && (oneTokenUsd as bigint) > 0n
-      ? (BigInt(selected.u) * parseUnits("1", 18) * parseUnits("1", 18)) / (oneTokenUsd as bigint)
-      : 0n;
+  const { data: effectiveTierRaw, refetch: refetchEffectiveTier } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "effectiveButtonTier",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
+  const { data: buttonTierRaw, refetch: refetchButtonTier } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "buttonTierOf",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
+  const myTier = tier != null ? Number(tier) : 0;
+  const buttonTier = buttonTierRaw != null ? Number(buttonTierRaw as number) : 0;
+  const effectiveTier =
+    effectiveTierRaw != null
+      ? Number(effectiveTierRaw as number)
+      : Math.max(myTier, buttonTier);
+  const tierAlreadyOwned = selectedTierId <= effectiveTier;
+  const nextOpenTierId = effectiveTier < 4 ? effectiveTier + 1 : 0;
+  const selected =
+    TIERS.find((tierItem) => tierItem.id === selectedTierId) ??
+    TIERS.find((tierItem) => tierItem.id === nextOpenTierId) ??
+    TIERS[0];
+
+  useEffect(() => {
+    if (nextOpenTierId > 0 && selectedTierId <= effectiveTier) {
+      setSelectedTierId(nextOpenTierId);
+    }
+  }, [effectiveTier, nextOpenTierId, selectedTierId]);
+
+  const { data: parsedRaw } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "quoteTokensForTier",
+    args: [selected.id],
+    chainId: appChainId,
+    query: { enabled: isConfigured && selected.id > 0 },
+  });
+  const parsed = (parsedRaw as bigint | undefined) ?? 0n;
 
   const { data: quoteUsd } = useReadContract({
     address: addresses.burn,
@@ -97,15 +127,6 @@ export default function PromoPage() {
     query: { enabled: enabled && parsed > 0n },
   });
 
-  const { data: tier } = useReadContract({
-    address: addresses.dividends,
-    abi: DivAbi,
-    functionName: "tierOf",
-    args: [address!],
-    chainId: appChainId,
-    query: { enabled },
-  });
-
   const { data: myBurnedUsd } = useReadContract({
     address: addresses.burn,
     abi: BurnAbi,
@@ -114,8 +135,6 @@ export default function PromoPage() {
     chainId: appChainId,
     query: { enabled },
   });
-
-  const buttonTier = tierFromBurnedUsd(myBurnedUsd as bigint | undefined);
 
   const { data: claimable } = useReadContract({
     address: addresses.dividends,
@@ -166,7 +185,17 @@ export default function PromoPage() {
     if (!isSuccess) return;
     void refetchAllowance();
     void refetchTokenBal();
-  }, [isSuccess, refetchAllowance, refetchTokenBal]);
+    void refetchTier();
+    void refetchEffectiveTier();
+    void refetchButtonTier();
+  }, [
+    isSuccess,
+    refetchAllowance,
+    refetchTokenBal,
+    refetchTier,
+    refetchEffectiveTier,
+    refetchButtonTier,
+  ]);
 
   const { data: m1 } = useReadContract({
     address: addresses.dividends,
@@ -227,7 +256,6 @@ export default function PromoPage() {
       ? Math.max(0, Number(nextClaim) - nowSec)
       : 0;
 
-  const myTier = tier != null ? Number(tier) : 0;
   const burnedGlobal =
     stats?.totalBurnedToken != null ? `${stats.totalBurnedToken} UMplan` : "—";
   const myWeight =
@@ -253,17 +281,26 @@ export default function PromoPage() {
         </div>
 
         <div className="presets">
-          {TIERS.map((tierItem) => (
-            <button
-              key={tierItem.id}
-              type="button"
-              className={selectedTierId === tierItem.id ? "preset-btn on" : "preset-btn"}
-              onClick={() => setSelectedTierId(tierItem.id)}
-            >
-              {tierItem.label}
-              <small>{tierSubs[tierItem.id]}</small>
-            </button>
-          ))}
+          {TIERS.map((tierItem) => {
+            const owned = tierItem.id <= effectiveTier;
+            return (
+              <button
+                key={tierItem.id}
+                type="button"
+                className={selectedTierId === tierItem.id ? "preset-btn on" : "preset-btn"}
+                disabled={owned}
+                aria-disabled={owned}
+                onClick={() => {
+                  if (!owned) setSelectedTierId(tierItem.id);
+                }}
+              >
+                {tierItem.label}
+                <small>
+                  {owned ? t("promo.tierOwned") : tierSubs[tierItem.id]}
+                </small>
+              </button>
+            );
+          })}
         </div>
 
         <div className="input-box tight">
@@ -282,6 +319,7 @@ export default function PromoPage() {
         </div>
         <p className="muted tip-line">{t("promo.tipManual")}</p>
         <p className="muted tip-line">{t("promo.notStakeTip")}</p>
+        <p className="muted tip-line">{t("promo.tierOnceTip")}</p>
 
         <dl className="stats compact-stats">
           <div>
@@ -354,8 +392,14 @@ export default function PromoPage() {
         ) : (
           <>
             {!agreed && <p className="muted tip-line">{t("promo.needAgree")}</p>}
-            {agreed && parsed === 0n && <p className="banner warn">{t("promo.quoteFailed")}</p>}
-            {agreed && insufficientBal && (
+            {effectiveTier >= 4 && <p className="banner ok">{t("promo.allTiersDone")}</p>}
+            {agreed && tierAlreadyOwned && effectiveTier < 4 && (
+              <p className="banner warn">{t("promo.tierUsed")}</p>
+            )}
+            {agreed && !tierAlreadyOwned && parsed === 0n && (
+              <p className="banner warn">{t("promo.quoteFailed")}</p>
+            )}
+            {agreed && !tierAlreadyOwned && insufficientBal && (
               <p className="banner warn">
                 {t("promo.insufficientBal", {
                   need: fmtToken(parsed),
@@ -363,7 +407,7 @@ export default function PromoPage() {
                 })}
               </p>
             )}
-            {agreed && parsed > 0n && needApprove && !insufficientBal && (
+            {agreed && !tierAlreadyOwned && parsed > 0n && needApprove && !insufficientBal && (
               <p className="banner warn">{t("promo.needApproveFirst")}</p>
             )}
             <div className="cta-row" style={{ marginTop: "0.75rem" }}>
@@ -377,7 +421,8 @@ export default function PromoPage() {
                     !agreed ||
                     parsed === 0n ||
                     !featuresUnlocked ||
-                    insufficientBal
+                    insufficientBal ||
+                    tierAlreadyOwned
                   }
                   onClick={() => {
                     reset();
@@ -409,18 +454,18 @@ export default function PromoPage() {
                   parsed === 0n ||
                   !agreed ||
                   !featuresUnlocked ||
-                  insufficientBal
+                  insufficientBal ||
+                  tierAlreadyOwned
                 }
                 onClick={() => {
-                  if (insufficientBal) return;
-                  if (needApprove) return;
+                  if (insufficientBal || tierAlreadyOwned || needApprove) return;
                   reset();
                   setPendingAction("burn");
                   writeContract({
                     address: addresses.burn,
                     abi: BurnAbi,
-                    functionName: "burn",
-                    args: [parsed],
+                    functionName: "burnTier",
+                    args: [selected.id],
                     chainId: appChainId,
                   });
                 }}

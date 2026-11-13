@@ -1561,6 +1561,13 @@ code {
   color: var(--fire);
 }
 
+.preset-btn:disabled,
+.preset-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
 .split-title {
   font-size: 0.75rem;
   color: var(--text-secondary);
