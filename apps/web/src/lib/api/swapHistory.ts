@@ -46,11 +46,38 @@ export type SwapHistoryResponse = {
 };
 
 function rpcUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_BSC_RPC_URL?.trim() ||
-    process.env.BSC_RPC_URL?.trim() ||
-    "https://bsc-rpc.publicnode.com"
-  );
+  // eth_getLogs is often rejected on bsc-dataseed*; prefer a tolerant public endpoint.
+  const fromEnv = (process.env.BSC_RPC_URL || process.env.NEXT_PUBLIC_BSC_RPC_URL || "").trim();
+  if (fromEnv && !/bsc-dataseed/i.test(fromEnv)) return fromEnv;
+  return "https://bsc-rpc.publicnode.com";
+}
+
+async function getLogsChunked(
+  client: ReturnType<typeof createPublicClient>,
+  params: {
+    address: Address;
+    event: typeof boughtEvent | typeof soldEvent;
+    args: Record<string, unknown>;
+    fromBlock: bigint;
+    toBlock: bigint;
+  },
+): Promise<Log[]> {
+  const span = 4_000n;
+  const out: Log[] = [];
+  let start = params.fromBlock;
+  while (start <= params.toBlock) {
+    const end = start + span > params.toBlock ? params.toBlock : start + span;
+    const part = await client.getLogs({
+      address: params.address,
+      event: params.event,
+      args: params.args as never,
+      fromBlock: start,
+      toBlock: end,
+    });
+    out.push(...part);
+    start = end + 1n;
+  }
+  return out;
 }
 
 function explorerTx(hash: Hex): string {
@@ -136,14 +163,14 @@ export async function fetchSwapHistory(address: string): Promise<SwapHistoryResp
   const fromBlock = SWAP_HOP_START_BLOCK > latest ? 0n : SWAP_HOP_START_BLOCK;
 
   const [buyLogs, sellLogs] = await Promise.all([
-    client.getLogs({
+    getLogsChunked(client, {
       address: addresses.swap,
       event: boughtEvent,
       args: { buyer: addr as Address },
       fromBlock,
       toBlock: latest,
     }),
-    client.getLogs({
+    getLogsChunked(client, {
       address: addresses.swap,
       event: soldEvent,
       args: { seller: addr as Address },
