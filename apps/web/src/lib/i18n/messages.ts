@@ -145,6 +145,8 @@ export type MessageTree = {
     sellProceeds: string;
     sellSpotHint: string;
     checkingAllowance: string;
+    allowanceCheckFailed: string;
+    retryAllowance: string;
     quotePending: string;
     waitWalletApprove: string;
     waitWalletBuy: string;
@@ -510,6 +512,9 @@ export const messages: Record<Locale, MessageTree> = {
       sellProceeds: "预计到账（USDT）",
       sellSpotHint: "按 Pancake 现货估算到账约 {amount} {token}（卖出数量是 UMplan 个数，不是 USDT）。授权完成后请点「确认卖出」。",
       checkingAllowance: "正在检查授权额度…",
+      allowanceCheckFailed:
+        "授权额度检查超时/失败。为避免卡住，请先点「授权」；若已授权过可稍候再点「重试检查」后确认买卖。",
+      retryAllowance: "重试检查授权",
       quotePending: "现货报价加载中或暂不可用，请稍候再点确认；勿反复点授权。",
       waitWalletApprove: "请在钱包弹窗中确认「授权」（Approve）。未弹窗请检查钱包 App / 浏览器插件。",
       waitWalletBuy: "请在钱包弹窗中确认「买入」交易。未弹窗请检查钱包，勿重复狂点。",
@@ -889,6 +894,9 @@ export const messages: Record<Locale, MessageTree> = {
       sellProceeds: "Est. proceeds (USDT)",
       sellSpotHint: "Pancake spot estimate ~{amount} {token} (amount is UMplan count, not USDT). After approve, tap Confirm sell.",
       checkingAllowance: "Checking allowance…",
+      allowanceCheckFailed:
+        "Allowance check timed out. Tap Approve to continue; if you already approved, Retry check then Confirm.",
+      retryAllowance: "Retry allowance check",
       quotePending: "Spot quote still loading — wait, then Confirm. Don’t keep tapping Approve.",
       waitWalletApprove: "Confirm Approve in your wallet popup. If none appears, check the wallet app/extension.",
       waitWalletBuy: "Confirm the buy in your wallet. If no popup, check the wallet — don’t spam-tap.",

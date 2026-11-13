@@ -42,6 +42,9 @@ type TxStatus = {
 const SLIP_PRESETS = [3.5, 5, 10];
 const FEE_PCT = 3.5;
 const FEE_FLOOR = 3;
+/** If wagmi allowance never settles, fall through so CTA is not stuck on「检查授权」. */
+const ALLOWANCE_SOFT_MS = 4_000;
+const ALLOWANCE_HARD_MS = 8_000;
 
 export default function SwapPage() {
   const mounted = useMounted();
@@ -59,6 +62,10 @@ export default function SwapPage() {
   const [txStatus, setTxStatus] = useState<TxStatus | null>(null);
   /** Prevents success effect from re-running / wiping after wagmi reset. */
   const [settledHash, setSettledHash] = useState<Hex | null>(null);
+  /** Direct RPC fallback when wagmi allowance stays undefined. */
+  const [payAllowanceFallback, setPayAllowanceFallback] = useState<bigint | null>(null);
+  const [tokenAllowanceFallback, setTokenAllowanceFallback] = useState<bigint | null>(null);
+  const [allowanceTimedOut, setAllowanceTimedOut] = useState(false);
   const [historyTick, setHistoryTick] = useState(0);
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const {
@@ -177,23 +184,96 @@ export default function SwapPage() {
 
   const spendToken = mode === "buy" ? paymentToken : addresses.token;
   // Fetch both allowances so switching buy↔sell does not flash a false "授权" (undefined → 0).
-  const { data: payAllowance, refetch: refetchPayAllowance } = useReadContract({
+  const {
+    data: payAllowance,
+    refetch: refetchPayAllowance,
+    isError: payAllowanceError,
+    isFetching: payAllowanceFetching,
+  } = useReadContract({
     address: paymentToken,
     abi: ERC20Abi,
     functionName: "allowance",
     args: [address!, addresses.swap],
     chainId: appChainId,
-    query: { enabled: mounted && !!address && isConfigured },
+    query: {
+      enabled: mounted && !!address && isConfigured,
+      retry: 2,
+      retryDelay: 1_200,
+      refetchOnWindowFocus: true,
+    },
   });
-  const { data: tokenAllowance, refetch: refetchTokenAllowance } = useReadContract({
+  const {
+    data: tokenAllowance,
+    refetch: refetchTokenAllowance,
+    isError: tokenAllowanceError,
+    isFetching: tokenAllowanceFetching,
+  } = useReadContract({
     address: addresses.token,
     abi: ERC20Abi,
     functionName: "allowance",
     args: [address!, addresses.swap],
     chainId: appChainId,
-    query: { enabled: mounted && !!address && isConfigured },
+    query: {
+      enabled: mounted && !!address && isConfigured,
+      retry: 2,
+      retryDelay: 1_200,
+      refetchOnWindowFocus: true,
+    },
   });
-  const allowance = mode === "buy" ? payAllowance : tokenAllowance;
+
+  // Direct publicClient fallback — unblocks CTA when wagmi/RPC hangs.
+  useEffect(() => {
+    if (!mounted || !address || !isConfigured || !publicClient) return;
+    let cancelled = false;
+    const soft = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const [pay, tok] = await Promise.all([
+            publicClient.readContract({
+              address: paymentToken,
+              abi: ERC20Abi,
+              functionName: "allowance",
+              args: [address, addresses.swap],
+            }) as Promise<bigint>,
+            publicClient.readContract({
+              address: addresses.token,
+              abi: ERC20Abi,
+              functionName: "allowance",
+              args: [address, addresses.swap],
+            }) as Promise<bigint>,
+          ]);
+          if (cancelled) return;
+          setPayAllowanceFallback(pay);
+          setTokenAllowanceFallback(tok);
+        } catch {
+          /* hard timeout below still unblocks */
+        }
+      })();
+    }, ALLOWANCE_SOFT_MS);
+    const hard = window.setTimeout(() => {
+      if (!cancelled) setAllowanceTimedOut(true);
+    }, ALLOWANCE_HARD_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(soft);
+      window.clearTimeout(hard);
+    };
+  }, [mounted, address, isConfigured, publicClient, paymentToken, historyTick]);
+
+  // Reset timeout/fallback when wallet changes.
+  useEffect(() => {
+    setPayAllowanceFallback(null);
+    setTokenAllowanceFallback(null);
+    setAllowanceTimedOut(false);
+  }, [address, paymentToken]);
+
+  const wagmiPay = payAllowance as bigint | undefined;
+  const wagmiTok = tokenAllowance as bigint | undefined;
+  const resolvedPay = wagmiPay ?? payAllowanceFallback ?? undefined;
+  const resolvedTok = wagmiTok ?? tokenAllowanceFallback ?? undefined;
+  const allowance = mode === "buy" ? resolvedPay : resolvedTok;
+  const allowanceError = mode === "buy" ? payAllowanceError : tokenAllowanceError;
+  const allowanceFetching = mode === "buy" ? payAllowanceFetching : tokenAllowanceFetching;
 
   const quote = mode === "buy" ? (buyQuote as [bigint, bigint] | undefined) : (sellQuote as [bigint, bigint] | undefined);
   const outAmount = hopMode ? hopOut : quote?.[0];
@@ -206,9 +286,16 @@ export default function SwapPage() {
   const rewardBase = mode === "buy" ? (outAmount ?? 0n) : 0n;
   const selfReward = (rewardBase * 50n) / 10_000n;
   const rewardLabel = "UMplan";
-  const allowanceReady = allowance !== undefined;
-  const allowanceBi = (allowance as bigint | undefined) ?? 0n;
-  /** Only require approve after allowance has loaded — never treat "loading" as 0 allowance. */
+  /**
+   * Settled when we have a value, RPC errored, or hard-timeout.
+   * On timeout/error with no value → treat as 0 so CTA becomes「授权」not forever「检查中」.
+   */
+  const allowanceReady =
+    allowance !== undefined || allowanceError || allowanceTimedOut;
+  const allowanceBi = allowance ?? 0n;
+  const allowanceAssumedZero =
+    allowance === undefined && (allowanceError || allowanceTimedOut);
+  /** Only require approve after allowance has loaded — never treat brief loading as 0. */
   const needApprove = allowanceReady && allowanceBi < parsed;
   const feePreview = Number(amount || "0") * (FEE_PCT / 100);
   const quotePending = hopMode && parsed > 0n && hopOut == null;
@@ -415,19 +502,26 @@ export default function SwapPage() {
     });
   }, [receiptError, hash, settledHash, locale]);
 
+  const showApproveCta = needApprove || (busy && pendingAction === "approve");
   const ctaLabel = busy
     ? isPending
       ? t("swap.waitingWallet")
       : t("common.confirming")
     : !allowanceReady
       ? t("swap.checkingAllowance")
-      : needApprove || (busy && pendingAction === "approve")
+      : showApproveCta
         ? t("common.approve")
         : mode === "buy"
           ? t("swap.confirmBuy")
           : t("swap.confirmSell");
+  // Never leave CTA disabled solely because allowance is still loading after timeout —
+  // allowanceReady becomes true on error/timeout (assumed 0 → 授权).
   const ctaDisabled =
-    busy || parsed === 0n || insufficientBal || !allowanceReady || (quotePending && !needApprove);
+    busy ||
+    parsed === 0n ||
+    insufficientBal ||
+    (!allowanceReady && !showApproveCta) ||
+    (quotePending && !needApprove);
 
   return (
     <section className="panel">
@@ -557,7 +651,12 @@ export default function SwapPage() {
             {!allowanceReady && parsed > 0n && (
               <p className="muted tip-line">{t("swap.checkingAllowance")}</p>
             )}
-            {needApprove && parsed > 0n && !insufficientBal && (
+            {allowanceAssumedZero && parsed > 0n && (
+              <p className="banner warn" style={{ marginBottom: "0.65rem" }}>
+                {t("swap.allowanceCheckFailed")}
+              </p>
+            )}
+            {needApprove && !allowanceAssumedZero && parsed > 0n && !insufficientBal && (
               <p className="banner warn" style={{ marginBottom: "0.65rem" }}>
                 {t("swap.needApproveFirst")}
               </p>
@@ -573,12 +672,12 @@ export default function SwapPage() {
               </p>
             )}
             <div className="cta-row">
-              {needApprove || (busy && pendingAction === "approve") ? (
+              {showApproveCta ? (
                 <button
                   type="button"
                   className="btn primary"
                   style={{ flex: 1 }}
-                  disabled={ctaDisabled && !(needApprove && allowanceReady)}
+                  disabled={busy || parsed === 0n || insufficientBal}
                   onClick={onApprove}
                 >
                   {ctaLabel}
@@ -595,6 +694,22 @@ export default function SwapPage() {
                 </button>
               )}
             </div>
+            {!allowanceReady && parsed > 0n && (
+              <button
+                type="button"
+                className="btn"
+                style={{ width: "100%", marginTop: "0.5rem" }}
+                disabled={allowanceFetching}
+                onClick={() => {
+                  void refetchPayAllowance();
+                  void refetchTokenAllowance();
+                  setAllowanceTimedOut(false);
+                  setHistoryTick((n) => n + 1);
+                }}
+              >
+                {t("swap.retryAllowance")}
+              </button>
+            )}
           </>
         )}
 
