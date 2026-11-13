@@ -13,12 +13,14 @@ import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { quoteUmplanToUsdt, quoteUsdtToUmplan } from "@/lib/dexQuote";
 import { fmtToken, parseAmount } from "@/lib/format";
+import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import { useI18n } from "@/lib/i18n";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
+import { bsc } from "viem/chains";
 
 type Mode = "buy" | "sell";
 type PendingAction = "approve" | "buy" | "sell" | null;
@@ -28,7 +30,7 @@ const FEE_PCT = 3.5;
 const FEE_FLOOR = 3;
 export default function SwapPage() {
   const mounted = useMounted();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: appChainId });
   const gate = useOnboardingOptional();
@@ -38,6 +40,7 @@ export default function SwapPage() {
   const [slippage, setSlippage] = useState(3.5);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [hopOut, setHopOut] = useState<bigint | null>(null);
+  const [ctaHint, setCtaHint] = useState<string | null>(null);
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
@@ -56,8 +59,18 @@ export default function SwapPage() {
     chainId: appChainId,
     query: { enabled: isConfigured },
   });
-  const hopMode = !!hopToken && (hopToken as string).toLowerCase() !== zeroAddress.toLowerCase();
-  /** Hop deploy pays USDT; legacy direct DEX pays SPCXB. */
+  const { data: hopModeFlag } = useReadContract({
+    address: addresses.swap,
+    abi: SwapAbi,
+    functionName: "hopMode",
+    chainId: appChainId,
+    query: { enabled: isConfigured },
+  });
+  /** Mainnet live deploy is USDT-hop; don't fall back to SPCXB while hopToken is still loading. */
+  const hopMode =
+    hopModeFlag === true ||
+    (!!hopToken && (hopToken as string).toLowerCase() !== zeroAddress.toLowerCase()) ||
+    (appChainId === bsc.id && hopModeFlag !== false);
   const paymentToken = hopMode ? addresses.usdt : addresses.spcxb;
   const paymentLabel = hopMode ? "USDT" : "SPCXB";
 
@@ -163,6 +176,7 @@ export default function SwapPage() {
   }
 
   async function onApprove() {
+    setCtaHint(null);
     reset();
     setPendingAction("approve");
     writeContract({
@@ -175,7 +189,19 @@ export default function SwapPage() {
   }
 
   async function onSwap() {
-    if (insufficientBal) return;
+    if (insufficientBal) {
+      setCtaHint(t("swap.insufficientBal"));
+      return;
+    }
+    if (needApprove) {
+      setCtaHint(t("swap.needApproveFirst"));
+      return;
+    }
+    if (parsed === 0n) {
+      setCtaHint(t("swap.enterAmount"));
+      return;
+    }
+    setCtaHint(null);
     reset();
     setPendingAction(mode === "buy" ? "buy" : "sell");
     if (mode === "buy") {
@@ -302,33 +328,42 @@ export default function SwapPage() {
         ) : !isConfigured ? (
           <p className="banner warn">{t("common.contractsUnconfigured")}</p>
         ) : (
-          <div className="cta-row">
-            {needApprove && (
-              <button type="button" className="btn" disabled={isPending || confirming} onClick={onApprove}>
-                {t("common.approve")}
-              </button>
+          <>
+            {needApprove && parsed > 0n && !insufficientBal && (
+              <p className="muted tip-line">{t("swap.needApproveFirst")}</p>
             )}
-            <button
-              type="button"
-              className={mode === "sell" ? "btn primary sell" : "btn primary"}
-              style={{ flex: 1 }}
-              disabled={
-                isPending ||
-                confirming ||
-                needApprove ||
-                parsed === 0n ||
-                !featuresUnlocked ||
-                insufficientBal
-              }
-              onClick={onSwap}
-            >
-              {isPending || confirming
-                ? t("common.confirming")
-                : mode === "buy"
-                  ? t("swap.confirmBuy")
-                  : t("swap.confirmSell")}
-            </button>
-          </div>
+            <div className="cta-row">
+              {needApprove ? (
+                <button
+                  type="button"
+                  className="btn primary"
+                  style={{ flex: 1 }}
+                  disabled={isPending || confirming || parsed === 0n || insufficientBal}
+                  onClick={onApprove}
+                >
+                  {isPending || confirming
+                    ? pendingAction === "approve"
+                      ? t("common.confirming")
+                      : t("common.approve")
+                    : t("common.approve")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={mode === "sell" ? "btn primary sell" : "btn primary"}
+                  style={{ flex: 1 }}
+                  disabled={isPending || confirming || parsed === 0n || insufficientBal}
+                  onClick={onSwap}
+                >
+                  {isPending || confirming
+                    ? t("common.confirming")
+                    : mode === "buy"
+                      ? t("swap.confirmBuy")
+                      : t("swap.confirmSell")}
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         <dl className="stats" style={{ marginTop: "1rem" }}>
@@ -345,8 +380,9 @@ export default function SwapPage() {
         </dl>
 
         {insufficientBal && <p className="banner warn">{t("swap.insufficientBal")}</p>}
+        {ctaHint && <p className="banner warn">{ctaHint}</p>}
         {successBanner && <p className="banner ok">{successBanner}</p>}
-        {error && <p className="banner warn">{error.message}</p>}
+        {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
       </div>
 
       <div className="card">

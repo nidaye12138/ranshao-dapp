@@ -133,6 +133,8 @@ export type MessageTree = {
     sellOk: string;
     approveOk: string;
     insufficientBal: string;
+    needApproveFirst: string;
+    enterAmount: string;
     instantTitle: string;
     instantOnly: string;
     noMilestone: string;
@@ -468,6 +470,8 @@ export const messages: Record<Locale, MessageTree> = {
       sellOk: "卖出已提交（经 Pancake 多跳），等待链上确认",
       approveOk: "授权成功，请再点「确认买入 / 卖出」完成交易（授权≠买入）",
       insufficientBal: "余额不足：买入需钱包持有足够 USDT；当前余额不够支付金额",
+      needApproveFirst: "需先点「授权」允许合约使用 USDT/UMplan，授权成功后再确认买卖（授权≠成交）。",
+      enterAmount: "请先输入大于 0 的数量",
       instantTitle: "即时奖励说明",
       instantOnly: "仅即时奖：买/卖 → 交易方 0.5% + 直推邀请人 0.5%（USDT）到钱包。",
       noMilestone: "不做累计买入业绩、级别或里程碑奖励。",
@@ -816,6 +820,8 @@ export const messages: Record<Locale, MessageTree> = {
       sellOk: "Sell submitted via Pancake multi-hop; awaiting confirmation",
       approveOk: "Approval confirmed — tap Confirm buy/sell to trade (approve ≠ buy)",
       insufficientBal: "Insufficient balance: buy needs enough USDT in your wallet",
+      needApproveFirst: "Approve USDT/UMplan for the swap contract first, then confirm (approve ≠ trade).",
+      enterAmount: "Enter an amount greater than 0",
       instantTitle: "Instant rewards",
       instantOnly: "Instant only: buy/sell → trader 0.5% + direct referrer 0.5% (USDT) to wallets.",
       noMilestone: "No cumulative buy volume, level, or milestone rewards.",
