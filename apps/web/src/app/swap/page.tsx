@@ -592,32 +592,31 @@ export default function SwapPage() {
         </button>
       </div>
 
-      <div className={`card swap-card ${mode}`}>
-        {txStatus && (
+      {txStatus && (
+        <div
+          className={`swap-status-overlay ${txStatus.kind}`}
+          role="dialog"
+          aria-modal="true"
+          aria-live="polite"
+          data-phase={txStatus.phase}
+          onClick={() => {
+            if (txStatus.phase === "success" || txStatus.phase === "failed") setTxStatus(null);
+          }}
+        >
           <div
-            className={`swap-status ${txStatus.kind}`}
-            role="status"
-            aria-live="polite"
-            data-phase={txStatus.phase}
+            className={`swap-status-modal ${txStatus.kind}`}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="swap-status-head">
-              <span className="swap-status-phase">
-                {txStatus.phase === "success"
-                  ? t("swap.statusSuccess")
-                  : txStatus.phase === "failed"
-                    ? t("swap.statusFailed")
-                    : t("swap.statusProcessing")}
-              </span>
-              {(txStatus.phase === "success" || txStatus.phase === "failed") && (
-                <button
-                  type="button"
-                  className="swap-status-dismiss"
-                  onClick={() => setTxStatus(null)}
-                >
-                  {t("swap.statusDismiss")}
-                </button>
-              )}
+            <div className={`swap-status-icon ${txStatus.phase}`} aria-hidden>
+              {txStatus.phase === "success" ? "✓" : txStatus.phase === "failed" ? "!" : "···"}
             </div>
+            <h3 className="swap-status-title">
+              {txStatus.phase === "success"
+                ? t("swap.statusSuccess")
+                : txStatus.phase === "failed"
+                  ? t("swap.statusFailed")
+                  : t("swap.statusProcessing")}
+            </h3>
             <p className="swap-status-body">{txStatus.text}</p>
             {txStatus.hash && (
               <p className="swap-status-link">
@@ -626,9 +625,16 @@ export default function SwapPage() {
                 </a>
               </p>
             )}
+            {(txStatus.phase === "success" || txStatus.phase === "failed") && (
+              <button type="button" className="btn primary swap-status-ok" onClick={() => setTxStatus(null)}>
+                {t("swap.statusDismiss")}
+              </button>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
+      <div className={`card swap-card ${mode}`}>
         <div className="input-box">
           <div className="ib-label">
             {mode === "buy" ? (hopMode ? t("swap.payUsdt") : `支付 ${paymentLabel}`) : t("swap.sellUmplan")}
