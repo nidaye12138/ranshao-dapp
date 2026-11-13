@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, http, formatUnits } from "viem";
+import { createPublicClient, http, formatUnits, parseUnits } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChain, appRpcUrl } from "@/lib/chain";
 import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
 import type { StatsResponse } from "@/lib/api/types";
-import { type Address } from "viem";
+import { type Address, zeroAddress } from "viem";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
+import {
+  formatTokenUsd,
+  PANCAKE_V2_ROUTER,
+  PancakeRouterAbi,
+} from "@/lib/tokenPrice";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +23,7 @@ const STATS_QUERY = `
   }
 `;
 
-/** Minimal oracle surface — DEX Swap quotes are in SPCXB, not USDT, so do not invert quoteUsdt. */
+/** Admin-set MockPriceOracle — fallback only when DEX path is unavailable. */
 const OracleAbi = [
   {
     type: "function",
@@ -28,6 +33,26 @@ const OracleAbi = [
     outputs: [{ type: "uint256" }],
   },
 ] as const;
+
+async function readDexTokenUsd(
+  client: ReturnType<typeof createPublicClient>,
+): Promise<string | null> {
+  const { token, spcxb, usdt } = addresses;
+  if (token === zeroAddress || spcxb === zeroAddress || usdt === zeroAddress) return null;
+  // Primary market: UMplan → SPCXB → USDT on Pancake V2 (matches Ave / DEX spot).
+  try {
+    const amounts = (await client.readContract({
+      address: PANCAKE_V2_ROUTER,
+      abi: PancakeRouterAbi,
+      functionName: "getAmountsOut",
+      args: [parseUnits("1", 18), [token, spcxb, usdt]],
+    })) as bigint[];
+    const out = amounts[amounts.length - 1];
+    return formatTokenUsd(out);
+  } catch {
+    return null;
+  }
+}
 
 export async function GET() {
   let source: StatsResponse["source"] = "unconfigured";
@@ -46,7 +71,7 @@ export async function GET() {
     }
   }
 
-  // Prefer live chain reads when modules are configured (burn totals + oracle token USD).
+  // Prefer live chain reads when modules are configured (burn totals + DEX/oracle USD).
   if (isConfigured && appRpcUrl) {
     try {
       const client = createPublicClient({
@@ -55,38 +80,40 @@ export async function GET() {
       });
 
       const oracleAddr = (process.env.NEXT_PUBLIC_ORACLE_ADDRESS || "").trim() as Address;
-      const reads: Promise<unknown>[] = [
-        client.readContract({
-          address: addresses.burn,
-          abi: BurnAbi,
-          functionName: "totalBurnedToken",
-        }),
-        client.readContract({
-          address: addresses.burn,
-          abi: BurnAbi,
-          functionName: "totalBurnedUsd",
-        }),
-      ];
-      if (oracleAddr.startsWith("0x") && oracleAddr.length === 42) {
-        reads.push(
-          client.readContract({
-            address: oracleAddr,
-            abi: OracleAbi,
-            functionName: "tokenUsd",
-          }),
-        );
-      }
+      const burnedTokP = client.readContract({
+        address: addresses.burn,
+        abi: BurnAbi,
+        functionName: "totalBurnedToken",
+      });
+      const burnedUsdP = client.readContract({
+        address: addresses.burn,
+        abi: BurnAbi,
+        functionName: "totalBurnedUsd",
+      });
+      const dexPriceP = readDexTokenUsd(client);
+      const oracleP =
+        oracleAddr.startsWith("0x") && oracleAddr.length === 42
+          ? client.readContract({
+              address: oracleAddr,
+              abi: OracleAbi,
+              functionName: "tokenUsd",
+            })
+          : Promise.resolve(null);
 
-      const settled = await Promise.all(reads);
-      const burnedTok = settled[0] as bigint;
-      const burnedUsd = settled[1] as bigint;
-      totalBurnedToken = formatUsdRaw(burnedTok);
-      totalBurnedUsd = formatUsdRaw(burnedUsd);
-      if (settled.length > 2) {
-        const tokenUsd = settled[2] as bigint;
-        if (tokenUsd > 0n) {
-          priceUsd = Number(formatUnits(tokenUsd, 18)).toFixed(4);
-        }
+      const [burnedTok, burnedUsd, dexPrice, tokenUsd] = await Promise.all([
+        burnedTokP,
+        burnedUsdP,
+        dexPriceP,
+        oracleP,
+      ]);
+
+      totalBurnedToken = formatUsdRaw(burnedTok as bigint);
+      totalBurnedUsd = formatUsdRaw(burnedUsd as bigint);
+
+      if (dexPrice) {
+        priceUsd = dexPrice;
+      } else if (typeof tokenUsd === "bigint" && tokenUsd > 0n) {
+        priceUsd = formatTokenUsd(tokenUsd) ?? Number(formatUnits(tokenUsd, 18)).toFixed(4);
       }
       source = source === "graph" ? "mixed" : "chain";
     } catch {
