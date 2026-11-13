@@ -1,4 +1,4 @@
-import { createPublicClient, http, parseAbiItem, type Address, type Hex } from "viem";
+import { createPublicClient, getAddress, http, parseAbiItem, type Address, type Hex } from "viem";
 import { bsc } from "viem/chains";
 import { addresses } from "@/lib/addresses";
 import type { LeaderboardRow } from "@/lib/api/types";
@@ -19,15 +19,19 @@ const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
 );
 
-/** Live + historical SwapFacade addresses that emit Bought. */
+function checksum(a: string): Address {
+  return getAddress(a);
+}
+
+/** Live + historical SwapFacade addresses that emit Bought (EIP-55). */
 const SWAP_LOG_ADDRESSES: Address[] = [
   addresses.swap,
-  "0x7a853364f4AddB839FdaDdFDf080a939b1275FbF",
-  "0x73CB0efF052034a19D40A0cdb747ef24F294681D",
-  "0x7cdB95aF2483B0e264355132dCb2FFcCc65BC27F",
-  "0xb7218002Ef918139d081fDFa2EabCA83D72574E5",
-  "0x188cD8D1f2dD395f0779FFAb1f9e7833Fc17f58D",
-].filter((a, i, arr) => a && a !== "0x0000000000000000000000000000000000000000" && arr.indexOf(a) === i) as Address[];
+  checksum("0x7a853364f4addb839fdaddfdf080a939b1275fbf"),
+  checksum("0x73cb0eff052034a19d40a0cdb747ef24f294681d"),
+  checksum("0x7cdb95af2483b0e264355132dcb2ffccc65bc27f"),
+  checksum("0xb7218002ef918139d081fdfa2eabca83d72574e5"),
+  checksum("0x188cd8d1f2dd395f0779ffab1f9e7833fc17f58d"),
+].filter((a, i, arr) => a && a !== "0x0000000000000000000000000000000000000000" && arr.indexOf(a) === i);
 
 const CACHE_TTL_MS = 60_000;
 let cache: { at: number; items: LeaderboardRow[] } | null = null;

@@ -15,7 +15,7 @@
   "priorUmplanRewardPauseTx": "0x00e812358297eb6b483adf50c01e9c65859911dca4fd33eeb26439dc5a5ca141",
   "umplanRewardTreasurySetModuleTx": "0x4763b180213fc3cd62ef3e289d8e6c1572f34acdb4554accd68f5e126edf30df",
   "priorUsdtHopPauseTx": "0x61e3b1f99399edc9b82dd96280e8223feb8c222693de654c31a990da3c65877f",
-  "note": "Live SwapFacade: USDT→SPCXB→UMplan hop; buy 0.5% UMplan to referrer/treasury; sell no instant rewards. Burn/weight USD→UMplan uses PancakeSpotOracle (V2 mid × V3 SPCXB/USDT), not MockPriceOracle 0.01.",
+  "note": "Live SwapFacade: USDT\u2192SPCXB\u2192UMplan hop; buy 0.5% UMplan to referrer/treasury; sell no instant rewards. Burn/weight USD\u2192UMplan uses PancakeSpotOracle (V2 mid \u00d7 V3 SPCXB/USDT), not MockPriceOracle 0.01.",
   "spotOracleDeployedAt": "2026-11-13",
   "spotOracleCreateTx": "0xdc72d2a92b514eef5dbd35d6847717efe8b3c6427c495685a749c06bf19452e7",
   "spotOracleBurnSetConfigTx": "0x097657b6c449b340903f350031e7a42aafef95b3bb75d7e3fff3bab2017b1899",
@@ -35,7 +35,7 @@
   "PancakeSpotOracle": "0xf38cA055CBD7a6278948F86bB19A298EC90D2101",
   "MockPriceOracle": "0x77528f697dbf977D5616146b8FFcF206e0BF346f",
   "MockPriceOracleNote": "Deprecated for burn/swap quoting; kept on-chain for history.",
-  "SwapFacade": "0x7a853364f4AddB839FdaDdFDf080a939b1275FbF",
+  "SwapFacade": "0x7A853364F4aDdB839FDaDDFdf080a939b1275fBF",
   "SwapFacadeUmplanRewardsSellPaused": "0x73CB0efF052034a19D40A0cdb747ef24F294681D",
   "SwapFacadeUsdtHopPaymentRewardsPaused": "0x7cdB95aF2483B0e264355132dCb2FFcCc65BC27F",
   "SwapFacadeSpcxbDirect": "0xb7218002Ef918139d081fDFa2EabCA83D72574E5",
@@ -55,9 +55,29 @@
     "layerBps": 5000,
     "shareholderBps": 1500,
     "precipBurnBps": 500,
-    "layerOfMarketBucket": [1000, 500, 500, 500, 500, 500, 500, 500, 500],
-    "tierThresholdsU": [100, 500, 800, 1500],
-    "poolWeightBps": [3333, 2500, 2500, 1667],
+    "layerOfMarketBucket": [
+      1000,
+      500,
+      500,
+      500,
+      500,
+      500,
+      500,
+      500,
+      500
+    ],
+    "tierThresholdsU": [
+      100,
+      500,
+      800,
+      1500
+    ],
+    "poolWeightBps": [
+      3333,
+      2500,
+      2500,
+      1667
+    ],
     "maxShareholderSeats": 453
   },
   "feeOnTransfer": {
