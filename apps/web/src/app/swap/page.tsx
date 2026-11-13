@@ -17,7 +17,11 @@ import { fmtToken, parseAmount } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
 import { useApiGet } from "@/lib/api/client";
-import type { SwapHistoryResponse } from "@/lib/api/swapHistory";
+import {
+  BOUGHT_TOPIC0,
+  SOLD_TOPIC0,
+  type SwapHistoryResponse,
+} from "@/lib/api/swapHistory";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
 import { useOnboardingOptional } from "@/components/OnboardingProvider";
 import { useI18n } from "@/lib/i18n";
@@ -77,7 +81,11 @@ export default function SwapPage() {
 
   const historyUrl =
     mounted && address ? `/api/swap-history?address=${address}&_=${historyTick}` : null;
-  const { data: history, loading: historyLoading } = useApiGet<SwapHistoryResponse>(historyUrl, {
+  const {
+    data: history,
+    loading: historyLoading,
+    error: historyError,
+  } = useApiGet<SwapHistoryResponse>(historyUrl, {
     refetchIntervalMs: 20_000,
   });
 
@@ -422,6 +430,44 @@ export default function SwapPage() {
   useEffect(() => {
     if (!isSuccess || !pendingAction || !hash) return;
     if (settledHash && settledHash.toLowerCase() === hash.toLowerCase()) return;
+    // Wait for receipt body before validating buy/sell events (isSuccess can flip first).
+    if ((pendingAction === "buy" || pendingAction === "sell") && !receipt) return;
+
+    const swapLc = addresses.swap.toLowerCase();
+    const receiptLogs = receipt?.logs ?? [];
+    const topic0 = (log: { topics?: readonly string[] }) =>
+      (log.topics?.[0] as string | undefined)?.toLowerCase();
+    const hasBought = receiptLogs.some(
+      (log) => log.address.toLowerCase() === swapLc && topic0(log) === BOUGHT_TOPIC0,
+    );
+    const hasSold = receiptLogs.some(
+      (log) => log.address.toLowerCase() === swapLc && topic0(log) === SOLD_TOPIC0,
+    );
+
+    // Don't claim buy/sell success unless the matching Swap event is in the receipt
+    // (avoids「买入成功」after approve-only or a mismatched confirmation).
+    if (pendingAction === "buy" && !hasBought) {
+      setSettledHash(hash);
+      showStatus({
+        kind: "warn",
+        phase: "failed",
+        text: t("swap.buyMissingEvent"),
+        hash,
+      });
+      setHistoryTick((n) => n + 1);
+      return;
+    }
+    if (pendingAction === "sell" && !hasSold) {
+      setSettledHash(hash);
+      showStatus({
+        kind: "warn",
+        phase: "failed",
+        text: t("swap.sellMissingEvent"),
+        hash,
+      });
+      setHistoryTick((n) => n + 1);
+      return;
+    }
 
     const rewardHint = fmtToken(selfReward);
     let text =
@@ -431,15 +477,18 @@ export default function SwapPage() {
           ? t("swap.buyOkDetail", { reward: rewardHint, token: rewardLabel })
           : t("swap.sellOkDetail");
 
-    if (receipt?.logs?.length) {
+    if (receiptLogs.length) {
       try {
-        for (const log of receipt.logs) {
-          if (log.address.toLowerCase() !== addresses.swap.toLowerCase()) continue;
+        for (const log of receiptLogs) {
+          if (log.address.toLowerCase() !== swapLc) continue;
           if (!log.data || log.data.length < 2 + 64 * 6) continue;
           const word = (i: number) => BigInt(`0x${log.data.slice(2 + 64 * i, 2 + 64 * (i + 1))}`);
           if (pendingAction === "buy") {
             // Bought: payment, usd, quoted, delivered, buyerReward, referrerReward
-            const rw = word(4);
+            // Live facade: buyerReward often 0; referrer gets 0.5% (word 5).
+            const selfRw = word(4);
+            const refRw = word(5);
+            const rw = selfRw > 0n ? selfRw : refRw;
             if (rw > 0n) {
               text = t("swap.buyOkDetail", {
                 reward: formatUnits(rw, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
@@ -740,6 +789,8 @@ export default function SwapPage() {
           <p className="muted">{t("common.connectWalletFirst")}</p>
         ) : historyLoading && !history ? (
           <p className="muted">{t("common.loading")}</p>
+        ) : historyError && !history?.rows?.length ? (
+          <p className="banner warn">{t("swap.historyLoadFailed")}</p>
         ) : !history?.rows?.length ? (
           <p className="muted">{t("swap.historyEmpty")}</p>
         ) : (

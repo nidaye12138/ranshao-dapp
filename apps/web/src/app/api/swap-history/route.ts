@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const address = (req.nextUrl.searchParams.get("address") || "").toLowerCase();
-  if (!address || !isAddress(address)) {
+  if (!address || !isAddress(address, { strict: false })) {
     return NextResponse.json({ error: "address required" }, { status: 400 });
   }
   try {

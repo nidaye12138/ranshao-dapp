@@ -161,6 +161,9 @@ export type MessageTree = {
     historyTitle: string;
     historyNote: string;
     historyEmpty: string;
+    historyLoadFailed: string;
+    buyMissingEvent: string;
+    sellMissingEvent: string;
     insufficientBal: string;
     needApproveFirst: string;
     enterAmount: string;
@@ -528,7 +531,12 @@ export const messages: Record<Locale, MessageTree> = {
       viewTx: "在 BscScan 查看交易 →",
       historyTitle: "成交记录（链上）",
       historyNote: "直接读取 Swap 合约事件，不依赖索引。买入直推 0.5% UMplan 已链上结算；卖出无即时奖。",
-      historyEmpty: "暂无成交。买入成功后会出现在这里。",
+      historyEmpty: "暂无成交。买入/卖出链上确认并出现 Bought/Sold 事件后会显示在这里。",
+      historyLoadFailed: "成交记录暂时读不到链上日志（RPC 限流）。请下拉刷新或稍后再试；授权成功不等于买卖成交。",
+      buyMissingEvent:
+        "交易已上链但未找到买入事件（Bought）。可能只完成了授权，或买入未真正成交。请查看 BscScan，勿重复狂点。",
+      sellMissingEvent:
+        "交易已上链但未找到卖出事件（Sold）。请打开 BscScan 核对，或稍后再查成交记录。",
       insufficientBal: "余额不足：买入需钱包持有足够 USDT；当前余额不够支付金额",
       needApproveFirst:
         "首次需授权：允许 Swap 合约扣 USDT/UMplan（链上 ERC-20 规则，无法省略）。请先点下方红色「授权」，钱包确认后再点确认买卖。",
@@ -910,7 +918,12 @@ export const messages: Record<Locale, MessageTree> = {
       viewTx: "View on BscScan →",
       historyTitle: "Trade history (on-chain)",
       historyNote: "Read from Swap events (no indexer). Buy referrer 0.5% UMplan is on-chain; sells have no instant rebate.",
-      historyEmpty: "No trades yet. Successful buys appear here.",
+      historyEmpty: "No trades yet. Buys/sells appear here after Bought/Sold is confirmed on-chain.",
+      historyLoadFailed: "Couldn’t load trade logs (RPC limit). Pull to refresh — Approve success is not a trade fill.",
+      buyMissingEvent:
+        "Tx confirmed but no Bought event — often Approve-only, or the buy didn’t fill. Check BscScan.",
+      sellMissingEvent:
+        "Tx confirmed but no Sold event. Check BscScan or retry history in a moment.",
       insufficientBal: "Insufficient balance: buy needs enough USDT in your wallet",
       needApproveFirst:
         "First-time approve lets Swap move USDT/UMplan (ERC-20). Tap Approve below, confirm in wallet, then Confirm trade.",
