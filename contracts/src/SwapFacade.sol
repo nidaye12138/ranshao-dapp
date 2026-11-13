@@ -14,8 +14,8 @@ import {IPancakeV3SwapRouter} from "./interfaces/IPancakeV3SwapRouter.sol";
 import {IPancakeV3QuoterV2} from "./interfaces/IPancakeV3QuoterV2.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title Swap facade — buy/sell project token with 0.5%/0.5% instant UMplan rewards (UI IA C1/C2).
-/// @dev Q10: no-referrer 0.5% → Treasury. Q11: rewards in project token. Q12: Ownable+Pausable.
+/// @title Swap facade — buy pays 0.5% UMplan to referrer/treasury; sell has no instant rewards.
+/// @dev Q10: buy no-referrer 0.5% → Treasury. Q11: buy rewards in project token. Q12: Ownable+Pausable.
 ///      Inventory mode (`pancakeRouter == 0`): mintMode or depositInventory; sell needs payment liquidity.
 ///      DEX direct (`pancakeRouter != 0`, `hopToken == 0`): V2 path payment↔token (e.g. SPCXB↔UMplan).
 ///      DEX hop (`hopToken != 0`): pay USDT; V3 USDT↔SPCXB then V2 SPCXB↔UMplan. ABI keeps `usdt`/`*USDT` names.
@@ -209,7 +209,7 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         tokenOut = _tokensForUsd(usdAmount);
     }
 
-    /// @notice Quote sell: tokens → payment (gross for full amount; execution withholds 1% UMplan rewards).
+    /// @notice Quote sell: tokens → payment (full amount; sell has no instant reward withhold).
     function quoteSellUsdt(uint256 tokenAmount) public view returns (uint256 usdtOut, uint256 usdAmount) {
         if (dexMode()) {
             if (hopMode()) {
@@ -273,7 +273,7 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
         emit Bought(buyer, address(0), bnbAmount, usdAmount, tokenOut, delivered, reward, paidToRef);
     }
 
-    /// @notice In-app sell: payment for 99% tokens; 0.5% UMplan self + 0.5% UMplan referrer/treasury.
+    /// @notice In-app sell: swap 100% received tokens → payment. No self/referrer instant rewards.
     function sellForUSDT(uint256 tokenAmount) external nonReentrant whenNotPaused {
         require(tokenAmount > 0, "swap: zero");
         address seller = msg.sender;
@@ -286,42 +286,27 @@ contract SwapFacade is Ownable, Pausable, ReentrancyGuard {
             "swap: fot too high"
         );
 
-        uint256 reward = (received * Constants.INSTANT_REWARD_BPS) / Constants.BPS_DENOM;
-        require(received >= reward * 2, "swap: dust");
-        uint256 swapAmount = received - (reward * 2);
-
         uint256 paymentGross;
         uint256 usdtOut;
         uint256 usdAmount;
         if (dexMode()) {
             if (hopMode()) {
-                paymentGross = _sellViaHop(swapAmount);
+                paymentGross = _sellViaHop(received);
             } else {
-                usdtOut = _routerAmountOut(swapAmount, _sellPath());
+                usdtOut = _routerAmountOut(received, _sellPath());
                 uint256 minOut = (usdtOut * swapSlippageBps) / Constants.BPS_DENOM;
-                paymentGross = _swapTokenForPayment(swapAmount, minOut);
+                paymentGross = _swapTokenForPayment(received, minOut);
             }
             usdtOut = paymentGross;
             usdAmount = _paymentToUsd(paymentGross);
         } else {
-            (usdtOut, usdAmount) = quoteSellUsdt(swapAmount);
+            (usdtOut, usdAmount) = quoteSellUsdt(received);
             require(usdt.balanceOf(address(this)) >= usdtOut, "swap: no usdt liq");
             paymentGross = usdtOut;
         }
 
         usdt.safeTransfer(seller, paymentGross);
-        token.safeTransfer(seller, reward);
-
-        uint256 paidToRef = 0;
-        address referrer = tree.referrerOf(seller);
-        if (referrer != address(0)) {
-            token.safeTransfer(referrer, reward);
-            paidToRef = reward;
-        } else {
-            token.safeTransfer(treasury, reward);
-        }
-
-        emit Sold(seller, address(usdt), received, usdtOut, paymentGross, usdAmount, reward, paidToRef);
+        emit Sold(seller, address(usdt), received, usdtOut, paymentGross, usdAmount, 0, 0);
     }
 
     /// @dev From `delivered` project tokens held by this contract: keep 99.5% for trader, 0.5% to ref/treasury.

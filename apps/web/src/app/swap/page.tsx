@@ -192,8 +192,8 @@ export default function SwapPage() {
       ? parsed
       : hopOut
     : quote?.[1];
-  // Instant rebate is 0.5% UMplan: buy → of tokens out; sell → of tokens sold.
-  const rewardBase = mode === "buy" ? (outAmount ?? 0n) : parsed;
+  // Buy-only instant: 0.5% UMplan to referrer/treasury. Sell has no rebate.
+  const rewardBase = mode === "buy" ? (outAmount ?? 0n) : 0n;
   const selfReward = (rewardBase * 50n) / 10_000n;
   const rewardLabel = "UMplan";
   const allowanceReady = allowance !== undefined;
@@ -329,12 +329,10 @@ export default function SwapPage() {
               });
             }
           } else if (pendingAction === "sell") {
-            // Sold: tokenAmount, paymentQuoted, paymentDelivered, usd, sellerReward(UMplan), referrerReward
+            // Sold: tokenAmount, paymentQuoted, paymentDelivered, usd, sellerReward=0, referrerReward=0
             const got = word(2);
-            const rw = word(4);
             text = t("swap.sellOkReceived", {
               received: formatUnits(got, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
-              reward: formatUnits(rw, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
               token: paymentLabel,
             });
           }
@@ -550,12 +548,14 @@ export default function SwapPage() {
             <dt>{mode === "sell" ? t("swap.sellProceeds") : t("swap.usdEquiv")}</dt>
             <dd>{usdAmount != null ? fmtToken(usdAmount) : "—"}</dd>
           </div>
-          <div>
-            <dt>{t("swap.selfRebate")}</dt>
-            <dd>
-              {fmtToken(selfReward)} {rewardLabel}
-            </dd>
-          </div>
+          {mode === "buy" ? (
+            <div>
+              <dt>{t("swap.selfRebate")}</dt>
+              <dd>
+                {fmtToken(selfReward)} {rewardLabel}
+              </dd>
+            </div>
+          ) : null}
         </dl>
 
         {insufficientBal && <p className="banner warn">{t("swap.insufficientBal")}</p>}
@@ -580,7 +580,7 @@ export default function SwapPage() {
                   {row.side === "BUY" ? t("swap.buy") : t("swap.sell")} · {row.paymentAmount}
                 </span>
                 <span className="d-amt">
-                  {t("swap.selfRebate")}: {row.selfReward}
+                  {row.side === "BUY" ? `${t("swap.selfRebate")}: ${row.selfReward}` : row.paymentAmount}
                 </span>
                 <span className="muted">
                   <a href={row.explorerUrl} target="_blank" rel="noreferrer">

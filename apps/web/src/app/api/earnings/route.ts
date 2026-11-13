@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
 
   const swapPromoRows: EarningsRow[] = a.swapRewards.map((r) => ({
     id: r.id,
-    label: r.role === "self" ? (r.side === "SELL" ? "卖出自返" : "买入自返") : "直推",
+    label: r.role === "self" ? (r.side === "SELL" ? "卖出（无即时奖）" : "买入直推奖") : "直推",
     amount: formatTokenRaw(r.rewardAmount, "USDT"),
     at: tsToLocal(r.timestamp),
   }));

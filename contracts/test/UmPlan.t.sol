@@ -469,11 +469,11 @@ contract UmPlanTest is Test {
         swap.sellForUSDT(sellAmt);
         vm.stopPrank();
 
-        // Swap 99% → 990 USDT to seller; self/ref each 5 UMplan
-        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 990e18);
+        // Full sell → 1000 USDT; no instant self/ref UMplan rewards
+        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 1_000e18);
         assertEq(usdt.balanceOf(admin), adminUsdtBefore);
-        assertEq(token.balanceOf(alice), aliceTokBefore - sellAmt + 5e18);
-        assertEq(token.balanceOf(admin), adminTokBefore + 5e18);
+        assertEq(token.balanceOf(alice), aliceTokBefore - sellAmt);
+        assertEq(token.balanceOf(admin), adminTokBefore);
     }
 
     function test_dividend_claim_24h_cooldown() public {

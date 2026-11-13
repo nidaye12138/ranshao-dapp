@@ -15,8 +15,8 @@ import { formatTokenRaw, tsToLocal } from "@/lib/api/graph";
 import type { EarningsRow } from "@/lib/api/types";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 
-/** Deploy block of live USDT-hop SwapFacade (UMplan rewards) `0x73CB…681D` on BSC. */
-export const SWAP_HOP_START_BLOCK = 133_310_411n;
+/** Deploy block of live USDT-hop SwapFacade (sell no-reward) `0x7a85…5FbF` on BSC. */
+export const SWAP_HOP_START_BLOCK = 133_317_567n;
 
 const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
@@ -238,11 +238,11 @@ export async function fetchSwapHistory(address: string): Promise<SwapHistoryResp
   };
 }
 
-/** Map chain swap history into Mine 「Swap 推广奖励」 rows (self 0.5%). */
+/** Map chain swap history into Mine 「Swap 推广奖励」 rows (buy referrer 0.5%; sells emit 0). */
 export function historyToSwapPromoRows(history: SwapHistoryResponse): EarningsRow[] {
   return history.rows.map((r) => ({
     id: r.id,
-    label: r.side === "BUY" ? "买入自返" : "卖出自返",
+    label: r.side === "BUY" ? "买入直推奖" : "卖出（无即时奖）",
     amount: r.selfReward,
     at: r.at,
   }));

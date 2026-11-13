@@ -9,8 +9,8 @@ import {Constants} from "../src/Constants.sol";
 /// @notice Mainnet: deploy DEX SwapFacade with payment=USDT + V3 hop via SPCXB → V2 UMplan.
 /// @dev Pauses prior DEX Swap (SPCXB-direct) best-effort. Admin key required.
 contract DeploySwapUsdtHopMainnet is Script {
-    /// @dev Prior USDT-hop Swap (payment-token rewards). Pause on cutover to UMplan-reward build.
-    address constant OLD_DEX_SWAP = 0x7cdB95aF2483B0e264355132dCb2FFcCc65BC27F;
+    /// @dev Prior USDT-hop Swap (had sell-side UMplan rewards). Pause on cutover to sell-no-reward build.
+    address constant OLD_DEX_SWAP = 0x73CB0efF052034a19D40A0cdb747ef24F294681D;
     address constant TREASURY = 0x962DbAF164F39dB4ad80A9b9b47Ed7FDD36Dea47;
     address constant ORACLE = 0x77528f697dbf977D5616146b8FFcF206e0BF346f;
     address constant TREE = 0xa1a08c5d0e7Ba306d98f06F5e98F85FAe900bc6c;

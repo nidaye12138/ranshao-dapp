@@ -22,6 +22,7 @@ const boughtEvent = parseAbiItem(
 /** Live + historical SwapFacade addresses that emit Bought. */
 const SWAP_LOG_ADDRESSES: Address[] = [
   addresses.swap,
+  "0x7a853364f4AddB839FdaDdFDf080a939b1275FbF",
   "0x73CB0efF052034a19D40A0cdb747ef24F294681D",
   "0x7cdB95aF2483B0e264355132dCb2FFcCc65BC27F",
   "0xb7218002Ef918139d081fDFa2EabCA83D72574E5",
