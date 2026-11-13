@@ -68,6 +68,12 @@ export type MessageTree = {
     errUnconfigured: string;
     errSelf: string;
     errZeroGas: string;
+    simulating: string;
+    waitingWallet: string;
+    confirmingOnChain: string;
+    errTimeout: string;
+    viewTx: string;
+    retry: string;
   };
   coach: {
     kicker: string;
@@ -379,6 +385,12 @@ export const messages: Record<Locale, MessageTree> = {
       errUnconfigured: "合约未配置，无法绑定",
       errSelf: "不能绑定自己为邀请人",
       errZeroGas: "钱包 BNB 余额为 0，无法支付 Gas。请确认 BNB Chain 主网并充入少量 BNB 后再绑定。",
+      simulating: "检查中…",
+      waitingWallet: "等待钱包确认…",
+      confirmingOnChain: "已提交，正在等待链上确认…",
+      errTimeout: "等待超时。若钱包已确认，请刷新页面；绑定成功后会自动进入。也可点「重试」。",
+      viewTx: "在 BscScan 查看交易",
+      retry: "重试",
     },
     coach: {
       kicker: "下一步 · 激活推广",
@@ -747,6 +759,12 @@ export const messages: Record<Locale, MessageTree> = {
       errUnconfigured: "Contracts are not configured; binding is unavailable",
       errSelf: "You cannot bind yourself as referrer",
       errZeroGas: "Wallet BNB balance is 0 — cannot pay gas. Use BNB Chain mainnet and hold a little BNB, then bind.",
+      simulating: "Checking…",
+      waitingWallet: "Waiting for wallet…",
+      confirmingOnChain: "Submitted — waiting for on-chain confirmation…",
+      errTimeout: "Timed out. If you already confirmed in the wallet, refresh — a successful bind opens the app. Or tap Retry.",
+      viewTx: "View on BscScan",
+      retry: "Retry",
     },
     coach: {
       kicker: "Next · Activate promo",

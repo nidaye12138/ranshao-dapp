@@ -49,7 +49,7 @@ export function captureRefFromSearch(search: string | URLSearchParams): string |
   const params = typeof search === "string" ? new URLSearchParams(search) : search;
   const ref = params.get("ref");
   if (!ref) return null;
-  return ref;
+  return ref.trim();
 }
 
 export const PENDING_REF_KEY = "umidor:pendingRef";

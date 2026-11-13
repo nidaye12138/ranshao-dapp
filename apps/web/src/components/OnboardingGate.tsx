@@ -1,23 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   useAccount,
   useBalance,
   useConnect,
+  usePublicClient,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { isAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
+import { isAddressLoose, toChecksumAddress } from "@/lib/addressUtils";
 import { shortAddr } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
 import { useOnboarding } from "@/components/OnboardingProvider";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 import { stashPendingRef } from "@/lib/onboardingStorage";
 import { useI18n } from "@/lib/i18n";
+
+const BIND_TIMEOUT_MS = 90_000;
 
 export function OnboardingGate() {
   const {
@@ -30,42 +33,96 @@ export function OnboardingGate() {
     markCompleted,
     referrer,
     bound,
+    refetchReferrer,
   } = useOnboarding();
   const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: connecting } = useConnect();
+  const publicClient = usePublicClient({ chainId: appChainId });
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
+  const {
+    isLoading: confirming,
+    isSuccess,
+    isError: receiptError,
+    error: receiptErr,
+  } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
   const { data: nativeBal } = useBalance({
     address,
     chainId: appChainId,
     query: { enabled: !!address && isConnected },
   });
   const [localError, setLocalError] = useState<string | null>(null);
+  const [simulating, setSimulating] = useState(false);
+  const startedAt = useRef<number | null>(null);
 
-  const validRef = isAddress(refDraft) && refDraft.toLowerCase() !== address?.toLowerCase();
-  const fromInvite = isAddress(refDraft);
-  const displayError = localError || (error ? formatTxError(error, locale) : null);
+  const checksumRef = toChecksumAddress(refDraft);
+  const validRef = !!checksumRef && checksumRef.toLowerCase() !== address?.toLowerCase();
+  const fromInvite = isAddressLoose(refDraft);
+  const busy = isPending || confirming || simulating;
+  const displayError =
+    localError ||
+    (error ? formatTxError(error, locale) : null) ||
+    (receiptError && receiptErr ? formatTxError(receiptErr, locale) : null);
+
+  // Tx mined OR on-chain already bound → close gate (covers receipt-poll stalls)
+  useEffect(() => {
+    if (!address) return;
+    if (isSuccess || bound) {
+      markCompleted(referrer ?? checksumRef ?? refDraft);
+      reset();
+      startedAt.current = null;
+      setSimulating(false);
+    }
+  }, [isSuccess, bound, address, referrer, checksumRef, refDraft, markCompleted, reset]);
+
+  // While waiting for wallet / receipt, keep re-reading referrerOf
+  useEffect(() => {
+    if (!busy && !hash) return;
+    refetchReferrer();
+    const id = window.setInterval(() => refetchReferrer(), 4_000);
+    return () => window.clearInterval(id);
+  }, [busy, hash, refetchReferrer]);
+
+  // Hard timeout so "确认中…" cannot spin forever
+  useEffect(() => {
+    if (!busy) {
+      startedAt.current = null;
+      return;
+    }
+    if (startedAt.current == null) startedAt.current = Date.now();
+    const id = window.setInterval(() => {
+      if (startedAt.current == null) return;
+      if (Date.now() - startedAt.current < BIND_TIMEOUT_MS) return;
+      refetchReferrer();
+      reset();
+      setSimulating(false);
+      startedAt.current = null;
+      setLocalError(t("onboarding.errTimeout"));
+    }, 2_000);
+    return () => window.clearInterval(id);
+  }, [busy, refetchReferrer, reset, t]);
 
   useEffect(() => {
-    if (!isSuccess || !address) return;
-    markCompleted(refDraft);
-    reset();
-  }, [isSuccess, address, refDraft, markCompleted, reset]);
+    if (receiptError) {
+      setSimulating(false);
+      startedAt.current = null;
+    }
+  }, [receiptError]);
 
   if (!showGate) return null;
 
-  function onPrimary() {
+  async function onPrimary() {
     setLocalError(null);
     if (!isConnected) {
       if (connectors[0]) connect({ connector: connectors[0] });
       return;
     }
     if (bound) {
-      markCompleted(referrer ?? refDraft);
+      markCompleted(referrer ?? checksumRef ?? refDraft);
       return;
     }
-    if (!validRef) {
+    const ref = toChecksumAddress(refDraft);
+    if (!ref) {
       setLocalError(t("onboarding.errInvalidRef"));
       setEditingRef(true);
       return;
@@ -74,7 +131,7 @@ export function OnboardingGate() {
       setLocalError(t("onboarding.errUnconfigured"));
       return;
     }
-    if (refDraft.toLowerCase() === address?.toLowerCase()) {
+    if (ref.toLowerCase() === address?.toLowerCase()) {
       setLocalError(t("onboarding.errSelf"));
       return;
     }
@@ -82,12 +139,37 @@ export function OnboardingGate() {
       setLocalError(t("onboarding.errZeroGas"));
       return;
     }
-    stashPendingRef(refDraft);
+
+    setRefDraft(ref);
+    stashPendingRef(ref);
+    reset();
+    setSimulating(true);
+    startedAt.current = Date.now();
+
+    if (publicClient && address) {
+      try {
+        await publicClient.simulateContract({
+          address: addresses.registry,
+          abi: TreeAbi,
+          functionName: "bindReferrer",
+          args: [ref],
+          account: address,
+          chain: publicClient.chain,
+        });
+      } catch (e) {
+        setSimulating(false);
+        startedAt.current = null;
+        setLocalError(formatTxError(e, locale));
+        return;
+      }
+    }
+
+    setSimulating(false);
     writeContract({
       address: addresses.registry,
       abi: TreeAbi,
       functionName: "bindReferrer",
-      args: [refDraft as `0x${string}`],
+      args: [ref],
       chainId: appChainId,
     });
   }
@@ -96,11 +178,15 @@ export function OnboardingGate() {
     ? connecting
       ? t("common.connecting")
       : t("onboarding.primaryConnect")
-    : isPending || confirming
-      ? t("common.confirming")
-      : bound
-        ? t("onboarding.primaryEnter")
-        : t("onboarding.primaryBindEnter");
+    : simulating
+      ? t("onboarding.simulating")
+      : isPending
+        ? t("onboarding.waitingWallet")
+        : confirming
+          ? t("onboarding.confirmingOnChain")
+          : bound
+            ? t("onboarding.primaryEnter")
+            : t("onboarding.primaryBindEnter");
 
   const hint = !isConnected
     ? t("onboarding.hintConnect")
@@ -146,9 +232,13 @@ export function OnboardingGate() {
                 type="button"
                 className="ob-link"
                 onClick={() => {
-                  if (isAddress(refDraft)) {
-                    stashPendingRef(refDraft);
+                  const normalized = toChecksumAddress(refDraft);
+                  if (normalized) {
+                    setRefDraft(normalized);
+                    stashPendingRef(normalized);
                     setEditingRef(false);
+                  } else {
+                    setLocalError(t("onboarding.errInvalidRef"));
                   }
                 }}
               >
@@ -215,11 +305,38 @@ export function OnboardingGate() {
         <button
           type="button"
           className="btn primary ob-primary"
-          disabled={isPending || confirming || connecting || (isConnected && !validRef && !bound)}
-          onClick={onPrimary}
+          disabled={busy || connecting || (isConnected && !validRef && !bound)}
+          onClick={() => void onPrimary()}
         >
           {primaryLabel}
         </button>
+
+        {hash && (
+          <p className="ob-step-note">
+            <a
+              href={`https://bscscan.com/tx/${hash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="ob-link"
+            >
+              {t("onboarding.viewTx")}
+            </a>
+            {" · "}
+            <button
+              type="button"
+              className="ob-link"
+              onClick={() => {
+                reset();
+                setSimulating(false);
+                startedAt.current = null;
+                refetchReferrer();
+                setLocalError(null);
+              }}
+            >
+              {t("onboarding.retry")}
+            </button>
+          </p>
+        )}
 
         {displayError && <p className="ob-error">{displayError}</p>}
 

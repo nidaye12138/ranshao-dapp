@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { isAddress, zeroAddress } from "viem";
+import { zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
+import { isAddressLoose, toChecksumAddress } from "@/lib/addressUtils";
 import { shortAddr } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
@@ -62,8 +63,8 @@ function HomeInner() {
   }, [slides.length]);
 
   useEffect(() => {
-    const ref = search.get("ref");
-    if (ref && isAddress(ref)) setRefInput(ref);
+    const ref = toChecksumAddress(search.get("ref"));
+    if (ref) setRefInput(ref);
   }, [search]);
 
   const enabled = mounted && isConfigured && !!address;
@@ -209,16 +210,18 @@ function HomeInner() {
             <button
               type="button"
               className="btn primary"
-              disabled={!isConfigured || isPending || confirming || !isAddress(refInput)}
-              onClick={() =>
+              disabled={!isConfigured || isPending || confirming || !isAddressLoose(refInput)}
+              onClick={() => {
+                const ref = toChecksumAddress(refInput);
+                if (!ref) return;
                 writeContract({
                   address: addresses.registry,
                   abi: TreeAbi,
                   functionName: "bindReferrer",
-                  args: [refInput as `0x${string}`],
+                  args: [ref],
                   chainId: appChainId,
-                })
-              }
+                });
+              }}
             >
               {isPending || confirming ? t("common.confirming") : t("home.bindReferrer")}
             </button>
