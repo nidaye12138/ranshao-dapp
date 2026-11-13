@@ -166,14 +166,24 @@ export default function SwapPage() {
   }, [hopMode, publicClient, mode, parsed]);
 
   const spendToken = mode === "buy" ? paymentToken : addresses.token;
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: spendToken,
+  // Fetch both allowances so switching buy↔sell does not flash a false "授权" (undefined → 0).
+  const { data: payAllowance, refetch: refetchPayAllowance } = useReadContract({
+    address: paymentToken,
     abi: ERC20Abi,
     functionName: "allowance",
     args: [address!, addresses.swap],
     chainId: appChainId,
     query: { enabled: mounted && !!address && isConfigured },
   });
+  const { data: tokenAllowance, refetch: refetchTokenAllowance } = useReadContract({
+    address: addresses.token,
+    abi: ERC20Abi,
+    functionName: "allowance",
+    args: [address!, addresses.swap],
+    chainId: appChainId,
+    query: { enabled: mounted && !!address && isConfigured },
+  });
+  const allowance = mode === "buy" ? payAllowance : tokenAllowance;
 
   const quote = mode === "buy" ? (buyQuote as [bigint, bigint] | undefined) : (sellQuote as [bigint, bigint] | undefined);
   const outAmount = hopMode ? hopOut : quote?.[0];
@@ -184,9 +194,12 @@ export default function SwapPage() {
     : quote?.[1];
   const rewardBase = hopMode && mode === "sell" && hopOut != null ? hopOut : parsed;
   const selfReward = (rewardBase * 50n) / 10_000n;
+  const allowanceReady = allowance !== undefined;
   const allowanceBi = (allowance as bigint | undefined) ?? 0n;
-  const needApprove = allowanceBi < parsed;
+  /** Only require approve after allowance has loaded — never treat "loading" as 0 allowance. */
+  const needApprove = allowanceReady && allowanceBi < parsed;
   const feePreview = Number(amount || "0") * (FEE_PCT / 100);
+  const quotePending = hopMode && parsed > 0n && hopOut == null;
 
   const bal = mode === "buy" ? (paymentBal as bigint | undefined) : (tokenBal as bigint | undefined);
   const insufficientBal = bal != null && parsed > 0n && bal < parsed;
@@ -222,6 +235,10 @@ export default function SwapPage() {
       setFeedback({ kind: "warn", text: t("swap.insufficientBal") });
       return;
     }
+    if (!allowanceReady) {
+      setFeedback({ kind: "info", text: t("swap.checkingAllowance") });
+      return;
+    }
     if (needApprove) {
       setFeedback({ kind: "warn", text: t("swap.needApproveFirst") });
       return;
@@ -230,29 +247,42 @@ export default function SwapPage() {
       setFeedback({ kind: "warn", text: t("swap.enterAmount") });
       return;
     }
+    if (hopMode && hopOut == null) {
+      setFeedback({ kind: "warn", text: t("swap.quotePending") });
+      return;
+    }
     setFeedback({
       kind: "info",
       text: mode === "buy" ? t("swap.waitWalletBuy") : t("swap.waitWalletSell"),
     });
     reset();
     setPendingAction(mode === "buy" ? "buy" : "sell");
-    if (mode === "buy") {
-      writeContract({
-        address: addresses.swap,
-        abi: SwapAbi,
-        functionName: "buyWithUSDT",
-        args: [parsed],
-        chainId: appChainId,
-      });
-    } else {
-      writeContract({
-        address: addresses.swap,
-        abi: SwapAbi,
-        functionName: "sellForUSDT",
-        args: [parsed],
-        chainId: appChainId,
-      });
+
+    const fn = mode === "buy" ? "buyWithUSDT" : "sellForUSDT";
+    if (publicClient && address) {
+      try {
+        await publicClient.simulateContract({
+          address: addresses.swap,
+          abi: SwapAbi,
+          functionName: fn,
+          args: [parsed],
+          account: address,
+          chain: publicClient.chain,
+        });
+      } catch (e) {
+        setPendingAction(null);
+        setFeedback({ kind: "warn", text: formatTxError(e, locale) });
+        return;
+      }
     }
+
+    writeContract({
+      address: addresses.swap,
+      abi: SwapAbi,
+      functionName: fn,
+      args: [parsed],
+      chainId: appChainId,
+    });
   }
 
   useEffect(() => {
@@ -281,21 +311,30 @@ export default function SwapPage() {
           ? t("swap.buyOkDetail", { reward: rewardHint, token: paymentLabel })
           : t("swap.sellOkDetail", { reward: rewardHint, token: paymentLabel });
 
-    if (pendingAction === "buy" && receipt?.logs?.length) {
+    if (receipt?.logs?.length) {
       try {
         for (const log of receipt.logs) {
           if (log.address.toLowerCase() !== addresses.swap.toLowerCase()) continue;
-          // Bought: buyerReward is 7th non-indexed uint in data (index 4 after 4 fields? data packs 6 uints)
-          // payment, usd, quoted, delivered, buyerReward, referrerReward
-          if (log.data && log.data.length >= 2 + 64 * 6) {
-            const buyerRewardHex = `0x${log.data.slice(2 + 64 * 4, 2 + 64 * 5)}` as Hex;
-            const rw = BigInt(buyerRewardHex);
+          if (!log.data || log.data.length < 2 + 64 * 6) continue;
+          const word = (i: number) => BigInt(`0x${log.data.slice(2 + 64 * i, 2 + 64 * (i + 1))}`);
+          if (pendingAction === "buy") {
+            // Bought: payment, usd, quoted, delivered, buyerReward, referrerReward
+            const rw = word(4);
             if (rw > 0n) {
               text = t("swap.buyOkDetail", {
-                reward: formatUnits(rw, 18).replace(/\.?0+$/, ""),
+                reward: formatUnits(rw, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
                 token: paymentLabel,
               });
             }
+          } else if (pendingAction === "sell") {
+            // Sold: tokenAmount, paymentQuoted, paymentDelivered(=sellerTotal), usd, sellerReward, referrerReward
+            const got = word(2);
+            const rw = word(4);
+            text = t("swap.sellOkReceived", {
+              received: formatUnits(got, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
+              reward: formatUnits(rw, 18).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1"),
+              token: paymentLabel,
+            });
           }
         }
       } catch {
@@ -304,7 +343,8 @@ export default function SwapPage() {
     }
 
     setFeedback({ kind: "ok", text, hash });
-    void refetchAllowance();
+    void refetchPayAllowance();
+    void refetchTokenAllowance();
     void refetchTokenBal();
     void refetchPaymentBal();
     void queryClient.invalidateQueries();
@@ -317,7 +357,8 @@ export default function SwapPage() {
     selfReward,
     paymentLabel,
     t,
-    refetchAllowance,
+    refetchPayAllowance,
+    refetchTokenAllowance,
     refetchTokenBal,
     refetchPaymentBal,
     queryClient,
@@ -332,11 +373,15 @@ export default function SwapPage() {
     ? isPending
       ? t("swap.waitingWallet")
       : t("common.confirming")
-    : needApprove || pendingAction === "approve"
-      ? t("common.approve")
-      : mode === "buy"
-        ? t("swap.confirmBuy")
-        : t("swap.confirmSell");
+    : !allowanceReady
+      ? t("swap.checkingAllowance")
+      : needApprove || (busy && pendingAction === "approve")
+        ? t("common.approve")
+        : mode === "buy"
+          ? t("swap.confirmBuy")
+          : t("swap.confirmSell");
+  const ctaDisabled =
+    busy || parsed === 0n || insufficientBal || !allowanceReady || (quotePending && !needApprove);
 
   return (
     <section className="panel">
@@ -453,9 +498,22 @@ export default function SwapPage() {
           <p className="banner warn">{t("common.contractsUnconfigured")}</p>
         ) : (
           <>
+            {!allowanceReady && parsed > 0n && (
+              <p className="muted tip-line">{t("swap.checkingAllowance")}</p>
+            )}
             {needApprove && parsed > 0n && !insufficientBal && (
               <p className="banner warn" style={{ marginBottom: "0.65rem" }}>
                 {t("swap.needApproveFirst")}
+              </p>
+            )}
+            {!needApprove && allowanceReady && quotePending && (
+              <p className="banner warn" style={{ marginBottom: "0.65rem" }}>
+                {t("swap.quotePending")}
+              </p>
+            )}
+            {mode === "sell" && hopOut != null && parsed > 0n && (
+              <p className="muted tip-line">
+                {t("swap.sellSpotHint", { amount: fmtToken(hopOut), token: paymentLabel })}
               </p>
             )}
             <div className="cta-row">
@@ -464,7 +522,7 @@ export default function SwapPage() {
                   type="button"
                   className="btn primary"
                   style={{ flex: 1 }}
-                  disabled={busy || parsed === 0n || insufficientBal}
+                  disabled={ctaDisabled && !(needApprove && allowanceReady)}
                   onClick={onApprove}
                 >
                   {ctaLabel}
@@ -474,7 +532,7 @@ export default function SwapPage() {
                   type="button"
                   className={mode === "sell" ? "btn primary sell" : "btn primary"}
                   style={{ flex: 1 }}
-                  disabled={busy || parsed === 0n || insufficientBal}
+                  disabled={ctaDisabled}
                   onClick={onSwap}
                 >
                   {ctaLabel}
@@ -486,7 +544,7 @@ export default function SwapPage() {
 
         <dl className="stats" style={{ marginTop: "1rem" }}>
           <div>
-            <dt>{t("swap.usdEquiv")}</dt>
+            <dt>{mode === "sell" ? t("swap.sellProceeds") : t("swap.usdEquiv")}</dt>
             <dd>{usdAmount != null ? fmtToken(usdAmount) : "—"}</dd>
           </div>
           <div>

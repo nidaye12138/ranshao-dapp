@@ -134,6 +134,11 @@ export type MessageTree = {
     approveOk: string;
     buyOkDetail: string;
     sellOkDetail: string;
+    sellOkReceived: string;
+    sellProceeds: string;
+    sellSpotHint: string;
+    checkingAllowance: string;
+    quotePending: string;
     waitWalletApprove: string;
     waitWalletBuy: string;
     waitWalletSell: string;
@@ -483,6 +488,11 @@ export const messages: Record<Locale, MessageTree> = {
       approveOk: "授权成功（一次即可，之后买卖一般不用再授权）。请再点「确认买入/卖出」完成交易。",
       buyOkDetail: "买入成功！自返 0.5% 已到钱包：{reward} {token}（邀请人同步到账）。可在下方「成交记录」查看。",
       sellOkDetail: "卖出成功！自返 0.5% 已到钱包：{reward} {token}。可在下方「成交记录」查看。",
+      sellOkReceived: "卖出成功！到账约 {received} {token}（含自返 ≈ {reward}）。按 Pancake 现货结算，不是预言机 0.01。见下方成交记录。",
+      sellProceeds: "预计到账（USDT）",
+      sellSpotHint: "按 Pancake 现货估算到账约 {amount} {token}（卖出数量是 UMplan 个数，不是 USDT）。授权完成后请点「确认卖出」。",
+      checkingAllowance: "正在检查授权额度…",
+      quotePending: "现货报价加载中或暂不可用，请稍候再点确认；勿反复点授权。",
       waitWalletApprove: "请在钱包弹窗中确认「授权」（Approve）。未弹窗请检查钱包 App / 浏览器插件。",
       waitWalletBuy: "请在钱包弹窗中确认「买入」交易。未弹窗请检查钱包，勿重复狂点。",
       waitWalletSell: "请在钱包弹窗中确认「卖出」交易。未弹窗请检查钱包，勿重复狂点。",
@@ -846,6 +856,11 @@ export const messages: Record<Locale, MessageTree> = {
       approveOk: "Approved (usually once). Tap Confirm buy/sell to finish the trade.",
       buyOkDetail: "Buy succeeded! 0.5% self rebate in wallet: {reward} {token} (referrer paid too). See Trade history below.",
       sellOkDetail: "Sell succeeded! 0.5% self rebate in wallet: {reward} {token}. See Trade history below.",
+      sellOkReceived: "Sell succeeded! You received ~{received} {token} (incl. rebate ≈ {reward}). Settled at Pancake spot, not the 0.01 oracle. See history below.",
+      sellProceeds: "Est. proceeds (USDT)",
+      sellSpotHint: "Pancake spot estimate ~{amount} {token} (amount is UMplan count, not USDT). After approve, tap Confirm sell.",
+      checkingAllowance: "Checking allowance…",
+      quotePending: "Spot quote still loading — wait, then Confirm. Don’t keep tapping Approve.",
       waitWalletApprove: "Confirm Approve in your wallet popup. If none appears, check the wallet app/extension.",
       waitWalletBuy: "Confirm the buy in your wallet. If no popup, check the wallet — don’t spam-tap.",
       waitWalletSell: "Confirm the sell in your wallet. If no popup, check the wallet — don’t spam-tap.",
