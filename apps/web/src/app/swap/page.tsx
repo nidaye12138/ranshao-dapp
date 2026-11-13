@@ -30,7 +30,14 @@ const APPROVE_MAX = maxUint256;
 
 type Mode = "buy" | "sell";
 type PendingAction = "approve" | "buy" | "sell" | null;
-type Feedback = { kind: "ok" | "warn" | "info"; text: string; hash?: Hex } | null;
+type StatusKind = "ok" | "warn" | "info";
+/** Durable banner — never cleared by wagmi reset / re-tap / buy↔sell. */
+type TxStatus = {
+  kind: StatusKind;
+  phase: "processing" | "success" | "failed";
+  text: string;
+  hash?: Hex;
+};
 
 const SLIP_PRESETS = [3.5, 5, 10];
 const FEE_PCT = 3.5;
@@ -49,12 +56,15 @@ export default function SwapPage() {
   const [slippage, setSlippage] = useState(3.5);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [hopOut, setHopOut] = useState<bigint | null>(null);
-  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [txStatus, setTxStatus] = useState<TxStatus | null>(null);
+  /** Prevents success effect from re-running / wiping after wagmi reset. */
+  const [settledHash, setSettledHash] = useState<Hex | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const {
     isLoading: confirming,
     isSuccess,
+    isError: receiptError,
     data: receipt,
   } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
 
@@ -217,9 +227,19 @@ export default function SwapPage() {
     return (Number(v) / 1e18).toString();
   }
 
+  function showStatus(next: TxStatus) {
+    setTxStatus(next);
+  }
+
   async function onApprove() {
+    // Never wipe an in-flight / settled banner via double-tap.
     if (busy) return;
-    setFeedback({ kind: "info", text: t("swap.waitWalletApprove") });
+    showStatus({
+      kind: "info",
+      phase: "processing",
+      text: t("swap.waitWalletApprove"),
+    });
+    setSettledHash(null);
     reset();
     setPendingAction("approve");
     writeContract({
@@ -234,29 +254,31 @@ export default function SwapPage() {
   async function onSwap() {
     if (busy) return;
     if (insufficientBal) {
-      setFeedback({ kind: "warn", text: t("swap.insufficientBal") });
+      showStatus({ kind: "warn", phase: "failed", text: t("swap.insufficientBal") });
       return;
     }
     if (!allowanceReady) {
-      setFeedback({ kind: "info", text: t("swap.checkingAllowance") });
+      showStatus({ kind: "info", phase: "processing", text: t("swap.checkingAllowance") });
       return;
     }
     if (needApprove) {
-      setFeedback({ kind: "warn", text: t("swap.needApproveFirst") });
+      showStatus({ kind: "warn", phase: "failed", text: t("swap.needApproveFirst") });
       return;
     }
     if (parsed === 0n) {
-      setFeedback({ kind: "warn", text: t("swap.enterAmount") });
+      showStatus({ kind: "warn", phase: "failed", text: t("swap.enterAmount") });
       return;
     }
     if (hopMode && hopOut == null) {
-      setFeedback({ kind: "warn", text: t("swap.quotePending") });
+      showStatus({ kind: "warn", phase: "failed", text: t("swap.quotePending") });
       return;
     }
-    setFeedback({
+    showStatus({
       kind: "info",
+      phase: "processing",
       text: mode === "buy" ? t("swap.waitWalletBuy") : t("swap.waitWalletSell"),
     });
+    setSettledHash(null);
     reset();
     setPendingAction(mode === "buy" ? "buy" : "sell");
 
@@ -273,7 +295,7 @@ export default function SwapPage() {
         });
       } catch (e) {
         setPendingAction(null);
-        setFeedback({ kind: "warn", text: formatTxError(e, locale) });
+        showStatus({ kind: "warn", phase: "failed", text: formatTxError(e, locale) });
         return;
       }
     }
@@ -288,9 +310,11 @@ export default function SwapPage() {
   }
 
   useEffect(() => {
-    if (isPending && pendingAction) {
-      setFeedback({
+    if (!pendingAction) return;
+    if (isPending) {
+      showStatus({
         kind: "info",
+        phase: "processing",
         text:
           pendingAction === "approve"
             ? t("swap.waitWalletApprove")
@@ -298,20 +322,27 @@ export default function SwapPage() {
               ? t("swap.waitWalletBuy")
               : t("swap.waitWalletSell"),
       });
-    } else if (confirming && pendingAction && hash) {
-      setFeedback({ kind: "info", text: t("swap.confirmingOnChain"), hash });
+    } else if (confirming && hash) {
+      showStatus({
+        kind: "info",
+        phase: "processing",
+        text: t("swap.confirmingOnChain"),
+        hash,
+      });
     }
   }, [isPending, confirming, pendingAction, hash, t]);
 
   useEffect(() => {
     if (!isSuccess || !pendingAction || !hash) return;
+    if (settledHash && settledHash.toLowerCase() === hash.toLowerCase()) return;
+
     const rewardHint = fmtToken(selfReward);
     let text =
       pendingAction === "approve"
         ? t("swap.approveOk")
         : pendingAction === "buy"
           ? t("swap.buyOkDetail", { reward: rewardHint, token: rewardLabel })
-          : t("swap.sellOkDetail", { reward: rewardHint, token: rewardLabel });
+          : t("swap.sellOkDetail");
 
     if (receipt?.logs?.length) {
       try {
@@ -342,7 +373,9 @@ export default function SwapPage() {
       }
     }
 
-    setFeedback({ kind: "ok", text, hash });
+    setSettledHash(hash);
+    showStatus({ kind: "ok", phase: "success", text, hash });
+    // Keep pendingAction so a later wagmi reset cannot blank the outcome mapping.
     void refetchPayAllowance();
     void refetchTokenAllowance();
     void refetchTokenBal();
@@ -353,6 +386,7 @@ export default function SwapPage() {
     isSuccess,
     pendingAction,
     hash,
+    settledHash,
     receipt,
     selfReward,
     paymentLabel,
@@ -367,8 +401,19 @@ export default function SwapPage() {
 
   useEffect(() => {
     if (!error) return;
-    setFeedback({ kind: "warn", text: formatTxError(error, locale) });
+    showStatus({ kind: "warn", phase: "failed", text: formatTxError(error, locale) });
   }, [error, locale]);
+
+  useEffect(() => {
+    if (!receiptError || !hash) return;
+    if (settledHash && settledHash.toLowerCase() === hash.toLowerCase()) return;
+    showStatus({
+      kind: "warn",
+      phase: "failed",
+      text: formatTxError(new Error("Transaction reverted on-chain"), locale),
+      hash,
+    });
+  }, [receiptError, hash, settledHash, locale]);
 
   const ctaLabel = busy
     ? isPending
@@ -391,39 +436,49 @@ export default function SwapPage() {
         <button
           type="button"
           className={mode === "buy" ? "seg-btn on-buy" : "seg-btn"}
-          onClick={() => {
-            setMode("buy");
-            setPendingAction(null);
-            reset();
-          }}
+          onClick={() => setMode("buy")}
         >
           {t("swap.buy")}
         </button>
         <button
           type="button"
           className={mode === "sell" ? "seg-btn on-sell" : "seg-btn"}
-          onClick={() => {
-            setMode("sell");
-            setPendingAction(null);
-            reset();
-          }}
+          onClick={() => setMode("sell")}
         >
           {t("swap.sell")}
         </button>
       </div>
 
       <div className={`card swap-card ${mode}`}>
-        {feedback && (
-          <div className={`banner ${feedback.kind === "ok" ? "ok" : feedback.kind === "warn" ? "warn" : ""}`} role="status">
-            <p style={{ margin: 0 }}>{feedback.text}</p>
-            {feedback.hash && (
-              <p style={{ margin: "0.35rem 0 0" }}>
-                <a
-                  href={`https://bscscan.com/tx/${feedback.hash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "inherit", textDecoration: "underline" }}
+        {txStatus && (
+          <div
+            className={`swap-status ${txStatus.kind}`}
+            role="status"
+            aria-live="polite"
+            data-phase={txStatus.phase}
+          >
+            <div className="swap-status-head">
+              <span className="swap-status-phase">
+                {txStatus.phase === "success"
+                  ? t("swap.statusSuccess")
+                  : txStatus.phase === "failed"
+                    ? t("swap.statusFailed")
+                    : t("swap.statusProcessing")}
+              </span>
+              {(txStatus.phase === "success" || txStatus.phase === "failed") && (
+                <button
+                  type="button"
+                  className="swap-status-dismiss"
+                  onClick={() => setTxStatus(null)}
                 >
+                  {t("swap.statusDismiss")}
+                </button>
+              )}
+            </div>
+            <p className="swap-status-body">{txStatus.text}</p>
+            {txStatus.hash && (
+              <p className="swap-status-link">
+                <a href={`https://bscscan.com/tx/${txStatus.hash}`} target="_blank" rel="noreferrer">
                   {t("swap.viewTx")}
                 </a>
               </p>

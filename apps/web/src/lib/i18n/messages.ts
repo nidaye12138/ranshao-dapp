@@ -151,6 +151,10 @@ export type MessageTree = {
     waitWalletSell: string;
     waitingWallet: string;
     confirmingOnChain: string;
+    statusProcessing: string;
+    statusSuccess: string;
+    statusFailed: string;
+    statusDismiss: string;
     viewTx: string;
     historyTitle: string;
     historyNote: string;
@@ -510,8 +514,12 @@ export const messages: Record<Locale, MessageTree> = {
       waitWalletApprove: "请在钱包弹窗中确认「授权」（Approve）。未弹窗请检查钱包 App / 浏览器插件。",
       waitWalletBuy: "请在钱包弹窗中确认「买入」交易。未弹窗请检查钱包，勿重复狂点。",
       waitWalletSell: "请在钱包弹窗中确认「卖出」交易。未弹窗请检查钱包，勿重复狂点。",
-      waitingWallet: "等待钱包确认…",
-      confirmingOnChain: "已提交，正在等待链上确认…",
+      waitingWallet: "处理中：等待钱包确认…",
+      confirmingOnChain: "处理中：已提交，正在等待链上确认…",
+      statusProcessing: "处理中",
+      statusSuccess: "成功",
+      statusFailed: "处理失败",
+      statusDismiss: "知道了",
       viewTx: "在 BscScan 查看交易 →",
       historyTitle: "成交记录（链上）",
       historyNote: "直接读取 Swap 合约事件，不依赖索引。买入直推 0.5% UMplan 已链上结算；卖出无即时奖。",
@@ -885,8 +893,12 @@ export const messages: Record<Locale, MessageTree> = {
       waitWalletApprove: "Confirm Approve in your wallet popup. If none appears, check the wallet app/extension.",
       waitWalletBuy: "Confirm the buy in your wallet. If no popup, check the wallet — don’t spam-tap.",
       waitWalletSell: "Confirm the sell in your wallet. If no popup, check the wallet — don’t spam-tap.",
-      waitingWallet: "Waiting for wallet…",
-      confirmingOnChain: "Submitted — waiting for on-chain confirmation…",
+      waitingWallet: "Processing: waiting for wallet…",
+      confirmingOnChain: "Processing: submitted — waiting for on-chain confirmation…",
+      statusProcessing: "Processing",
+      statusSuccess: "Success",
+      statusFailed: "Failed",
+      statusDismiss: "Got it",
       viewTx: "View on BscScan →",
       historyTitle: "Trade history (on-chain)",
       historyNote: "Read from Swap events (no indexer). Buy referrer 0.5% UMplan is on-chain; sells have no instant rebate.",
