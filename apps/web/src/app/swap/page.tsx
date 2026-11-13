@@ -8,7 +8,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { zeroAddress } from "viem";
+import { maxUint256, zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { quoteUmplanToUsdt, quoteUsdtToUmplan } from "@/lib/dexQuote";
@@ -21,6 +21,9 @@ import { useI18n } from "@/lib/i18n";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 import { bsc } from "viem/chains";
+
+/** One-time max allowance so later trades skip approve (ERC-20 still requires the first). */
+const APPROVE_MAX = maxUint256;
 
 type Mode = "buy" | "sell";
 type PendingAction = "approve" | "buy" | "sell" | null;
@@ -183,7 +186,7 @@ export default function SwapPage() {
       address: spendToken,
       abi: ERC20Abi,
       functionName: "approve",
-      args: [addresses.swap, parsed],
+      args: [addresses.swap, APPROVE_MAX],
       chainId: appChainId,
     });
   }
