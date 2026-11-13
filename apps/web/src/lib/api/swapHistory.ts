@@ -238,12 +238,17 @@ export async function fetchSwapHistory(address: string): Promise<SwapHistoryResp
   };
 }
 
-/** Map chain swap history into Mine 「Swap 推广奖励」 rows (buy referrer 0.5%; sells emit 0). */
+/**
+ * Map chain swap history into Mine 「Swap 推广奖励」 rows.
+ * Buy-only: sells have no instant rebate — never list「卖出（无即时奖）」.
+ */
 export function historyToSwapPromoRows(history: SwapHistoryResponse): EarningsRow[] {
-  return history.rows.map((r) => ({
-    id: r.id,
-    label: r.side === "BUY" ? "买入直推奖" : "卖出（无即时奖）",
-    amount: r.selfReward,
-    at: r.at,
-  }));
+  return history.rows
+    .filter((r) => r.side === "BUY")
+    .map((r) => ({
+      id: r.id,
+      label: "买入直推奖",
+      amount: r.selfReward,
+      at: r.at,
+    }));
 }

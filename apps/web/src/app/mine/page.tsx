@@ -113,10 +113,14 @@ export default function MinePage() {
       return { total: "—", unit: "UMplan", rows: [] as { id: string; label: string; amount: string; at: string }[] };
     }
     if (incomeTab === "swap") {
+      // Sell has no instant rebate — never show「卖出（无即时奖）」even from stale API.
+      const swapRows = (earnings.swapPromoRows ?? []).filter(
+        (row) => !/卖出|sell/i.test(row.label),
+      );
       return {
         total: earnings.swapPromoTotal ?? "—",
         unit: "USDT",
-        rows: (earnings.swapPromoRows ?? []).map((row) => ({
+        rows: swapRows.map((row) => ({
           ...row,
           label: localizeLayerLabel(row.label, locale),
         })),

@@ -95,9 +95,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await chainSwapFallback(address, { ...empty(address), source: "graph" }));
   }
 
-  const swapPromoRows: EarningsRow[] = a.swapRewards.map((r) => ({
+  // Sell has no instant rebate — omit SELL from Mine 「Swap 推广奖励」.
+  const swapRewardsBuyOnly = a.swapRewards.filter((r) => r.side !== "SELL");
+  const swapPromoRows: EarningsRow[] = swapRewardsBuyOnly.map((r) => ({
     id: r.id,
-    label: r.role === "self" ? (r.side === "SELL" ? "卖出（无即时奖）" : "买入直推奖") : "直推",
+    label: r.role === "self" ? "买入直推奖" : "直推",
     amount: formatTokenRaw(r.rewardAmount, "USDT"),
     at: tsToLocal(r.timestamp),
   }));
@@ -124,7 +126,7 @@ export async function GET(req: NextRequest) {
   let body: EarningsResponse = {
     source: "graph",
     address: a.id,
-    swapPromoTotal: formatTokenRaw(sum(a.swapRewards.map((r) => r.rewardAmount)), "USDT"),
+    swapPromoTotal: formatTokenRaw(sum(swapRewardsBuyOnly.map((r) => r.rewardAmount)), "USDT"),
     swapPromoRows,
     layerTotal: {
       直推: formatTokenRaw(sum(l1), "UMplan"),
