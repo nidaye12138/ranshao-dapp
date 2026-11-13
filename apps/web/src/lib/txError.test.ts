@@ -15,6 +15,11 @@ describe("formatTxError", () => {
     assert.doesNotMatch(msg, /Testnet|Chapel/);
   });
 
+  it("maps TokenPocket cannot-estimate-gas to allowance copy", () => {
+    const msg = formatTxError(new Error("合约错误，无法预估 Gas"));
+    assert.match(msg, /授权/);
+  });
+
   it("maps unknown RPC without Chapel wording", () => {
     const err = Object.assign(new Error("An unknown RPC error occurred."), {
       shortMessage: "An unknown RPC error occurred.",

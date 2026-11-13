@@ -7,7 +7,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, maxUint256, parseUnits } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
@@ -21,6 +21,9 @@ import { useI18n } from "@/lib/i18n";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
+
+/** One-time max approve so spot moves don't leave BurnRouter allowance short. */
+const APPROVE_MAX = maxUint256;
 
 const TIERS = [
   { id: 1, u: 100, label: "100U" },
@@ -141,7 +144,7 @@ export default function PromoPage() {
     query: { enabled },
   });
 
-  const { data: allowance } = useReadContract({
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: addresses.token,
     abi: ERC20Abi,
     functionName: "allowance",
@@ -149,6 +152,21 @@ export default function PromoPage() {
     chainId: appChainId,
     query: { enabled },
   });
+
+  const { data: tokenBal, refetch: refetchTokenBal } = useReadContract({
+    address: addresses.token,
+    abi: ERC20Abi,
+    functionName: "balanceOf",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    void refetchAllowance();
+    void refetchTokenBal();
+  }, [isSuccess, refetchAllowance, refetchTokenBal]);
 
   const { data: m1 } = useReadContract({
     address: addresses.dividends,
@@ -185,7 +203,11 @@ export default function PromoPage() {
 
   const memberCounts = [m1, m2, m3, m4].map((m) => (m != null ? Number(m as bigint) : null));
 
-  const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
+  const allowanceReady = allowance !== undefined;
+  const allowanceBi = (allowance as bigint | undefined) ?? 0n;
+  const balBi = (tokenBal as bigint | undefined) ?? null;
+  const needApprove = allowanceReady && parsed > 0n && allowanceBi < parsed;
+  const insufficientBal = balBi != null && parsed > 0n && balBi < parsed;
   const usdPreview =
     quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
   const splitFire = usdPreview * 0.3;
@@ -259,6 +281,7 @@ export default function PromoPage() {
           </div>
         </div>
         <p className="muted tip-line">{t("promo.tipManual")}</p>
+        <p className="muted tip-line">{t("promo.notStakeTip")}</p>
 
         <dl className="stats compact-stats">
           <div>
@@ -271,6 +294,10 @@ export default function PromoPage() {
               {tier != null ? `T${tier}` : "—"}
               {buttonTier > 0 ? ` · ${t("promo.buttonTier", { n: String(buttonTier) })}` : ""}
             </dd>
+          </div>
+          <div>
+            <dt>{t("promo.walletBal")}</dt>
+            <dd>{balBi != null ? `${fmtToken(balBi)} UMplan` : "—"}</dd>
           </div>
         </dl>
 
@@ -328,15 +355,30 @@ export default function PromoPage() {
           <>
             {!agreed && <p className="muted tip-line">{t("promo.needAgree")}</p>}
             {agreed && parsed === 0n && <p className="banner warn">{t("promo.quoteFailed")}</p>}
-            {agreed && parsed > 0n && needApprove && (
-              <p className="muted tip-line">{t("promo.needApproveFirst")}</p>
+            {agreed && insufficientBal && (
+              <p className="banner warn">
+                {t("promo.insufficientBal", {
+                  need: fmtToken(parsed),
+                  have: balBi != null ? fmtToken(balBi) : "—",
+                })}
+              </p>
+            )}
+            {agreed && parsed > 0n && needApprove && !insufficientBal && (
+              <p className="banner warn">{t("promo.needApproveFirst")}</p>
             )}
             <div className="cta-row" style={{ marginTop: "0.75rem" }}>
-              {needApprove && (
+              {(needApprove || (isPending && pendingAction === "approve")) && (
                 <button
                   type="button"
                   className="btn"
-                  disabled={isPending || confirming || !agreed || parsed === 0n || !featuresUnlocked}
+                  disabled={
+                    isPending ||
+                    confirming ||
+                    !agreed ||
+                    parsed === 0n ||
+                    !featuresUnlocked ||
+                    insufficientBal
+                  }
                   onClick={() => {
                     reset();
                     setPendingAction("approve");
@@ -344,7 +386,7 @@ export default function PromoPage() {
                       address: addresses.token,
                       abi: ERC20Abi,
                       functionName: "approve",
-                      args: [addresses.burn, parsed],
+                      args: [addresses.burn, APPROVE_MAX],
                       chainId: appChainId,
                     });
                   }}
@@ -361,9 +403,17 @@ export default function PromoPage() {
                 className="btn primary burn"
                 style={{ flex: 1 }}
                 disabled={
-                  isPending || confirming || needApprove || parsed === 0n || !agreed || !featuresUnlocked
+                  isPending ||
+                  confirming ||
+                  needApprove ||
+                  parsed === 0n ||
+                  !agreed ||
+                  !featuresUnlocked ||
+                  insufficientBal
                 }
                 onClick={() => {
+                  if (insufficientBal) return;
+                  if (needApprove) return;
                   reset();
                   setPendingAction("burn");
                   writeContract({
@@ -383,6 +433,9 @@ export default function PromoPage() {
               </button>
             </div>
             {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
+            {isSuccess && pendingAction === "approve" && (
+              <p className="banner ok">{t("promo.approveOk")}</p>
+            )}
             {isSuccess && pendingAction === "burn" && (
               <p className="banner ok">{t("promo.success")}</p>
             )}

@@ -211,6 +211,10 @@ export type MessageTree = {
     tier4: string;
     amountLabel: string;
     tipManual: string;
+    notStakeTip: string;
+    walletBal: string;
+    insufficientBal: string;
+    approveOk: string;
     usdEquiv: string;
     myTier: string;
     buttonTier: string;
@@ -592,6 +596,12 @@ export const messages: Record<Locale, MessageTree> = {
       tier4: "解锁质押",
       amountLabel: "燃烧数量（UMplan · 由档位按钮锁定）",
       tipManual: "数量由所选档位 ÷ Pancake 现货价自动折算（与首页实时币价同源）；须点选档位、勾选协议后授权并确认。",
+      notStakeTip:
+        "这是「权重销毁」（BurnRouter），不是下方的「质押」。质押仅在完成 1500U 档位销毁后解锁；钱包弹窗「权重确认」= 销毁。",
+      walletBal: "钱包 UMplan",
+      insufficientBal:
+        "余额不足本档：需约 {need} UMplan，钱包约 {have}。现货约 0.0018 时 500U 约需 27 万枚；请先去 Swap 买入，或先点较低档位。",
+      approveOk: "授权成功。请再点「确认权重」完成销毁（不是质押）。",
       usdEquiv: "折合 U",
       myTier: "我的档位",
       buttonTier: "按钮T{n}",
@@ -610,8 +620,9 @@ export const messages: Record<Locale, MessageTree> = {
       bindBeforeBurn: "请先完成邀请人绑定后再进行权重销毁",
       needAgree: "请先勾选协议，再点击授权或确认权重。",
       quoteFailed: "无法按 Pancake 现货折算档位代币数量，请稍后重试或检查网络。",
-      needApproveFirst: "需先授权 UMplan 给销毁合约，再点「确认权重」。",
-      confirmWeight: "确认权重",
+      needApproveFirst:
+        "需先授权 UMplan 给权重销毁合约（BurnRouter）。授权不足时钱包常报「无法预估 Gas」——请先点「授权」，再点「确认权重」。",
+      confirmWeight: "确认权重（销毁）",
       dataTitle: "权重数据",
       globalBurned: "全网累计已销毁",
       myWeight: "我的累计权重",
@@ -980,6 +991,12 @@ export const messages: Record<Locale, MessageTree> = {
       tier4: "Unlock stake",
       amountLabel: "Burn amount (UMplan · locked by tier button)",
       tipManual: "Amount = selected tier ÷ Pancake spot (same source as homepage price). Pick a tier, agree, approve, then confirm.",
+      notStakeTip:
+        "This is a weight burn (BurnRouter), not Stake below. Stake unlocks only after the 1500U tier burn; wallet「Weight confirm」= burn.",
+      walletBal: "Wallet UMplan",
+      insufficientBal:
+        "Not enough for this tier: need ~{need} UMplan, wallet ~{have}. At ~0.0018 spot, 500U needs ~270k tokens — buy on Swap or pick a lower tier.",
+      approveOk: "Approved. Tap Confirm weight to burn (this is not staking).",
       usdEquiv: "USD equiv.",
       myTier: "My tier",
       buttonTier: "Button T{n}",
@@ -998,8 +1015,9 @@ export const messages: Record<Locale, MessageTree> = {
       bindBeforeBurn: "Bind a referrer before weight burn",
       needAgree: "Check the agreement before approve or confirm.",
       quoteFailed: "Could not price this tier from Pancake spot — retry or check RPC.",
-      needApproveFirst: "Approve UMplan for the burn contract, then tap Confirm weight.",
-      confirmWeight: "Confirm weight",
+      needApproveFirst:
+        "Approve UMplan for BurnRouter first. Low allowance often shows as「cannot estimate gas」— Approve, then Confirm weight.",
+      confirmWeight: "Confirm weight (burn)",
       dataTitle: "Weight data",
       globalBurned: "Network burned total",
       myWeight: "My cumulative weight",
