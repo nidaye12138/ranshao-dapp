@@ -162,7 +162,7 @@ function HomeInner() {
           <span className="muted">{t("home.boardSub")}</span>
         </h2>
         <p className="muted source-line">
-          {board?.source === "graph"
+          {board?.source === "graph" || board?.source === "chain"
             ? t("home.boardByDirects")
             : board?.source === "unconfigured"
               ? t("home.boardUnconfigured")

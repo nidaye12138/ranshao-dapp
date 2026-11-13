@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAddress } from "viem";
+import { isAddress, type Address } from "viem";
 import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
 import { fetchSwapHistory } from "@/lib/api/swapHistory";
+import { fetchTeamDirectsFromChain } from "@/lib/api/teamChain";
 import type { TeamResponse } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,13 @@ export async function GET(req: NextRequest) {
   }
 
   if (!graphUrl()) {
-    return NextResponse.json(await withChainBuyVolume(address, empty(address)));
+    const base = empty(address);
+    const chainTeam = await fetchTeamDirectsFromChain(address as Address);
+    if (chainTeam.directs > 0) {
+      base.directs = chainTeam.directs;
+      base.source = "chain";
+    }
+    return NextResponse.json(await withChainBuyVolume(address, base));
   }
 
   const result = await graphQuery<{
