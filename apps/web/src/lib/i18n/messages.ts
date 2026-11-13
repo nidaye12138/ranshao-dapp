@@ -361,7 +361,7 @@ export const messages: Record<Locale, MessageTree> = {
       errInvalidRef: "请填写有效的邀请人地址",
       errUnconfigured: "合约未配置，无法绑定",
       errSelf: "不能绑定自己为邀请人",
-      errZeroGas: "钱包 BNB 余额为 0，无法支付 Gas。请先领取 Chapel（BSC Testnet）测试 BNB 后再绑定。",
+      errZeroGas: "钱包 BNB 余额为 0，无法支付 Gas。请确认 BNB Chain 主网并充入少量 BNB 后再绑定。",
     },
     coach: {
       kicker: "下一步 · 激活推广",
@@ -633,7 +633,7 @@ export const messages: Record<Locale, MessageTree> = {
     },
     tx: {
       insufficientGas:
-        "钱包 BNB 余额不足，无法支付 Gas。请先领取或转入 Chapel（BSC Testnet）测试 BNB 后再绑定。",
+        "钱包 BNB 不足以支付 Gas。请确认已切到 BNB Chain 主网（chainId 56），并充入少量 BNB。",
       rejected: "已取消交易。",
       alreadyBound: "该地址已绑定推荐关系，不可重复绑定。",
       self: "不能绑定自己为邀请人。",
@@ -641,9 +641,9 @@ export const messages: Record<Locale, MessageTree> = {
       zero: "邀请人地址无效。",
       cycle: "绑定会形成环路，请更换邀请人。",
       unknownRpc:
-        "交易未能提交（常见原因：BNB Gas 不足，或合约拒绝）。请确认已切到 BSC Testnet 且钱包有测试 BNB。",
-      wrongNetwork: "网络不正确，请切换到 BSC Testnet（Chapel，chainId 97）。",
-      bindFailed: "绑定失败，请稍后重试。若持续失败，请确认钱包有 Chapel 测试 BNB 并使用有效邀请链接。",
+        "交易未能提交（常见：BNB Gas 不足、未授权、或合约拒绝）。请确认 BNB Chain 主网，并查看是否需先授权。",
+      wrongNetwork: "网络不正确，请切换到 BNB Chain 主网（BSC，chainId 56）。",
+      bindFailed: "操作失败，请稍后重试。若持续失败，请确认主网 BNB 与授权状态。",
     },
   },
   en: {
@@ -712,7 +712,7 @@ export const messages: Record<Locale, MessageTree> = {
       errInvalidRef: "Enter a valid referrer address",
       errUnconfigured: "Contracts are not configured; binding is unavailable",
       errSelf: "You cannot bind yourself as referrer",
-      errZeroGas: "Wallet BNB balance is 0 — cannot pay gas. Get Chapel (BSC Testnet) test BNB, then bind.",
+      errZeroGas: "Wallet BNB balance is 0 — cannot pay gas. Use BNB Chain mainnet and hold a little BNB, then bind.",
     },
     coach: {
       kicker: "Next · Activate promo",
@@ -989,7 +989,7 @@ export const messages: Record<Locale, MessageTree> = {
     },
     tx: {
       insufficientGas:
-        "Not enough BNB for gas. Get or transfer Chapel (BSC Testnet) test BNB, then bind.",
+        "Not enough BNB for gas. Switch to BNB Chain mainnet (56) and hold a little BNB.",
       rejected: "Transaction cancelled.",
       alreadyBound: "This address already has a referrer and cannot rebind.",
       self: "You cannot bind yourself as referrer.",
@@ -997,10 +997,9 @@ export const messages: Record<Locale, MessageTree> = {
       zero: "Invalid referrer address.",
       cycle: "Binding would create a cycle. Choose another referrer.",
       unknownRpc:
-        "Transaction could not be submitted (often low BNB gas or a contract reject). Confirm BSC Testnet and test BNB.",
-      wrongNetwork: "Wrong network — switch to BSC Testnet (Chapel, chainId 97).",
-      bindFailed:
-        "Bind failed. Retry later. If it keeps failing, confirm Chapel test BNB and a valid invite link.",
+        "Transaction could not be submitted (gas, missing approve, or contract reject). Confirm BNB Chain mainnet.",
+      wrongNetwork: "Wrong network — switch to BNB Chain mainnet (BSC, chainId 56).",
+      bindFailed: "Action failed. Retry later; confirm mainnet BNB and token approval.",
     },
   },
 };

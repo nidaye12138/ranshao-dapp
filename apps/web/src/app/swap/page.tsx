@@ -160,9 +160,16 @@ export default function SwapPage() {
 
   const quote = mode === "buy" ? (buyQuote as [bigint, bigint] | undefined) : (sellQuote as [bigint, bigint] | undefined);
   const outAmount = hopMode ? hopOut : quote?.[0];
-  const usdAmount = hopMode ? parsed : quote?.[1];
-  const selfReward = (parsed * 50n) / 10_000n;
-  const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
+  // Buy: payment is USDT `parsed`. Sell: show hop USDT out (not UMplan amount mislabeled as USDT).
+  const usdAmount = hopMode
+    ? mode === "buy"
+      ? parsed
+      : hopOut
+    : quote?.[1];
+  const rewardBase = hopMode && mode === "sell" && hopOut != null ? hopOut : parsed;
+  const selfReward = (rewardBase * 50n) / 10_000n;
+  const allowanceBi = (allowance as bigint | undefined) ?? 0n;
+  const needApprove = allowanceBi < parsed;
   const feePreview = Number(amount || "0") * (FEE_PCT / 100);
 
   const bal = mode === "buy" ? (paymentBal as bigint | undefined) : (tokenBal as bigint | undefined);
@@ -336,7 +343,8 @@ export default function SwapPage() {
               <p className="muted tip-line">{t("swap.needApproveFirst")}</p>
             )}
             <div className="cta-row">
-              {needApprove ? (
+              {/* Always prefer Approve when allowance < amount — sell often failed as "confirm" with stale UI. */}
+              {needApprove || (isPending && pendingAction === "approve") ? (
                 <button
                   type="button"
                   className="btn primary"
