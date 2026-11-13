@@ -15,8 +15,8 @@ import { formatTokenRaw, tsToLocal } from "@/lib/api/graph";
 import type { EarningsRow } from "@/lib/api/types";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 
-/** Deploy block of live USDT-hop SwapFacade `0x7cdB…C27F` on BSC. */
-export const SWAP_HOP_START_BLOCK = 133_280_106n;
+/** Deploy block of live USDT-hop SwapFacade (UMplan rewards) `0x73CB…681D` on BSC. */
+export const SWAP_HOP_START_BLOCK = 133_310_411n;
 
 const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
