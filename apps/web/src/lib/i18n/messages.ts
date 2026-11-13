@@ -218,6 +218,7 @@ export type MessageTree = {
     tierUsed: string;
     allTiersDone: string;
     approveOk: string;
+    checkingAllowance: string;
     usdEquiv: string;
     myTier: string;
     buttonTier: string;
@@ -609,7 +610,8 @@ export const messages: Record<Locale, MessageTree> = {
         "余额不足本档：需约 {need} UMplan，钱包约 {have}。现货约 0.0018 时 500U 约需 27 万枚；请先去 Swap 买入，或先点较低档位。",
       tierUsed: "本档已购买过，同一钱包不可复购；请选择更高档位。",
       allTiersDone: "四个档位均已达成，无需再购。",
-      approveOk: "授权成功。请再点「确认权重」完成销毁（不是质押）。",
+      approveOk: "授权成功（一次即可，之后换档一般不用再授权）。请再点「确认权重」完成销毁（不是质押）。",
+      checkingAllowance: "正在检查授权额度…",
       usdEquiv: "折合 U",
       myTier: "我的档位",
       buttonTier: "按钮T{n}",
@@ -630,7 +632,7 @@ export const messages: Record<Locale, MessageTree> = {
       needAgree: "请先勾选协议，再点击授权或确认权重。",
       quoteFailed: "无法按 Pancake 现货折算档位代币数量，请稍后重试或检查网络。",
       needApproveFirst:
-        "需先授权 UMplan 给权重销毁合约（BurnRouter）。授权不足时钱包常报「无法预估 Gas」——请先点「授权」，再点「确认权重」。",
+        "需先授权 UMplan 给权重销毁合约（一次即可）。请先点「授权」，授权成功后再点「确认权重」。",
       confirmWeight: "确认权重（销毁）",
       dataTitle: "权重数据",
       globalBurned: "全网累计已销毁",
@@ -1009,7 +1011,8 @@ export const messages: Record<Locale, MessageTree> = {
         "Not enough for this tier: need ~{need} UMplan, wallet ~{have}. At ~0.0018 spot, 500U needs ~270k tokens — buy on Swap or pick a lower tier.",
       tierUsed: "This tier was already purchased for this wallet; pick a higher tier.",
       allTiersDone: "All four tiers already reached — nothing left to buy.",
-      approveOk: "Approved. Tap Confirm weight to burn (this is not staking).",
+      approveOk: "Approved (usually once — later tiers skip approve). Tap Confirm weight to burn (not staking).",
+      checkingAllowance: "Checking allowance…",
       usdEquiv: "USD equiv.",
       myTier: "My tier",
       buttonTier: "Button T{n}",
@@ -1030,7 +1033,7 @@ export const messages: Record<Locale, MessageTree> = {
       needAgree: "Check the agreement before approve or confirm.",
       quoteFailed: "Could not price this tier from Pancake spot — retry or check RPC.",
       needApproveFirst:
-        "Approve UMplan for BurnRouter first. Low allowance often shows as「cannot estimate gas」— Approve, then Confirm weight.",
+        "Approve UMplan for BurnRouter first (once is enough). Tap Approve, then Confirm weight.",
       confirmWeight: "Confirm weight (burn)",
       dataTitle: "Weight data",
       globalBurned: "Network burned total",

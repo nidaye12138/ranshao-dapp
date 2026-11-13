@@ -235,8 +235,11 @@ export default function PromoPage() {
   const allowanceReady = allowance !== undefined;
   const allowanceBi = (allowance as bigint | undefined) ?? 0n;
   const balBi = (tokenBal as bigint | undefined) ?? null;
+  /** Max approve once → later burns skip 授权 (same UX as Swap). */
   const needApprove = allowanceReady && parsed > 0n && allowanceBi < parsed;
   const insufficientBal = balBi != null && parsed > 0n && balBi < parsed;
+  const busy = isPending || confirming;
+  const showApproveCta = needApprove || (busy && pendingAction === "approve");
   const usdPreview =
     quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
   const splitFire = usdPreview * 0.3;
@@ -407,17 +410,24 @@ export default function PromoPage() {
                 })}
               </p>
             )}
-            {agreed && !tierAlreadyOwned && parsed > 0n && needApprove && !insufficientBal && (
-              <p className="banner warn">{t("promo.needApproveFirst")}</p>
+            {agreed && !tierAlreadyOwned && !allowanceReady && parsed > 0n && (
+              <p className="muted tip-line">{t("promo.checkingAllowance")}</p>
             )}
+            {agreed &&
+              !tierAlreadyOwned &&
+              needApprove &&
+              parsed > 0n &&
+              !insufficientBal && (
+                <p className="banner warn">{t("promo.needApproveFirst")}</p>
+              )}
             <div className="cta-row" style={{ marginTop: "0.75rem" }}>
-              {(needApprove || (isPending && pendingAction === "approve")) && (
+              {showApproveCta ? (
                 <button
                   type="button"
-                  className="btn"
+                  className="btn primary"
+                  style={{ flex: 1 }}
                   disabled={
-                    isPending ||
-                    confirming ||
+                    busy ||
                     !agreed ||
                     parsed === 0n ||
                     !featuresUnlocked ||
@@ -436,46 +446,48 @@ export default function PromoPage() {
                     });
                   }}
                 >
-                  {isPending || confirming
-                    ? pendingAction === "approve"
-                      ? t("common.confirming")
-                      : t("common.approve")
+                  {busy
+                    ? isPending
+                      ? t("swap.waitingWallet")
+                      : t("common.confirming")
                     : t("common.approve")}
                 </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn primary burn"
+                  style={{ flex: 1 }}
+                  disabled={
+                    busy ||
+                    !allowanceReady ||
+                    parsed === 0n ||
+                    !agreed ||
+                    !featuresUnlocked ||
+                    insufficientBal ||
+                    tierAlreadyOwned
+                  }
+                  onClick={() => {
+                    if (insufficientBal || tierAlreadyOwned || needApprove) return;
+                    reset();
+                    setPendingAction("burn");
+                    writeContract({
+                      address: addresses.burn,
+                      abi: BurnAbi,
+                      functionName: "burnTier",
+                      args: [selected.id],
+                      chainId: appChainId,
+                    });
+                  }}
+                >
+                  {busy
+                    ? isPending
+                      ? t("swap.waitingWallet")
+                      : t("common.confirming")
+                    : !allowanceReady
+                      ? t("promo.checkingAllowance")
+                      : t("promo.confirmWeight")}
+                </button>
               )}
-              <button
-                type="button"
-                className="btn primary burn"
-                style={{ flex: 1 }}
-                disabled={
-                  isPending ||
-                  confirming ||
-                  needApprove ||
-                  parsed === 0n ||
-                  !agreed ||
-                  !featuresUnlocked ||
-                  insufficientBal ||
-                  tierAlreadyOwned
-                }
-                onClick={() => {
-                  if (insufficientBal || tierAlreadyOwned || needApprove) return;
-                  reset();
-                  setPendingAction("burn");
-                  writeContract({
-                    address: addresses.burn,
-                    abi: BurnAbi,
-                    functionName: "burnTier",
-                    args: [selected.id],
-                    chainId: appChainId,
-                  });
-                }}
-              >
-                {isPending || confirming
-                  ? pendingAction === "burn"
-                    ? t("common.confirming")
-                    : t("promo.confirmWeight")
-                  : t("promo.confirmWeight")}
-              </button>
             </div>
             {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
             {isSuccess && pendingAction === "approve" && (
