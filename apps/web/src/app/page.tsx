@@ -14,7 +14,7 @@ import { useLeaderboard, useStats } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
-const TOKEN_SUPPLY = 10_000_000;
+const TOKEN_SUPPLY = 1_000_000_000;
 
 export default function HomePage() {
   return (
