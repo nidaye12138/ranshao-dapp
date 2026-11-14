@@ -467,7 +467,7 @@ export const messages: Record<Locale, MessageTree> = {
         {
           id: "s3",
           title: "通缩模型 · 权重销毁",
-          subtitle: "权重订单 30% 销毁 / 50% 市场奖励桶 / 15% 股东 / 5% 变异沉淀池",
+          subtitle: "权重订单 30% 销毁 / 50% 市场奖励桶 / 15% 股东 / 5% 沉淀分红池",
           tone: "b3",
         },
       ],
@@ -491,7 +491,7 @@ export const messages: Record<Locale, MessageTree> = {
       ],
       rules: [
         "手续费：买入 / 卖出交易收取手续费，协议约定最低 3%，系统参数当前默认 3.5%。",
-        "权重分配：权重订单资金按合约固定比例自动执行：30% 打入销毁地址、50% 市场奖励桶、15% 股东、5% 变异沉淀池。",
+        "权重分配：权重订单资金按合约固定比例自动执行：30% 打入销毁地址、50% 市场奖励桶、15% 股东、5% 沉淀分红池。",
         "质押分红：达成第四档 15U 解锁质押权益，质押 UMplan 获得分红配额，分红以 UMplan 币量发放。公式：百 5 总释放量 ÷ 全网总质押 = 每币分红。",
         "币种口径：推广类代币奖励、质押分红均以 UMplan 发放；完成权重销毁后，按所达档位享受对应档次的 SPCXB 分红。",
         "推广奖励：达到 1U 门槛解锁推广资格后，享受直推、间推与市场奖励（直推、间推以外的团队成员统称市场；市场按每层 10% 口径）；买入另享直推 0.5% 即时到账，卖出无即时奖。",
@@ -624,7 +624,7 @@ export const messages: Record<Locale, MessageTree> = {
       splitMarketPct: "50% · 桶内再分直推 / 间推 / 市场",
       splitShare: "股东分红",
       splitSharePct: "15% · 股东池（与 SPCXB 四档分红分属不同模块）",
-      splitPrecip: "变异沉淀池",
+      splitPrecip: "沉淀分红池",
       splitPrecipPct: "5% · UMplan 沉淀 / 分红储备",
       agree:
         "我已阅读并同意《权重销毁协议》，确认后从钱包扣除所选档位等值 UMplan 并调用合约，需在钱包中授权签名。资金按合约约定比例销毁与分配，不可撤回。",
@@ -637,7 +637,7 @@ export const messages: Record<Locale, MessageTree> = {
       dataTitle: "权重数据",
       globalBurned: "全网累计已销毁",
       myWeight: "我的累计权重",
-      noteSplit: "权重订单资金按 30% 销毁 / 50% 市场奖励桶 / 15% 股东 / 5% 变异沉淀池自动执行。",
+      noteSplit: "权重订单资金按 30% 销毁 / 50% 市场奖励桶 / 15% 股东 / 5% 沉淀分红池自动执行。",
       noteFee: "买卖手续费（最低 3%、默认 3.5%）属交易费用，不计入权重销毁。",
       notePublic: "销毁地址链上公开可查。",
       earningsTitle: "推广收益",
@@ -867,7 +867,7 @@ export const messages: Record<Locale, MessageTree> = {
         {
           id: "s3",
           title: "Deflation · weight burn",
-          subtitle: "Weight orders: 30% burn · 50% market bucket · 15% shareholders · 5% precip pool",
+          subtitle: "Weight orders: 30% burn · 50% market bucket · 15% shareholders · 5% sediment dividend pool",
           tone: "b3",
         },
       ],
@@ -891,7 +891,7 @@ export const messages: Record<Locale, MessageTree> = {
       ],
       rules: [
         "Fees: buy/sell trades charge a fee — protocol floor 3%, current product default 3.5%.",
-        "Weight split: each weight order runs fixed on-chain shares — 30% burn sink, 50% market-reward bucket, 15% shareholders, 5% precip pool.",
+        "Weight split: each weight order runs fixed on-chain shares — 30% burn sink, 50% market-reward bucket, 15% shareholders, 5% sediment dividend pool.",
         "Stake dividends: completing the 15U tier unlocks staking. Stake UMplan for a share of the pool; dividends are paid in UMplan. Formula: 「百5」 total release ÷ network stake = per-token dividend.",
         "Assets: promo token rewards and stake dividends are UMplan; after a weight burn you earn SPCXB dividends for your highest reached tier pool.",
         "Promo: after the 1U threshold unlocks invite links, you earn Direct, Indirect, and Market rewards (team beyond Direct/Indirect is Market — marketed as market 10% per layer). Buys pay 0.5% to direct instantly; sells have no instant rebate.",
@@ -1025,7 +1025,7 @@ export const messages: Record<Locale, MessageTree> = {
       splitMarketPct: "50% · bucket then Direct / Indirect / Market",
       splitShare: "Shareholders",
       splitSharePct: "15% · shareholder pool (separate from SPCXB four-tier dividends)",
-      splitPrecip: "Precip pool",
+      splitPrecip: "Sediment dividend pool",
       splitPrecipPct: "5% · UMplan sedimentation / dividend reserve",
       agree:
         "I have read the Weight Burn Agreement. Confirming deducts tier-equivalent UMplan and calls the contract (wallet signature required). Funds follow contract shares and cannot be reversed.",
@@ -1038,7 +1038,7 @@ export const messages: Record<Locale, MessageTree> = {
       dataTitle: "Weight data",
       globalBurned: "Network burned total",
       myWeight: "My cumulative weight",
-      noteSplit: "Weight orders auto-run 30% burn / 50% market bucket / 15% shareholders / 5% precip pool.",
+      noteSplit: "Weight orders auto-run 30% burn / 50% market bucket / 15% shareholders / 5% sediment dividend pool.",
       noteFee: "Trade fees (floor 3%, default 3.5%) are trading costs — not part of weight burn.",
       notePublic: "Burn sink address is public on-chain.",
       earningsTitle: "Promo earnings",
