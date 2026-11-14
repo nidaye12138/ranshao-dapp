@@ -174,7 +174,7 @@ function pushBoughtLogs(
       buyer: key,
       tokenAmount: delivered.toString(),
       block: Number(log.blockNumber ?? 0),
-      tx: log.transactionHash,
+      tx: log.transactionHash ?? undefined,
       swap: swap.toLowerCase(),
     });
   }
