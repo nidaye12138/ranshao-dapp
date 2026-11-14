@@ -20,6 +20,8 @@ import {
 import { serverBscLogsRpcCandidates } from "@/lib/api/serverBscRpc";
 import type { EarningsRow } from "@/lib/api/types";
 
+// LayerEarningsRow is structurally compatible with EarningsRow.
+
 /** ReferralTree / modules deploy on BSC — LayerPaid cannot predate this. */
 const LAYER_START_BLOCK = 133_139_300n;
 
