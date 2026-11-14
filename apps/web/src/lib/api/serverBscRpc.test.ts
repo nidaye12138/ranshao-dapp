@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { serverBscRpcCandidates } from "./serverBscRpc.ts";
+import { serverBscLogsRpcCandidates, serverBscRpcCandidates } from "./serverBscRpc.ts";
 
 describe("serverBscRpcCandidates", () => {
   it("puts publicnode after non-publicnode URLs and includes bnbchain seeds", () => {
@@ -19,6 +19,19 @@ describe("serverBscRpcCandidates", () => {
       else process.env.BSC_RPC_URL = prevBsc;
       if (prevPub === undefined) delete process.env.NEXT_PUBLIC_BSC_RPC_URL;
       else process.env.NEXT_PUBLIC_BSC_RPC_URL = prevPub;
+    }
+  });
+
+  it("prefers logs-capable RPCs for eth_getLogs", () => {
+    const prev = process.env.LEADERBOARD_LOGS_RPC;
+    process.env.LEADERBOARD_LOGS_RPC = "https://rpc-bsc.48.club";
+    try {
+      const list = serverBscLogsRpcCandidates();
+      assert.equal(list[0], "https://rpc-bsc.48.club");
+      assert.ok(list.some((u) => /publicnode/i.test(u)));
+    } finally {
+      if (prev === undefined) delete process.env.LEADERBOARD_LOGS_RPC;
+      else process.env.LEADERBOARD_LOGS_RPC = prev;
     }
   });
 });
