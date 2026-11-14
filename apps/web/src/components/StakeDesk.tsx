@@ -94,14 +94,6 @@ export function StakeDesk() {
     query: { enabled },
   });
 
-  const { data: rewardToken } = useReadContract({
-    address: addresses.elite,
-    abi: EliteAbi,
-    functionName: "rewardToken",
-    chainId: appChainId,
-    query: { enabled: mounted && eliteReady },
-  });
-
   const { data: tokenBal } = useReadContract({
     address: addresses.token,
     abi: ERC20Abi,
@@ -142,14 +134,12 @@ export function StakeDesk() {
       ? (Number(previewStake) / Number(previewTotal)) * 100
       : 0;
 
-  const rewardLabel =
-    rewardToken && typeof rewardToken === "string"
-      ? rewardToken.toLowerCase() === addresses.spcxb.toLowerCase()
-        ? "SPCXB"
-        : rewardToken.toLowerCase() === addresses.token.toLowerCase()
-          ? "UMplan"
-          : t("common.rewardTokenFallback")
-      : t("common.rewardTokenFallback");
+  /**
+   * Product rule: stake dividends are UMplan (principal + rewards).
+   * Do not surface EliteStake.rewardToken() here — live deploy still points at SPCXB,
+   * which wrongly produced「预估每期分红 (UMplan · 链上 SPCXB)」.
+   */
+  const rewardLabel = "UMplan";
 
   const estimateDisplay =
     stakedBn > 0n ? `${fmtToken(pendingBn)} ${rewardLabel}` : "—";
@@ -242,9 +232,7 @@ export function StakeDesk() {
             <i className="est-gem" aria-hidden>
               ◆
             </i>
-            {rewardLabel !== "UMplan"
-              ? t("stake.estimateOnChain", { token: rewardLabel })
-              : t("stake.estimateLabel")}
+            {t("stake.estimateLabel")}
           </span>
           <b className="quota-est">{estimateDisplay}</b>
         </div>
