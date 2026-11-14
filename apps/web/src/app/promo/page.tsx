@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccount,
   useReadContract,
@@ -11,6 +11,7 @@ import { formatUnits, maxUint256 } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
+import { inferPurchasedButtonTiers } from "@/lib/inferPurchasedTiers";
 import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useStats } from "@/lib/api/client";
@@ -96,6 +97,7 @@ export default function PromoPage() {
     effectiveTierRaw != null
       ? Number(effectiveTierRaw as number)
       : Math.max(myTier, buttonTier);
+  /** Locked for purchase (strict upgrade) — not the same as「已购」. */
   const tierAlreadyOwned = selectedTierId <= effectiveTier;
   const nextOpenTierId = effectiveTier < 4 ? effectiveTier + 1 : 0;
   const selected =
@@ -103,11 +105,29 @@ export default function PromoPage() {
     TIERS.find((tierItem) => tierItem.id === nextOpenTierId) ??
     TIERS[0];
 
+  /** User clicked a tier chip (including locked) for split preview. */
+  const userPickedTierRef = useRef(false);
   useEffect(() => {
-    if (nextOpenTierId > 0 && selectedTierId <= effectiveTier) {
+    userPickedTierRef.current = false;
+  }, [address]);
+
+  useEffect(() => {
+    if (userPickedTierRef.current) return;
+    if (effectiveTierRaw == null && buttonTierRaw == null && tier == null) return;
+    if (nextOpenTierId > 0) {
       setSelectedTierId(nextOpenTierId);
+    } else if (effectiveTier > 0) {
+      // All buttons locked (e.g. T4) — preview highest, not stuck on default 1U.
+      setSelectedTierId(effectiveTier);
     }
-  }, [effectiveTier, nextOpenTierId, selectedTierId]);
+  }, [
+    address,
+    buttonTierRaw,
+    effectiveTier,
+    effectiveTierRaw,
+    nextOpenTierId,
+    tier,
+  ]);
 
   const { data: parsedRaw } = useReadContract({
     address: addresses.burn,
@@ -136,6 +156,12 @@ export default function PromoPage() {
     chainId: appChainId,
     query: { enabled },
   });
+
+  const purchasedButtonTiers = useMemo(() => {
+    const burned =
+      myBurnedUsd != null ? Number(formatUnits(myBurnedUsd as bigint, 18)) : 0;
+    return inferPurchasedButtonTiers(buttonTier, burned);
+  }, [buttonTier, myBurnedUsd]);
 
   const { data: claimable } = useReadContract({
     address: addresses.dividends,
@@ -286,22 +312,33 @@ export default function PromoPage() {
 
         <div className="presets">
           {TIERS.map((tierItem) => {
-            const owned = tierItem.id <= effectiveTier;
+            const locked = tierItem.id <= effectiveTier;
+            const purchased = purchasedButtonTiers.has(tierItem.id);
+            const sub = purchased
+              ? t("promo.tierOwned")
+              : locked
+                ? t("promo.tierSkipped")
+                : tierSubs[tierItem.id];
             return (
               <button
                 key={tierItem.id}
                 type="button"
                 className={selectedTierId === tierItem.id ? "preset-btn on" : "preset-btn"}
-                disabled={owned}
-                aria-disabled={owned}
+                aria-disabled={locked}
+                title={
+                  locked
+                    ? purchased
+                      ? t("promo.tierOwned")
+                      : t("promo.tierSkipped")
+                    : undefined
+                }
                 onClick={() => {
-                  if (!owned) setSelectedTierId(tierItem.id);
+                  userPickedTierRef.current = true;
+                  setSelectedTierId(tierItem.id);
                 }}
               >
                 {tierItem.label}
-                <small>
-                  {owned ? t("promo.tierOwned") : tierSubs[tierItem.id]}
-                </small>
+                <small>{sub}</small>
               </button>
             );
           })}

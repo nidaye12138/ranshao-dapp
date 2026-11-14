@@ -222,6 +222,8 @@ export type MessageTree = {
     myTier: string;
     buttonTier: string;
     tierOwned: string;
+    /** Locked because a higher button was bought; this button was never paid. */
+    tierSkipped: string;
     splitTitle: string;
     contractTag: string;
     splitBurn: string;
@@ -618,6 +620,7 @@ export const messages: Record<Locale, MessageTree> = {
       myTier: "我的档位",
       buttonTier: "按钮T{n}",
       tierOwned: "已购",
+      tierSkipped: "已跳过",
       splitTitle: "扣除后资金分配预览",
       contractTag: "比例以合约参数为准",
       splitBurn: "权重销毁",
@@ -1022,6 +1025,7 @@ export const messages: Record<Locale, MessageTree> = {
       myTier: "My tier",
       buttonTier: "Button T{n}",
       tierOwned: "Owned",
+      tierSkipped: "Skipped",
       splitTitle: "Post-deduction allocation preview",
       contractTag: "Shares follow contract params",
       splitBurn: "Weight burn",
