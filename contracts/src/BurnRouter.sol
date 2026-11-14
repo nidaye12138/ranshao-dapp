@@ -14,7 +14,7 @@ import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
 import {Constants} from "./Constants.sol";
 
 /// @title Burn entry — gold-peg U tiering + 30/50/15/5 split.
-/// @dev Tier / activate / 1500U stake unlock only via `burnTier` (preset buttons).
+/// @dev Tier / activate / T4 (15U test / was 1500U) stake unlock only via `burnTier`.
 ///      Each wallet may purchase each tier at most once and only as a strict upgrade
 ///      (same or lower tier reverts). Buying a higher tier voids lower-pool membership
 ///      via DividendPools highest-tier-only (Q2). Free-amount `burn` still splits funds

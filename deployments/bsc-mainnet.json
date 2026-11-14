@@ -44,11 +44,11 @@
   "SwapFacadeUsdtHopPaymentRewardsPaused": "0x7cdB95aF2483B0e264355132dCb2FFcCc65BC27F",
   "SwapFacadeSpcxbDirect": "0xb7218002Ef918139d081fDFa2EabCA83D72574E5",
   "SwapFacadeInventoryPaused": "0x188cD8D1f2dD395f0779FFAb1f9e7833Fc17f58D",
-  "BurnRouter": "0xBED03529ecFf7406a9721a900de77d170d83C270",
+  "BurnRouter": "0xA4C75FC51B0f3B60053ca0dae55bC922C0454aFc",
   "BurnRouterPriorCumulative": "0x2b2439Bd7894C134b6Db3CbFEB9AE92278419E28",
   "LayerRewards": "0x53B854cE25E6dAa3BaCD8F3dced82FC6E6c7b79b",
   "PrecipitationPool": "0xC9e2111677a4d565743aA98f535819937054dB3A",
-  "DividendPools": "0x0F502BFf1D1e4E24dc3B73A62062B1d74f3161bb",
+  "DividendPools": "0xC9Dc470F2f9CDBcdfC56316516E66459D4a73265",
   "ShareholderPool": "0xF0206e493213CDC1288bAE8D12eEF3ff7654B1fE",
   "EliteStake": "0xdD5aA4E93719897528cDB4802B19A87026094dCE",
   "BrokerMarket": "0x752da0224E1E299D8409b48e3EacC8cDBff6d633",
@@ -72,10 +72,10 @@
       500
     ],
     "tierThresholdsU": [
-      100,
-      500,
-      800,
-      1500
+      1,
+      5,
+      8,
+      15
     ],
     "poolWeightBps": [
       3333,
@@ -90,5 +90,9 @@
     "notes": "SwapFacade/BurnRouter allow maxTransferTaxBps (mainnet default 300)."
   },
   "rpcHint": "https://bsc-dataseed.binance.org",
-  "explorer": "https://bscscan.com"
+  "explorer": "https://bscscan.com",
+  "BurnRouterPriorOncePerTier": "0xBED03529ecFf7406a9721a900de77d170d83C270",
+  "DividendPoolsPrior": "0x0F502BFf1D1e4E24dc3B73A62062B1d74f3161bb",
+  "testTiersDeployedAt": "2026-11-14",
+  "testTiersNote": "Weight burn tiers cut to 1/5/8/15 U for testing; DividendPools+BurnRouter redeployed."
 }

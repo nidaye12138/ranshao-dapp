@@ -18,7 +18,7 @@ import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
 /**
- * 1500U 质押台 — unlock after burnTier(4) / DividendPools.tierOf == 4.
+ * 15U (T4) 质押台 — unlock after burnTier(4) / DividendPools.tierOf == 4.
  * Wire: EliteStake (stake UMplan, dividends UMplan, 24h min, redeem / claim+extend).
  */
 export function StakeDesk() {

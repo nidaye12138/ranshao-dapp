@@ -5,8 +5,8 @@ import { useOnboarding } from "@/components/OnboardingProvider";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * Post-bind coach: activate 推广 via 100U 权重档 burnTier — not 质押.
- * 质押 unlocks only at 1500U. Zero UMplan → Swap buy CTA.
+ * Post-bind coach: activate 推广 via 1U 权重档 burnTier — not 质押.
+ * 质押 unlocks only at 15U (T4). Zero UMplan → Swap buy CTA.
  */
 export function ActivationCoach() {
   const { showCoach, dismissCoach, umplanBalance } = useOnboarding();

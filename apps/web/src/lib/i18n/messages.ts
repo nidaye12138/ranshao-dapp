@@ -413,11 +413,11 @@ export const messages: Record<Locale, MessageTree> = {
     },
     coach: {
       kicker: "下一步 · 激活推广",
-      title: "选择 100U 权重档并销毁",
-      body: "激活推广 = 在「权重」页用档位按钮完成至少 100U 的权重销毁（burnTier）。这不是质押；质押台仅在完成 1500U 档位销毁后解锁。",
+      title: "选择 1U 权重档并销毁",
+      body: "激活推广 = 在「权重」页用档位按钮完成至少 1U 的权重销毁（burnTier）。这不是质押；质押台仅在完成 15U 档位销毁后解锁。",
       zeroBal: "当前钱包 UMplan 余额为 0，请先在 Swap 买入后再回来激活。",
       goSwap: "去 Swap 买入",
-      goWeight: "去权重 · 选 100U 档",
+      goWeight: "去权重 · 选 1U 档",
       later: "稍后再说",
       foot: "激活后即可在「我的」生成邀请链接，发展直推成员。",
     },
@@ -482,19 +482,19 @@ export const messages: Record<Locale, MessageTree> = {
         },
         {
           id: "3",
-          text: "推广资格：在「权重」点选任意档位按钮燃烧（最低 100U）后解锁邀请链接——非累计买入。",
+          text: "推广资格：在「权重」点选任意档位按钮燃烧（最低 1U）后解锁邀请链接——非累计买入。",
         },
         {
           id: "4",
-          text: "1500U 档位按钮解锁质押台；最短 24h；分红以 UMplan 发放。",
+          text: "15U 档位按钮解锁质押台；最短 24h；分红以 UMplan 发放。",
         },
       ],
       rules: [
         "手续费：买入 / 卖出交易收取手续费，协议约定最低 3%，系统参数当前默认 3.5%。",
         "权重分配：权重订单资金按合约固定比例自动执行：30% 打入销毁地址、50% 市场奖励桶、15% 股东、5% 变异沉淀池。",
-        "质押分红：达成第四档 1500U 解锁质押权益，质押 UMplan 获得分红配额，分红以 UMplan 币量发放。公式：百 5 总释放量 ÷ 全网总质押 = 每币分红。",
+        "质押分红：达成第四档 15U 解锁质押权益，质押 UMplan 获得分红配额，分红以 UMplan 币量发放。公式：百 5 总释放量 ÷ 全网总质押 = 每币分红。",
         "币种口径：推广类代币奖励、质押分红均以 UMplan 发放；完成权重销毁后，按所达档位享受对应档次的 SPCXB 分红。",
-        "推广奖励：达到 100U 门槛解锁推广资格后，享受直推、间推与市场奖励（直推、间推以外的团队成员统称市场；市场按每层 10% 口径）；买入另享直推 0.5% 即时到账，卖出无即时奖。",
+        "推广奖励：达到 1U 门槛解锁推广资格后，享受直推、间推与市场奖励（直推、间推以外的团队成员统称市场；市场按每层 10% 口径）；买入另享直推 0.5% 即时到账，卖出无即时奖。",
       ],
     },
     swap: {
@@ -558,7 +558,7 @@ export const messages: Record<Locale, MessageTree> = {
     },
     stake: {
       title: "质押分红权益",
-      subtitle: "1500U 档按钮解锁 · 最短 24h",
+      subtitle: "15U 档按钮解锁 · 最短 24h",
       ruleFormula:
         "分红公式：百 5 的总释放量 ÷ 全网总质押量 = 每个质押币的分红（合约 notifyRelease × 5% / totalStaked）。",
       ruleExample:
@@ -570,8 +570,8 @@ export const messages: Record<Locale, MessageTree> = {
         "分红池来源：池内 UMplan 来自市场进单——每笔进单只按直推、间推、市场三档发放奖励；邀请链路中超出这三档范围、无对应奖励档次的应付部分，统一注入本池，按质押配额分配。",
       eliteMissing: "EliteStake 地址未配置（NEXT_PUBLIC_ELITE_ADDRESS）。UI 已就绪，待部署后接线。",
       locked:
-        "质押权益仅对完成 1500U 档位权重销毁的用户开放；当前未达成，下方质押按钮为灰色不可用，达成后自动点亮。手输金额不计入档位。",
-      unlocked: "1500U 档位已达成，质押权益已解锁，可自由选择质押数量。",
+        "质押权益仅对完成 15U 档位权重销毁的用户开放；当前未达成，下方质押按钮为灰色不可用，达成后自动点亮。手输金额不计入档位。",
+      unlocked: "15U 档位已达成，质押权益已解锁，可自由选择质押数量。",
       amountLabel: "质押数量（UMplan · 可自由选择）",
       shareLabel: "我的分红配额（占总质押）",
       estimateLabel: "预估每期分红（UMplan）",
@@ -602,12 +602,12 @@ export const messages: Record<Locale, MessageTree> = {
       amountLabel: "燃烧数量（UMplan · 由档位按钮锁定）",
       tipManual: "数量由所选档位 ÷ Pancake 现货价自动折算（与首页实时币价同源）；须点选档位、勾选协议后授权并确认。",
       notStakeTip:
-        "这是「权重销毁」（BurnRouter），不是下方的「质押」。质押仅在完成 1500U 档位销毁后解锁；钱包弹窗「权重确认」= 销毁。",
+        "这是「权重销毁」（BurnRouter），不是下方的「质押」。质押仅在完成 15U 档位销毁后解锁；钱包弹窗「权重确认」= 销毁。",
       tierOnceTip:
         "同一钱包每个档位只能购买一次，且只能升档（不可复购同档或低档）。买入更高档后，低档 SPCXB 分红权自动作废，只保留最高档。",
       walletBal: "钱包 UMplan",
       insufficientBal:
-        "余额不足本档：需约 {need} UMplan，钱包约 {have}。现货约 0.0018 时 500U 约需 27 万枚；请先去 Swap 买入，或先点较低档位。",
+        "余额不足本档：需约 {need} UMplan，钱包约 {have}。现货约 0.0018 时 5U 约需约 2.8 千枚；请先去 Swap 买入，或先点较低档位。",
       tierUsed: "本档已购买过，同一钱包不可复购；请选择更高档位。",
       allTiersDone: "四个档位均已达成，无需再购。",
       approveOk: "授权成功（一次即可，之后换档一般不用再授权）。请再点「确认权重」完成销毁（不是质押）。",
@@ -648,7 +648,7 @@ export const messages: Record<Locale, MessageTree> = {
       earnDirect: "直推：直推成员每笔买入 / 权重进单时，从市场奖励桶（占订单 50%）中按桶内 20%（=订单 10%）即时奖励给你。",
       earnIndirect: "间推：间推成员（即直推成员的直推）进单时，从市场奖励桶中按桶内 10%（=订单 5%）奖励给你。",
       earnMarket: "市场：直推、间推以外的团队成员统称市场；市场业绩按市场每层桶内 10%（=订单 5%）管理奖励口径。",
-      earnActivate: "任意档位按钮燃烧（≥100U）即激活，解锁邀请链接（见「我的」）— 非累计买入。",
+      earnActivate: "任意档位按钮燃烧（≥1U）即激活，解锁邀请链接（见「我的」）— 非累计买入。",
       poolsTitle: "SPCXB 档位分红",
       poolsSub: "成为对应池的分红股东 · 24h 冷却",
       poolOpen: "已达成档位 T{n}，成为对应池分红股东（最高档，不叠加；升档后低档分红权作废）。",
@@ -667,7 +667,7 @@ export const messages: Record<Locale, MessageTree> = {
       rule: "规则",
       perDay: "24h / 次",
       poolPctDoc:
-        "池占比：四个分红池合计分配总释放的 100% —— 100U 档池占 33.33%，500U 档池与 800U 档池各占 25%，1500U 档池占 16.67%。",
+        "池占比：四个分红池合计分配总释放的 100% —— 1U 档池占 33.33%，5U 档池与 8U 档池各占 25%，15U 档池占 16.67%。",
       poolShareDoc:
         "个人实得：你所在池的占比额度 ÷ 同池股东人数。达成哪档权重销毁，就成为哪档池的分红股东；同一钱包每档只能买一次，仅计入最高已达档位，升档后低档分红权作废、不叠加。",
       poolFairDoc:
@@ -694,14 +694,14 @@ export const messages: Record<Locale, MessageTree> = {
       buyVolume: "购买总量",
       marketVolume: "市场总业绩",
       qualTitle: "推广资格",
-      qualOn: "已激活，可生成专属推广链接（权重档位按钮 · ≥100U）",
+      qualOn: "已激活，可生成专属推广链接（权重档位按钮 · ≥1U）",
       copied: "已复制",
       copy: "复制",
       copyLink: "复制链接",
       myQr: "我的二维码",
       qrStub: "二维码占位 · 专属推广链接二维码即将接入",
       qualOff:
-        "需在「权重」完成任意档燃烧（最低 ≥100U，点选档位按钮）才可解锁推广资格并生成专属推广链接——不是累计买入。",
+        "需在「权重」完成任意档燃烧（最低 ≥1U，点选档位按钮）才可解锁推广资格并生成专属推广链接——不是累计买入。",
       incomeTitle: "我的收益",
       incomeSub: "质押分红=UMplan · 档位分红=SPCXB",
       bindBeforeIncome: "请先完成邀请人绑定后查看收益明细",
@@ -813,11 +813,11 @@ export const messages: Record<Locale, MessageTree> = {
     },
     coach: {
       kicker: "Next · Activate promo",
-      title: "Burn the 100U weight tier",
-      body: "Activate promo by completing at least a 100U weight burn with a tier button on Weight (burnTier). This is not staking; the stake desk unlocks only after the 1500U tier burn.",
+      title: "Burn the 1U weight tier",
+      body: "Activate promo by completing at least a 1U weight burn with a tier button on Weight (burnTier). This is not staking; the stake desk unlocks only after the 15U tier burn.",
       zeroBal: "Your UMplan balance is 0. Buy on Swap first, then come back to activate.",
       goSwap: "Go to Swap",
-      goWeight: "Go to Weight · 100U",
+      goWeight: "Go to Weight · 1U",
       later: "Later",
       foot: "After activation you can create an invite link in Mine and grow directs.",
     },
@@ -882,19 +882,19 @@ export const messages: Record<Locale, MessageTree> = {
         },
         {
           id: "3",
-          text: "Promo unlock: burn any Weight tier button (min 100U) — not cumulative buys.",
+          text: "Promo unlock: burn any Weight tier button (min 1U) — not cumulative buys.",
         },
         {
           id: "4",
-          text: "1500U tier button unlocks staking; min 24h; dividends paid in UMplan.",
+          text: "15U tier button unlocks staking; min 24h; dividends paid in UMplan.",
         },
       ],
       rules: [
         "Fees: buy/sell trades charge a fee — protocol floor 3%, current product default 3.5%.",
         "Weight split: each weight order runs fixed on-chain shares — 30% burn sink, 50% market-reward bucket, 15% shareholders, 5% precip pool.",
-        "Stake dividends: completing the 1500U tier unlocks staking. Stake UMplan for a share of the pool; dividends are paid in UMplan. Formula: 「百5」 total release ÷ network stake = per-token dividend.",
+        "Stake dividends: completing the 15U tier unlocks staking. Stake UMplan for a share of the pool; dividends are paid in UMplan. Formula: 「百5」 total release ÷ network stake = per-token dividend.",
         "Assets: promo token rewards and stake dividends are UMplan; after a weight burn you earn SPCXB dividends for your highest reached tier pool.",
-        "Promo: after the 100U threshold unlocks invite links, you earn Direct, Indirect, and Market rewards (team beyond Direct/Indirect is Market — marketed as market 10% per layer). Buys pay 0.5% to direct instantly; sells have no instant rebate.",
+        "Promo: after the 1U threshold unlocks invite links, you earn Direct, Indirect, and Market rewards (team beyond Direct/Indirect is Market — marketed as market 10% per layer). Buys pay 0.5% to direct instantly; sells have no instant rebate.",
       ],
     },
     swap: {
@@ -958,7 +958,7 @@ export const messages: Record<Locale, MessageTree> = {
     },
     stake: {
       title: "Stake dividend rights",
-      subtitle: "Unlocks after 1500U tier button · min 24h",
+      subtitle: "Unlocks after 15U tier button · min 24h",
       ruleFormula:
         "Dividend formula: 「百5」 total release ÷ network total stake = dividend per staked token (contract notifyRelease × 5% / totalStaked).",
       ruleExample:
@@ -970,8 +970,8 @@ export const messages: Record<Locale, MessageTree> = {
         "Pool source: UMplan in this pool comes from inbound market orders — each order pays Direct, Indirect, and Market only in public copy. Amounts with no matching reward slot along the invite chain are deposited here and shared by stake quota.",
       eliteMissing: "EliteStake address missing (NEXT_PUBLIC_ELITE_ADDRESS). UI is ready for post-deploy wiring.",
       locked:
-        "Staking opens only after a 1500U weight-tier burn. Until then the stake button stays disabled. Free-typed amounts do not count toward the tier.",
-      unlocked: "1500U tier reached — staking unlocked. Choose any stake amount.",
+        "Staking opens only after a 15U weight-tier burn. Until then the stake button stays disabled. Free-typed amounts do not count toward the tier.",
+      unlocked: "15U tier reached — staking unlocked. Choose any stake amount.",
       amountLabel: "Stake amount (UMplan · free amount)",
       shareLabel: "My dividend share (of total stake)",
       estimateLabel: "Est. period dividend (UMplan)",
@@ -1003,12 +1003,12 @@ export const messages: Record<Locale, MessageTree> = {
       amountLabel: "Burn amount (UMplan · locked by tier button)",
       tipManual: "Amount = selected tier ÷ Pancake spot (same source as homepage price). Pick a tier, agree, approve, then confirm.",
       notStakeTip:
-        "This is a weight burn (BurnRouter), not Stake below. Stake unlocks only after the 1500U tier burn; wallet「Weight confirm」= burn.",
+        "This is a weight burn (BurnRouter), not Stake below. Stake unlocks only after the 15U tier burn; wallet「Weight confirm」= burn.",
       tierOnceTip:
         "Each wallet may buy each tier only once, and only as an upgrade (no same/lower rebuy). Buying a higher tier voids lower SPCXB pool rights — highest tier only.",
       walletBal: "Wallet UMplan",
       insufficientBal:
-        "Not enough for this tier: need ~{need} UMplan, wallet ~{have}. At ~0.0018 spot, 500U needs ~270k tokens — buy on Swap or pick a lower tier.",
+        "Not enough for this tier: need ~{need} UMplan, wallet ~{have}. At ~0.0018 spot, 5U needs ~2.8k tokens — buy on Swap or pick a lower tier.",
       tierUsed: "This tier was already purchased for this wallet; pick a higher tier.",
       allTiersDone: "All four tiers already reached — nothing left to buy.",
       approveOk: "Approved (usually once — later tiers skip approve). Tap Confirm weight to burn (not staking).",
@@ -1052,7 +1052,7 @@ export const messages: Record<Locale, MessageTree> = {
         "Indirect: when an indirect member (direct of your direct) enters an order, you receive 10% of the market-reward bucket (= 5% of order).",
       earnMarket:
         "Market: team beyond Direct/Indirect is Market; marketed as market 10% of the bucket per layer (= 5% of order).",
-      earnActivate: "Any tier-button burn (≥100U) activates and unlocks invite links in Mine — not cumulative buys.",
+      earnActivate: "Any tier-button burn (≥1U) activates and unlocks invite links in Mine — not cumulative buys.",
       poolsTitle: "SPCXB tier dividends",
       poolsSub: "Become a pool shareholder · 24h cooldown",
       poolOpen:
@@ -1072,7 +1072,7 @@ export const messages: Record<Locale, MessageTree> = {
       rule: "Rule",
       perDay: "24h / claim",
       poolPctDoc:
-        "Pool weights sum to 100% of release — 100U pool 33.33%, 500U and 800U pools 25% each, 1500U pool 16.67%.",
+        "Pool weights sum to 100% of release — 1U pool 33.33%, 5U and 8U pools 25% each, 15U pool 16.67%.",
       poolShareDoc:
         "Your payout = your pool’s share ÷ members in that pool. Each wallet buys each tier once; highest reached only — upgrading voids lower rights, no stacking.",
       poolFairDoc:
@@ -1100,14 +1100,14 @@ export const messages: Record<Locale, MessageTree> = {
       buyVolume: "Buy volume",
       marketVolume: "Market volume",
       qualTitle: "Promo eligibility",
-      qualOn: "Activated — you can create an invite link (weight tier button · ≥100U)",
+      qualOn: "Activated — you can create an invite link (weight tier button · ≥1U)",
       copied: "Copied",
       copy: "Copy",
       copyLink: "Copy link",
       myQr: "My QR",
       qrStub: "QR placeholder · invite QR coming soon",
       qualOff:
-        "Complete any Weight tier burn (min ≥100U via tier button) to unlock promo and generate your invite link — not cumulative buys.",
+        "Complete any Weight tier burn (min ≥1U via tier button) to unlock promo and generate your invite link — not cumulative buys.",
       incomeTitle: "My earnings",
       incomeSub: "Stake dividends = UMplan · tier dividends = SPCXB",
       bindBeforeIncome: "Bind a referrer before viewing earnings detail",

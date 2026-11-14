@@ -25,18 +25,19 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
 /** One-time max approve so spot moves don't leave BurnRouter allowance short. */
 const APPROVE_MAX = maxUint256;
 
+/** Spot USD-equivalent burn tiers (test cut: 1/5/8/15; was 100/500/800/1500). */
 const TIERS = [
-  { id: 1, u: 100, label: "100U" },
-  { id: 2, u: 500, label: "500U" },
-  { id: 3, u: 800, label: "800U" },
-  { id: 4, u: 1500, label: "1500U" },
+  { id: 1, u: 1, label: "1U" },
+  { id: 2, u: 5, label: "5U" },
+  { id: 3, u: 8, label: "8U" },
+  { id: 4, u: 15, label: "15U" },
 ];
 
 const POOL_META = [
-  { key: "pool1" as const, tier: "100U", pct: "33.33%", tierId: 1 },
-  { key: "pool2" as const, tier: "500U", pct: "25%", tierId: 2 },
-  { key: "pool3" as const, tier: "800U", pct: "25%", tierId: 3 },
-  { key: "pool4" as const, tier: "1500U", pct: "16.67%", tierId: 4 },
+  { key: "pool1" as const, tier: "1U", pct: "33.33%", tierId: 1 },
+  { key: "pool2" as const, tier: "5U", pct: "25%", tierId: 2 },
+  { key: "pool3" as const, tier: "8U", pct: "25%", tierId: 3 },
+  { key: "pool4" as const, tier: "15U", pct: "16.67%", tierId: 4 },
 ];
 
 export default function PromoPage() {

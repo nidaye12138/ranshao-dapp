@@ -272,7 +272,7 @@ contract UmPlanTest is Test {
         vm.prank(alice);
         tree.bindReferrer(admin);
 
-        // Free typed amount ≥100U must NOT activate / grant tier
+        // Free typed amount must NOT activate / grant tier
         vm.startPrank(alice);
         token.approve(address(burnRouter), type(uint256).max);
         burnRouter.burn(1_500e18);
@@ -280,7 +280,7 @@ contract UmPlanTest is Test {
         assertEq(dividends.tierOf(alice), 0);
         assertFalse(dividends.isActivated(alice));
 
-        // 100U button → T1
+        // 1U button → T1
         vm.startPrank(alice);
         burnRouter.burnTier(1);
         vm.stopPrank();
@@ -295,7 +295,7 @@ contract UmPlanTest is Test {
         burnRouter.burnTier(1);
         vm.stopPrank();
 
-        // 500U button → T2 (leaves T1 — lower dividend rights voided)
+        // 5U button → T2 (leaves T1 — lower dividend rights voided)
         vm.startPrank(alice);
         burnRouter.burnTier(2);
         vm.stopPrank();
@@ -311,13 +311,13 @@ contract UmPlanTest is Test {
         burnRouter.burnTier(1);
         vm.stopPrank();
 
-        // 800U button → T3
+        // 8U button → T3
         vm.startPrank(alice);
         burnRouter.burnTier(3);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 3);
 
-        // 1500U button → T4 (stake unlock)
+        // 15U button → T4 (stake unlock)
         vm.startPrank(alice);
         burnRouter.burnTier(4);
         vm.stopPrank();
@@ -416,14 +416,14 @@ contract UmPlanTest is Test {
 
         vm.startPrank(eve);
         token.approve(address(burnRouter), type(uint256).max);
-        burnRouter.burnTier(4);
+        burnRouter.burnTier(4); // 15U at $1 → 15 tokens
         vm.stopPrank();
         assertEq(dividends.tierOf(eve), 4);
 
-        // Market bucket 50% = 750; L2–L9 missing = 80% of bucket = 600; + 5% sedimentation = 75 → 675
-        uint256 marketBucket = (1_500e18 * 5000) / 10_000;
+        uint256 burnedAmt = 15e18;
+        uint256 marketBucket = (burnedAmt * 5000) / 10_000;
         uint256 missingLayers = (marketBucket * 500 * 8) / 5000;
-        uint256 sedimentation = (1_500e18 * 500) / 10_000;
+        uint256 sedimentation = (burnedAmt * 500) / 10_000;
         uint256 expectedPrecip = missingLayers + sedimentation;
         assertEq(precip.totalDeposited(), expectedPrecip);
 
@@ -434,9 +434,8 @@ contract UmPlanTest is Test {
 
         vm.prank(eve);
         precip.claim();
-        // eve had 2000-1500=500 left + L1 reward to admin not eve + claim
-        // eve received no layer reward (she's burner). Balance = 500 + cap5
-        assertEq(token.balanceOf(eve), 500e18 + cap5);
+        // eve had 2000-15=1985 left; no layer reward to burner. Balance = 1985 + cap5
+        assertEq(token.balanceOf(eve), 2_000e18 - burnedAmt + cap5);
     }
 
     function test_elite_stake_notify_release() public {

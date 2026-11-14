@@ -38,11 +38,11 @@ library Constants {
     uint8 internal constant LAYER_COUNT = 9;
     uint8 internal constant TIER_COUNT = 4;
 
-    // Burn tier thresholds in USD (1e18)
-    uint256 internal constant TIER1_USD = 100e18;
-    uint256 internal constant TIER2_USD = 500e18;
-    uint256 internal constant TIER3_USD = 800e18;
-    uint256 internal constant TIER4_USD = 1500e18;
+    // Burn tier thresholds in USD (1e18) — test cut: 1 / 5 / 8 / 15 (was 100 / 500 / 800 / 1500).
+    uint256 internal constant TIER1_USD = 1e18;
+    uint256 internal constant TIER2_USD = 5e18;
+    uint256 internal constant TIER3_USD = 8e18;
+    uint256 internal constant TIER4_USD = 15e18;
 
     // Pool weights bps [3333, 2500, 2500, 1667] = 10000
     function poolWeightBps(uint8 tier) internal pure returns (uint16) {
