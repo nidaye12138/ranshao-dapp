@@ -186,7 +186,6 @@ export type MessageTree = {
     amountLabel: string;
     shareLabel: string;
     estimateLabel: string;
-    estimateOnChain: string;
     estimateNote: string;
     totalStaked: string;
     confirmStake: string;
@@ -579,7 +578,6 @@ export const messages: Record<Locale, MessageTree> = {
       amountLabel: "质押数量（UMplan · 可自由选择）",
       shareLabel: "我的分红配额（占总质押）",
       estimateLabel: "预估每期分红（UMplan）",
-      estimateOnChain: "预估每期分红（UMplan · 链上 {token}）",
       estimateNote:
         "预估取自链上已累计未领；新一期数值随 notifyRelease × 5% × 配额更新。分红以 UMplan 计。",
       totalStaked: "全网总质押",
@@ -983,7 +981,6 @@ export const messages: Record<Locale, MessageTree> = {
       amountLabel: "Stake amount (UMplan · free amount)",
       shareLabel: "My dividend share (of total stake)",
       estimateLabel: "Est. period dividend (UMplan)",
-      estimateOnChain: "Est. period dividend (UMplan · on-chain {token})",
       estimateNote:
         "Estimate uses on-chain accrued unclaimed rewards; each period updates with notifyRelease × 5% × your share. Counted in UMplan.",
       totalStaked: "Network total stake",
