@@ -12,7 +12,10 @@ import type {
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
-    throw new Error(`API ${res.status}`);
+    if (res.status === 504 || res.status === 502 || res.status === 408) {
+      throw new Error("服务响应超时，请稍后重试");
+    }
+    throw new Error(`请求失败（${res.status}）`);
   }
   return res.json() as Promise<T>;
 }

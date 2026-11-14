@@ -287,6 +287,7 @@ export type MessageTree = {
     valNote: string;
     teamTitle: string;
     teamGraph: string;
+    teamChain: string;
     teamUnconfigured: string;
     teamLoading: string;
     teamConnect: string;
@@ -294,6 +295,9 @@ export type MessageTree = {
     indirects: string;
     buyVolume: string;
     marketVolume: string;
+    directMembersTitle: string;
+    directMembersEmpty: string;
+    boundAtUnknown: string;
     qualTitle: string;
     qualOn: string;
     copied: string;
@@ -686,6 +690,7 @@ export const messages: Record<Locale, MessageTree> = {
       valNote: "含 UMplan×实时价 + USDT；SPCXB / BNB 暂未折算",
       teamTitle: "我的团队",
       teamGraph: "索引聚合",
+      teamChain: "直推来自链上 ReferralTree",
       teamUnconfigured: "索引未配置（GRAPH_URL）；直推可走链上",
       teamLoading: "加载中…",
       teamConnect: "连接钱包后查看",
@@ -693,6 +698,9 @@ export const messages: Record<Locale, MessageTree> = {
       indirects: "间推人数",
       buyVolume: "购买总量",
       marketVolume: "市场总业绩",
+      directMembersTitle: "直推成员 共 {n} 人",
+      directMembersEmpty: "暂无直推成员",
+      boundAtUnknown: "—",
       qualTitle: "推广资格",
       qualOn: "已激活，可生成专属推广链接（权重档位按钮 · ≥1U）",
       copied: "已复制",
@@ -1092,6 +1100,7 @@ export const messages: Record<Locale, MessageTree> = {
       valNote: "UMplan×live price + USDT; SPCXB / BNB not converted yet",
       teamTitle: "My team",
       teamGraph: "From indexer",
+      teamChain: "Directs from on-chain ReferralTree",
       teamUnconfigured: "Indexer not configured (GRAPH_URL); directs may use chain",
       teamLoading: "Loading…",
       teamConnect: "Connect wallet to view",
@@ -1099,6 +1108,9 @@ export const messages: Record<Locale, MessageTree> = {
       indirects: "Indirects",
       buyVolume: "Buy volume",
       marketVolume: "Market volume",
+      directMembersTitle: "Direct members · {n}",
+      directMembersEmpty: "No direct members yet",
+      boundAtUnknown: "—",
       qualTitle: "Promo eligibility",
       qualOn: "Activated — you can create an invite link (weight tier button · ≥1U)",
       copied: "Copied",

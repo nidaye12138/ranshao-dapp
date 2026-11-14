@@ -25,6 +25,13 @@ export type LeaderboardResponse = {
   items: LeaderboardRow[];
 };
 
+/** One direct referral under the queried wallet. */
+export type TeamDirectMember = {
+  address: string;
+  /** Local bind time when known (indexer / optional logs); omit if unavailable. */
+  boundAt?: string;
+};
+
 export type TeamResponse = {
   source: ApiSource;
   address: string;
@@ -32,6 +39,8 @@ export type TeamResponse = {
   indirects: number;
   buyVolumeUsd: string;
   umbrellaUsd: string;
+  /** Direct referral wallets (chain getDirectRefs or indexer). */
+  members?: TeamDirectMember[];
 };
 
 export type EarningsRow = {

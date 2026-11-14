@@ -1740,6 +1740,66 @@ code {
   margin-top: 0.15rem;
 }
 
+.direct-members {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.direct-members-head {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.55rem;
+}
+
+.direct-members-empty {
+  margin: 0;
+  font-size: 0.72rem;
+}
+
+.direct-members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.direct-member-row {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  background: var(--card-sub);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+
+.direct-member-row .dm-idx {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.direct-member-row .dm-addr {
+  color: #fff;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.direct-member-row .dm-meta {
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
 .qual-off,
 .qual-on {
   display: flex;

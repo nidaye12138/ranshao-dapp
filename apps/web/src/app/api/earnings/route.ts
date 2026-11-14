@@ -51,8 +51,15 @@ function sum(amounts: string[]): bigint {
 
 async function chainSwapFallback(address: string, base: EarningsResponse): Promise<EarningsResponse> {
   try {
-    const history = await fetchSwapHistory(address);
-    if ("error" in history) return base;
+    const history = await Promise.race([
+      fetchSwapHistory(address, { maxMs: 5_000, maxBlocks: 10_000n }),
+      new Promise<{ error: string }>((resolve) =>
+        setTimeout(() => resolve({ error: "swap history timeout" }), 5_500),
+      ),
+    ]);
+    if ("error" in history) {
+      return { ...base, source: base.source === "unconfigured" ? "chain" : base.source };
+    }
     const rows = historyToSwapPromoRows(history);
     return {
       ...base,
@@ -61,7 +68,7 @@ async function chainSwapFallback(address: string, base: EarningsResponse): Promi
       swapPromoRows: rows,
     };
   } catch {
-    return base;
+    return { ...base, source: base.source === "unconfigured" ? "chain" : base.source };
   }
 }
 

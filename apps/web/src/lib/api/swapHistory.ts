@@ -96,13 +96,16 @@ async function getLogsChunked(
     args: Record<string, unknown>;
     fromBlock: bigint;
     toBlock: bigint;
+    deadlineMs?: number;
   },
 ): Promise<Log[]> {
   /** BSC public RPCs often reject wide eth_getLogs — keep chunks small + degrade. */
-  let span = 1_000n;
+  let span = 500n;
   const out: Log[] = [];
   let start = params.fromBlock;
+  const deadline = params.deadlineMs ?? 0;
   while (start <= params.toBlock) {
+    if (deadline > 0 && Date.now() > deadline) break;
     const end = start + span > params.toBlock ? params.toBlock : start + span;
     try {
       const part = await client.getLogs({
@@ -115,7 +118,7 @@ async function getLogsChunked(
       out.push(...part);
       start = end + 1n;
     } catch {
-      if (span > 200n) {
+      if (span > 100n) {
         span = span / 2n;
         continue;
       }
@@ -185,29 +188,46 @@ function decodeSold(log: Log): Omit<SwapHistoryRow, "at"> | null {
   }
 }
 
-async function clientForRpc(url: string): Promise<PublicClient> {
+async function clientForRpc(url: string, timeout = 8_000): Promise<PublicClient> {
   return createPublicClient({
     chain: bsc,
-    transport: http(url, { timeout: 20_000, retryCount: 1 }),
+    transport: http(url, { timeout, retryCount: 0 }),
   });
 }
 
+export type SwapHistoryOpts = {
+  /** Soft deadline — stop scanning and return what we have (default 6s). */
+  maxMs?: number;
+  /** Max blocks back from tip (default 12_000 ≈ ~10h on BSC). */
+  maxBlocks?: bigint;
+};
+
 /** Read Bought/Sold for one wallet (live + prior SwapFacades; resilient getLogs). */
-export async function fetchSwapHistory(address: string): Promise<SwapHistoryResponse | { error: string }> {
+export async function fetchSwapHistory(
+  address: string,
+  opts?: SwapHistoryOpts,
+): Promise<SwapHistoryResponse | { error: string }> {
   const addr = address.toLowerCase();
   if (!isAddress(addr, { strict: false })) return { error: "address required" };
 
   const targets = swapLogAddresses();
   if (!targets.length) return { error: "swap unconfigured" };
 
+  const maxMs = opts?.maxMs ?? 6_000;
+  const maxBlocks = opts?.maxBlocks ?? 12_000n;
+  const deadline = Date.now() + maxMs;
+
   const checksummed = getAddress(addr);
   let lastErr: unknown;
 
   for (const rpc of rpcCandidates()) {
+    if (Date.now() > deadline) break;
     try {
-      const client = await clientForRpc(rpc);
+      const client = await clientForRpc(rpc, Math.min(8_000, Math.max(2_000, deadline - Date.now())));
       const latest = await client.getBlockNumber();
-      const fromBlock = SWAP_HOP_START_BLOCK > latest ? 0n : SWAP_HOP_START_BLOCK;
+      const hopFrom = SWAP_HOP_START_BLOCK > latest ? 0n : SWAP_HOP_START_BLOCK;
+      const recentFrom = latest > maxBlocks ? latest - maxBlocks : 0n;
+      const fromBlock = hopFrom > recentFrom ? hopFrom : recentFrom;
 
       const [buyLogs, sellLogs] = await Promise.all([
         getLogsChunked(client, {
@@ -216,6 +236,7 @@ export async function fetchSwapHistory(address: string): Promise<SwapHistoryResp
           args: { buyer: checksummed },
           fromBlock,
           toBlock: latest,
+          deadlineMs: deadline,
         }),
         getLogsChunked(client, {
           address: targets,
@@ -223,6 +244,7 @@ export async function fetchSwapHistory(address: string): Promise<SwapHistoryResp
           args: { seller: checksummed },
           fromBlock,
           toBlock: latest,
+          deadlineMs: deadline,
         }),
       ]);
 
