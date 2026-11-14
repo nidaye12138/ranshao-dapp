@@ -84,7 +84,8 @@ contract UmPlanTest is Test {
             address(tree),
             payable(address(treasury)),
             true,
-            0
+            0,
+            address(0)
         );
         token.setMinter(address(swap), true);
 
@@ -147,6 +148,7 @@ contract UmPlanTest is Test {
         uint256 pay = 1_000e18;
         uint256 aliceBefore = usdt.balanceOf(alice);
         uint256 adminBefore = usdt.balanceOf(admin);
+        uint256 adminTokBefore = token.balanceOf(admin);
         uint256 treasuryBefore = usdt.balanceOf(address(treasury));
 
         vm.startPrank(alice);
@@ -154,37 +156,44 @@ contract UmPlanTest is Test {
         swap.buyWithUSDT(pay);
         vm.stopPrank();
 
-        // $1000 / $1 = 1000 tokens
-        assertEq(token.balanceOf(alice), 1_000_000e18 + 1_000e18);
-        assertEq(usdt.balanceOf(alice), aliceBefore - pay + 5e18);
-        assertEq(usdt.balanceOf(admin), adminBefore + 5e18);
-        assertEq(usdt.balanceOf(address(treasury)), treasuryBefore + 990e18);
+        // $1000 / $1 = 1000 tokens; buyer 995 UMplan, ref 5 UMplan; full USDT to treasury
+        assertEq(token.balanceOf(alice), 1_000_000e18 + 995e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 5e18);
+        assertEq(usdt.balanceOf(alice), aliceBefore - pay);
+        assertEq(usdt.balanceOf(admin), adminBefore);
+        assertEq(usdt.balanceOf(address(treasury)), treasuryBefore + pay);
     }
 
     function test_buyUSDT_noReferrer_rewardToTreasury() public {
         uint256 pay = 1_000e18;
-        uint256 treasuryBefore = usdt.balanceOf(address(treasury));
+        uint256 treasuryUsdtBefore = usdt.balanceOf(address(treasury));
+        uint256 treasuryTokBefore = token.balanceOf(address(treasury));
+        uint256 bobTokBefore = token.balanceOf(bob);
 
         vm.startPrank(bob);
         usdt.approve(address(swap), pay);
         swap.buyWithUSDT(pay);
         vm.stopPrank();
 
-        // buyer 5 + no-ref 5 + remainder 990 = 995 to treasury path; buyer keeps 5
-        assertEq(usdt.balanceOf(address(treasury)), treasuryBefore + 995e18);
+        // Full USDT to treasury; no-ref 0.5% UMplan to treasury; buyer keeps 99.5%
+        assertEq(usdt.balanceOf(address(treasury)), treasuryUsdtBefore + pay);
+        assertEq(token.balanceOf(bob), bobTokBefore + 995e18);
+        assertEq(token.balanceOf(address(treasury)), treasuryTokBefore + 5e18);
     }
 
     function test_buyBNB_withReferrer() public {
         vm.prank(alice);
         tree.bindReferrer(admin);
 
-        uint256 adminBefore = admin.balance;
+        uint256 adminBnbBefore = admin.balance;
+        uint256 adminTokBefore = token.balanceOf(admin);
         vm.prank(alice);
         swap.buyWithBNB{value: 1 ether}();
 
-        // 600 tokens at $1
-        assertEq(token.balanceOf(alice), 1_000_000e18 + 600e18);
-        assertEq(admin.balance, adminBefore + 0.005 ether);
+        // 600 tokens at $1 → buyer 597, ref 3 UMplan; BNB rewards removed
+        assertEq(token.balanceOf(alice), 1_000_000e18 + 597e18);
+        assertEq(token.balanceOf(admin), adminTokBefore + 3e18);
+        assertEq(admin.balance, adminBnbBefore);
     }
 
     // ---------- Burn 30/50/15/5 + layers + tiers ----------
@@ -234,8 +243,9 @@ contract UmPlanTest is Test {
         // 15% shareholders → admin claimable
         assertEq(shareholders.claimable(admin), 1_500e18);
 
-        // Dave burned $10k → tier 4
-        assertEq(dividends.tierOf(dave), 4);
+        // Free-amount burn does NOT grant tier benefits
+        assertEq(dividends.tierOf(dave), 0);
+        assertEq(burnRouter.buttonTierOf(dave), 0);
         assertEq(burnRouter.burnedUsd(dave), 10_000e18);
     }
 
@@ -258,42 +268,69 @@ contract UmPlanTest is Test {
         assertEq(precip.totalDeposited(), 450e18);
     }
 
-    function test_burn_tier_thresholds_highest_only() public {
+    function test_burn_tier_buttons_once_and_highest_only() public {
         vm.prank(alice);
         tree.bindReferrer(admin);
 
-        // 100 U → T1
+        // Free typed amount must NOT activate / grant tier
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burn(1_500e18);
+        vm.stopPrank();
+        assertEq(dividends.tierOf(alice), 0);
+        assertFalse(dividends.isActivated(alice));
+
+        // 1U button → T1
+        vm.startPrank(alice);
+        burnRouter.burnTier(1);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 1);
+        assertEq(burnRouter.buttonTierOf(alice), 1);
         assertEq(dividends.tierMemberCount(1), 1);
+        assertTrue(dividends.isActivated(alice));
 
-        // +400 → 500 U → T2 (leaves T1)
+        // Same tier again forever blocked
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 400e18);
-        burnRouter.burn(400e18);
+        vm.expectRevert("burn: tier used");
+        burnRouter.burnTier(1);
+        vm.stopPrank();
+
+        // 5U button → T2 (leaves T1 — lower dividend rights voided)
+        vm.startPrank(alice);
+        burnRouter.burnTier(2);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 2);
         assertEq(dividends.tierMemberCount(1), 0);
         assertEq(dividends.tierMemberCount(2), 1);
+        assertFalse(dividends.isTierMember(1, alice));
+        assertTrue(dividends.isTierMember(2, alice));
 
-        // +300 → 800 → T3
+        // Lower tier after upgrade also blocked
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 300e18);
-        burnRouter.burn(300e18);
+        vm.expectRevert("burn: tier used");
+        burnRouter.burnTier(1);
+        vm.stopPrank();
+
+        // 8U button → T3
+        vm.startPrank(alice);
+        burnRouter.burnTier(3);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 3);
 
-        // +700 → 1500 → T4
+        // 15U button → T4 (stake unlock)
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 700e18);
-        burnRouter.burn(700e18);
+        burnRouter.burnTier(4);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 4);
+        assertEq(burnRouter.buttonTierOf(alice), 4);
         assertEq(dividends.tierMemberCount(3), 0);
         assertEq(dividends.tierMemberCount(4), 1);
+
+        // T4 already held — cannot rebuy
+        vm.startPrank(alice);
+        vm.expectRevert("burn: tier used");
+        burnRouter.burnTier(4);
+        vm.stopPrank();
     }
 
     function test_dividend_inject_equal_per_address() public {
@@ -304,12 +341,12 @@ contract UmPlanTest is Test {
         tree.bindReferrer(admin);
 
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
         vm.startPrank(bob);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
 
         uint256 injectAmt = 10_000e18;
@@ -378,15 +415,15 @@ contract UmPlanTest is Test {
         tree.bindReferrer(admin);
 
         vm.startPrank(eve);
-        token.approve(address(burnRouter), 1_500e18);
-        burnRouter.burn(1_500e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(4); // 15U at $1 → 15 tokens
         vm.stopPrank();
         assertEq(dividends.tierOf(eve), 4);
 
-        // Market bucket 50% = 750; L2–L9 missing = 80% of bucket = 600; + 5% sedimentation = 75 → 675
-        uint256 marketBucket = (1_500e18 * 5000) / 10_000;
+        uint256 burnedAmt = 15e18;
+        uint256 marketBucket = (burnedAmt * 5000) / 10_000;
         uint256 missingLayers = (marketBucket * 500 * 8) / 5000;
-        uint256 sedimentation = (1_500e18 * 500) / 10_000;
+        uint256 sedimentation = (burnedAmt * 500) / 10_000;
         uint256 expectedPrecip = missingLayers + sedimentation;
         assertEq(precip.totalDeposited(), expectedPrecip);
 
@@ -397,17 +434,16 @@ contract UmPlanTest is Test {
 
         vm.prank(eve);
         precip.claim();
-        // eve had 2000-1500=500 left + L1 reward to admin not eve + claim
-        // eve received no layer reward (she's burner). Balance = 500 + cap5
-        assertEq(token.balanceOf(eve), 500e18 + cap5);
+        // eve had 2000-15=1985 left; no layer reward to burner. Balance = 1985 + cap5
+        assertEq(token.balanceOf(eve), 2_000e18 - burnedAmt + cap5);
     }
 
     function test_elite_stake_notify_release() public {
         vm.prank(alice);
         tree.bindReferrer(admin);
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 1_500e18);
-        burnRouter.burn(1_500e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(4);
         vm.stopPrank();
         assertEq(dividends.tierOf(alice), 4);
 
@@ -425,8 +461,18 @@ contract UmPlanTest is Test {
 
         assertEq(elite.pendingRewards(alice), 500e18);
         vm.prank(alice);
+        vm.expectRevert("elite: locked");
+        elite.claim();
+
+        uint256 firstUnlock = elite.unlockAt(alice);
+        vm.warp(firstUnlock);
+        assertTrue(elite.isUnlocked(alice));
+        vm.prank(alice);
         elite.claim();
         assertEq(spcxb.balanceOf(alice), 500e18);
+        // claim-only extends lock another 24h from prior unlock boundary
+        assertFalse(elite.isUnlocked(alice));
+        assertEq(elite.unlockAt(alice), firstUnlock + 24 hours);
     }
 
     function test_broker_stub_receiveFee() public {
@@ -452,23 +498,27 @@ contract UmPlanTest is Test {
         uint256 sellAmt = 1_000e18; // $1000 at $1
         uint256 aliceUsdtBefore = usdt.balanceOf(alice);
         uint256 adminUsdtBefore = usdt.balanceOf(admin);
+        uint256 adminTokBefore = token.balanceOf(admin);
+        uint256 aliceTokBefore = token.balanceOf(alice);
 
         vm.startPrank(alice);
         token.approve(address(swap), sellAmt);
         swap.sellForUSDT(sellAmt);
         vm.stopPrank();
 
-        // seller 99.5% = 995; ref 0.5% = 5
-        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 995e18);
-        assertEq(usdt.balanceOf(admin), adminUsdtBefore + 5e18);
+        // Full sell → 1000 USDT; no instant self/ref UMplan rewards
+        assertEq(usdt.balanceOf(alice), aliceUsdtBefore + 1_000e18);
+        assertEq(usdt.balanceOf(admin), adminUsdtBefore);
+        assertEq(token.balanceOf(alice), aliceTokBefore - sellAmt);
+        assertEq(token.balanceOf(admin), adminTokBefore);
     }
 
     function test_dividend_claim_24h_cooldown() public {
         vm.prank(alice);
         tree.bindReferrer(admin);
         vm.startPrank(alice);
-        token.approve(address(burnRouter), 100e18);
-        burnRouter.burn(100e18);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(1);
         vm.stopPrank();
         assertTrue(dividends.isActivated(alice));
 

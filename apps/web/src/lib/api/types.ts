@@ -13,12 +13,23 @@ export type LeaderboardRow = {
   rank: number;
   address: string;
   directs: number;
+  /** Downline buy volume in UMplan (18-dec string, no symbol). */
+  umbrellaToken?: string;
+  /** Downline buy volume in USD when sourced from the indexer. */
+  umbrellaUsd?: string;
 };
 
 export type LeaderboardResponse = {
   source: ApiSource;
   updatedAt: string;
   items: LeaderboardRow[];
+};
+
+/** One direct referral under the queried wallet. */
+export type TeamDirectMember = {
+  address: string;
+  /** Local bind time when known (indexer / optional logs); omit if unavailable. */
+  boundAt?: string;
 };
 
 export type TeamResponse = {
@@ -28,6 +39,8 @@ export type TeamResponse = {
   indirects: number;
   buyVolumeUsd: string;
   umbrellaUsd: string;
+  /** Direct referral wallets (chain getDirectRefs or indexer). */
+  members?: TeamDirectMember[];
 };
 
 export type EarningsRow = {
@@ -47,6 +60,7 @@ export type EarningsResponse = {
   layerRows: EarningsRow[];
   dividendTotal: string;
   dividendRows: EarningsRow[];
+  error?: string;
 };
 
 export type AnnouncementsResponse = {

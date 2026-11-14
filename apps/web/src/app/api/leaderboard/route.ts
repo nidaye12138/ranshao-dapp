@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { graphQuery, graphUrl } from "@/lib/api/graph";
+import { formatUsdRaw, graphQuery, graphUrl } from "@/lib/api/graph";
+import { fetchLeaderboardFromChain } from "@/lib/api/leaderboardChain";
 import type { LeaderboardResponse } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ const QUERY = `
     accounts(first: $first, orderBy: directCount, orderDirection: desc, where: { directCount_gt: 0 }) {
       id
       directCount
+      umbrellaVolumeUsd
     }
   }
 `;
@@ -16,34 +18,42 @@ const QUERY = `
 export async function GET() {
   const updatedAt = new Date().toISOString();
 
-  if (!graphUrl()) {
-    const body: LeaderboardResponse = {
-      source: "unconfigured",
+  if (graphUrl()) {
+    const result = await graphQuery<{
+      accounts: { id: string; directCount: string; umbrellaVolumeUsd: string }[];
+    }>(QUERY, {
+      first: 10,
+    });
+
+    if (!("error" in result)) {
+      const items = result.data.accounts.map((a, i) => ({
+        rank: i + 1,
+        address: a.id,
+        directs: Number(a.directCount),
+        umbrellaUsd: formatUsdRaw(a.umbrellaVolumeUsd),
+      }));
+      const body: LeaderboardResponse = { source: "graph", updatedAt, items };
+      return NextResponse.json(body);
+    }
+    // fall through to chain if graph errors
+  }
+
+  const chain = await fetchLeaderboardFromChain(10);
+  if (chain.error && chain.items.length === 0) {
+    const registryMissing = /registry unconfigured/i.test(chain.error);
+    const body: LeaderboardResponse & { error?: string } = {
+      source: registryMissing ? "unconfigured" : "chain",
       updatedAt,
       items: [],
+      error: chain.error,
     };
-    return NextResponse.json(body);
+    return NextResponse.json(body, { status: graphUrl() || !registryMissing ? 502 : 200 });
   }
 
-  const result = await graphQuery<{ accounts: { id: string; directCount: string }[] }>(QUERY, {
-    first: 10,
-  });
-
-  if ("error" in result) {
-    return NextResponse.json(
-      { source: "unconfigured", updatedAt, items: [], error: result.error } satisfies LeaderboardResponse & {
-        error?: string;
-      },
-      { status: 502 }
-    );
-  }
-
-  const items = result.data.accounts.map((a, i) => ({
-    rank: i + 1,
-    address: a.id,
-    directs: Number(a.directCount),
-  }));
-
-  const body: LeaderboardResponse = { source: "graph", updatedAt, items };
+  const body: LeaderboardResponse = {
+    source: "chain",
+    updatedAt,
+    items: chain.items,
+  };
   return NextResponse.json(body);
 }

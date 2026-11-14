@@ -14,6 +14,11 @@ import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
 import {Constants} from "./Constants.sol";
 
 /// @title Burn entry — gold-peg U tiering + 30/50/15/5 split.
+/// @dev Tier / activate / T4 (15U test / was 1500U) stake unlock only via `burnTier`.
+///      Each wallet may purchase each tier at most once and only as a strict upgrade
+///      (same or lower tier reverts). Buying a higher tier voids lower-pool membership
+///      via DividendPools highest-tier-only (Q2). Free-amount `burn` still splits funds
+///      but does NOT grant tier benefits.
 contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -27,6 +32,8 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
 
     mapping(address => uint256) public burnedToken;
     mapping(address => uint256) public burnedUsd;
+    /// @notice Highest preset tier button completed by user on this router (0..4).
+    mapping(address => uint8) public buttonTierOf;
     uint256 public totalBurnedToken;
     uint256 public totalBurnedUsd;
     uint16 public maxTransferTaxBps;
@@ -42,6 +49,7 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         uint256 toPrecip,
         uint8 tier
     );
+    event TierButtonBurned(address indexed user, uint8 tierId, uint256 usdValue, uint8 buttonTier);
     event ConfigUpdated(
         address oracle, address layers, address shareholders, address dividends, address precip, address sink
     );
@@ -102,16 +110,54 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         _unpause();
     }
 
+    function tierUsd(uint8 tierId) public pure returns (uint256) {
+        if (tierId == 1) return Constants.TIER1_USD;
+        if (tierId == 2) return Constants.TIER2_USD;
+        if (tierId == 3) return Constants.TIER3_USD;
+        if (tierId == 4) return Constants.TIER4_USD;
+        return 0;
+    }
+
+    /// @notice Effective highest tier already held: max(buttonTier, DividendPools.tierOf).
+    /// @dev Uses dividend membership so cutover from a prior cumulative BurnRouter still
+    ///      blocks re-buying the same or a lower tier.
+    function effectiveButtonTier(address user) public view returns (uint8) {
+        uint8 button = buttonTierOf[user];
+        uint8 divTier = dividendPools.tierOf(user);
+        return button > divTier ? button : divTier;
+    }
+
     function quoteBurnUsd(uint256 tokenAmount) public view returns (uint256) {
         uint256 price = oracle.tokenUsd();
         require(price > 0, "burn: bad price");
         return (tokenAmount * price) / 1e18;
     }
 
+    /// @notice Tokens needed (ceil) to hit a preset tier's gold-peg USD at current oracle price.
+    function quoteTokensForTier(uint8 tierId) public view returns (uint256) {
+        uint256 targetUsd = tierUsd(tierId);
+        require(targetUsd > 0, "burn: tier");
+        uint256 price = oracle.tokenUsd();
+        require(price > 0, "burn: bad price");
+        return (targetUsd * 1e18 + price - 1) / price;
+    }
+
+    /// @notice Free-amount burn: 30/50/15/5 split only. Does NOT grant tier / activate / stake unlock.
     function burn(uint256 amount) external nonReentrant whenNotPaused {
+        _burnAmount(msg.sender, amount, 0);
+    }
+
+    /// @notice Preset tier button. Same wallet may buy each tier once; must be a strict upgrade.
+    function burnTier(uint8 tierId) external nonReentrant whenNotPaused {
+        require(tierId >= 1 && tierId <= 4, "burn: tier");
+        require(tierId > effectiveButtonTier(msg.sender), "burn: tier used");
+        uint256 amount = quoteTokensForTier(tierId);
+        _burnAmount(msg.sender, amount, tierId);
+    }
+
+    function _burnAmount(address user, uint256 amount, uint8 tierId) private {
         require(amount > 0, "burn: zero");
         require(address(precipPool) != address(0), "burn: no precip");
-        address user = msg.sender;
 
         uint256 beforeBal = token.balanceOf(address(this));
         token.safeTransferFrom(user, address(this), amount);
@@ -122,6 +168,15 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
         require(received > 0, "burn: zero recv");
 
         uint256 usdValue = quoteBurnUsd(received);
+        if (tierId != 0) {
+            uint256 targetUsd = tierUsd(tierId);
+            // After FOT, received USD must still clear the preset threshold within tax tolerance.
+            require(
+                usdValue * Constants.BPS_DENOM >= targetUsd * (Constants.BPS_DENOM - maxTransferTaxBps),
+                "burn: usd short"
+            );
+        }
+
         burnedToken[user] += received;
         burnedUsd[user] += usdValue;
         totalBurnedToken += received;
@@ -150,9 +205,16 @@ contract BurnRouter is Ownable, Pausable, ReentrancyGuard {
             precipPool.receiveBurnSedimentation(toPrecip);
         }
 
-        dividendPools.updateTier(user, burnedUsd[user]);
-        uint8 tier = dividendPools.tierOf(user);
+        if (tierId != 0) {
+            // Re-check after payment path: still must be a strict upgrade (once per tier forever).
+            require(tierId > effectiveButtonTier(user), "burn: tier used");
+            buttonTierOf[user] = tierId;
+            // Pass this button's threshold USD — highest-tier-only membership (voids lower pools).
+            dividendPools.updateTier(user, tierUsd(tierId));
+            emit TierButtonBurned(user, tierId, usdValue, tierId);
+        }
 
+        uint8 tier = dividendPools.tierOf(user);
         emit Burned(user, amount, received, usdValue, toSink, toLayers, toShareholders, toPrecip, tier);
     }
 }

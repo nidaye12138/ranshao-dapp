@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { isAddress, zeroAddress } from "viem";
+import { zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
+import { isAddressLoose, toChecksumAddress } from "@/lib/addressUtils";
 import { shortAddr } from "@/lib/format";
 import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
@@ -13,7 +14,7 @@ import { useLeaderboard, useStats } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
-const TOKEN_SUPPLY = 10_000_000;
+const TOKEN_SUPPLY = 1_000_000_000;
 
 export default function HomePage() {
   return (
@@ -62,8 +63,8 @@ function HomeInner() {
   }, [slides.length]);
 
   useEffect(() => {
-    const ref = search.get("ref");
-    if (ref && isAddress(ref)) setRefInput(ref);
+    const ref = toChecksumAddress(search.get("ref"));
+    if (ref) setRefInput(ref);
   }, [search]);
 
   const enabled = mounted && isConfigured && !!address;
@@ -161,7 +162,7 @@ function HomeInner() {
           <span className="muted">{t("home.boardSub")}</span>
         </h2>
         <p className="muted source-line">
-          {board?.source === "graph"
+          {board?.source === "graph" || board?.source === "chain"
             ? t("home.boardByDirects")
             : board?.source === "unconfigured"
               ? t("home.boardUnconfigured")
@@ -171,13 +172,24 @@ function HomeInner() {
           <p className="muted">{board?.source === "unconfigured" ? "—" : t("home.noData")}</p>
         ) : (
           <ol className="rank-list">
-            {board.items.map((r) => (
-              <li key={r.address}>
-                <span className="rank-n">{r.rank}</span>
-                <span className="rank-addr">{shortAddr(r.address)}</span>
-                <span className="rank-val">{t("home.directsCount", { n: r.directs })}</span>
-              </li>
-            ))}
+            {board.items.map((r) => {
+              const vol =
+                r.umbrellaToken != null
+                  ? t("home.umbrellaVolume", { amount: `${r.umbrellaToken} UMplan` })
+                  : r.umbrellaUsd != null
+                    ? t("home.umbrellaVolume", { amount: `$${r.umbrellaUsd}` })
+                    : null;
+              return (
+                <li key={r.address}>
+                  <span className="rank-n">{r.rank}</span>
+                  <span className="rank-addr">{shortAddr(r.address)}</span>
+                  <span className="rank-meta">
+                    <span className="rank-val">{t("home.directsCount", { n: r.directs })}</span>
+                    {vol && <span className="rank-vol">{vol}</span>}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>
@@ -209,16 +221,18 @@ function HomeInner() {
             <button
               type="button"
               className="btn primary"
-              disabled={!isConfigured || isPending || confirming || !isAddress(refInput)}
-              onClick={() =>
+              disabled={!isConfigured || isPending || confirming || !isAddressLoose(refInput)}
+              onClick={() => {
+                const ref = toChecksumAddress(refInput);
+                if (!ref) return;
                 writeContract({
                   address: addresses.registry,
                   abi: TreeAbi,
                   functionName: "bindReferrer",
-                  args: [refInput as `0x${string}`],
+                  args: [ref],
                   chainId: appChainId,
-                })
-              }
+                });
+              }}
             >
               {isPending || confirming ? t("common.confirming") : t("home.bindReferrer")}
             </button>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useBalance, useReadContract } from "wagmi";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
-import { fmtToken, shortAddr } from "@/lib/format";
+import { fmtToken, maskAddr, shortAddr } from "@/lib/format";
 import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useStats, useTeam } from "@/lib/api/client";
 import { FeatureGateBanner } from "@/components/FeatureGateBanner";
@@ -83,8 +83,12 @@ export default function MinePage() {
     query: { enabled: ready },
   });
 
-  const { data: team } = useTeam(mounted && address ? address : undefined);
-  const { data: earnings } = useEarnings(mounted && address ? address : undefined);
+  const { data: team, loading: teamLoading, error: teamError } = useTeam(
+    mounted && address ? address : undefined,
+  );
+  const { data: earnings, loading: earningsLoading, error: earningsError } = useEarnings(
+    mounted && address ? address : undefined,
+  );
 
   const inviteDisplay =
     mounted && address ? (inviteOrigin ? `${inviteOrigin}/?ref=${address}` : `/?ref=${address}`) : "";
@@ -109,10 +113,14 @@ export default function MinePage() {
       return { total: "—", unit: "UMplan", rows: [] as { id: string; label: string; amount: string; at: string }[] };
     }
     if (incomeTab === "swap") {
+      // Sell has no instant rebate — never show「卖出（无即时奖）」even from stale API.
+      const swapRows = (earnings.swapPromoRows ?? []).filter(
+        (row) => !/卖出|sell/i.test(row.label),
+      );
       return {
         total: earnings.swapPromoTotal ?? "—",
-        unit: "UMplan",
-        rows: (earnings.swapPromoRows ?? []).map((row) => ({
+        unit: "USDT",
+        rows: swapRows.map((row) => ({
           ...row,
           label: localizeLayerLabel(row.label, locale),
         })),
@@ -210,13 +218,19 @@ export default function MinePage() {
       <div className="card">
         <h2 className="card-title">{t("mine.teamTitle")}</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          {team?.source === "graph"
+          {team?.source === "graph" || team?.source === "mixed"
             ? t("mine.teamGraph")
-            : team?.source === "unconfigured"
-              ? t("mine.teamUnconfigured")
-              : mounted && isConnected
-                ? t("mine.teamLoading")
-                : t("mine.teamConnect")}
+            : team?.source === "chain"
+              ? t("mine.teamChain")
+              : team?.source === "unconfigured"
+                ? t("mine.teamUnconfigured")
+                : teamLoading && mounted && isConnected
+                  ? t("mine.teamLoading")
+                  : teamError
+                    ? teamError
+                    : mounted && isConnected
+                      ? t("mine.teamUnconfigured")
+                      : t("mine.teamConnect")}
         </p>
         <div className="team-grid">
           <div className="team-cell">
@@ -236,6 +250,32 @@ export default function MinePage() {
             <div className="t-label">{t("mine.marketVolume")}</div>
           </div>
         </div>
+        {mounted && isConnected && (
+          <div className="direct-members">
+            <div className="direct-members-head">
+              {t("mine.directMembersTitle", {
+                n: team?.members?.length ?? (Number(directsDisplay) || 0),
+              })}
+            </div>
+            {(team?.members?.length ?? 0) === 0 ? (
+              <p className="muted direct-members-empty">
+                {teamLoading ? t("mine.teamLoading") : t("mine.directMembersEmpty")}
+              </p>
+            ) : (
+              <ul className="direct-members-list">
+                {team!.members!.map((m, i) => (
+                  <li key={m.address} className="direct-member-row">
+                    <span className="dm-idx">{i + 1}</span>
+                    <span className="dm-addr mono">{maskAddr(m.address)}</span>
+                    <span className="dm-meta muted">
+                      {m.boundAt || t("mine.boundAtUnknown")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -282,13 +322,19 @@ export default function MinePage() {
         ) : (
           <>
             <p className="muted" style={{ marginTop: 0 }}>
-              {earnings?.source === "graph"
+              {earnings?.source === "graph" || earnings?.source === "mixed"
                 ? t("mine.incomeGraph")
-                : earnings?.source === "unconfigured"
-                  ? t("mine.incomeUnconfigured")
-                  : mounted && isConnected
-                    ? t("common.loading")
-                    : ""}
+                : earnings?.source === "chain"
+                  ? t("mine.incomeChain")
+                  : earnings?.source === "unconfigured"
+                    ? t("mine.incomeUnconfigured")
+                    : earningsLoading && mounted && isConnected
+                      ? t("common.loading")
+                      : earningsError
+                        ? earningsError
+                        : mounted && isConnected
+                          ? t("mine.incomeUnconfigured")
+                          : ""}
             </p>
             <div className="filters">
               <button

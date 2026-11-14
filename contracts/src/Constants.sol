@@ -13,12 +13,12 @@ pragma solidity ^0.8.24;
 /// - Q7b: admin whitelist seats up to 453
 /// - Q8: BrokerMarket stub / Phase 2 only
 /// - Q10: no-referrer 0.5% → Treasury
-/// - Q11: rewards in payment token
+/// - Q11: swap instant rewards paid in project token (UMplan)
 /// - Q12: no UUPS for MVP (Ownable + Pausable)
 library Constants {
     uint16 internal constant BPS_DENOM = 10_000;
 
-    // Swap instant rewards (payment token) — only retained overlap with initial design.
+    // Swap instant rewards in project token (UMplan): trader 0.5% + referrer/treasury 0.5%.
     uint16 internal constant INSTANT_REWARD_BPS = 50; // 0.5%
 
     // Burn split of B (sum = 10000): 30% sink / 50% market / 15% shareholders / 5% 变异沉淀池
@@ -38,11 +38,11 @@ library Constants {
     uint8 internal constant LAYER_COUNT = 9;
     uint8 internal constant TIER_COUNT = 4;
 
-    // Burn tier thresholds in USD (1e18)
-    uint256 internal constant TIER1_USD = 100e18;
-    uint256 internal constant TIER2_USD = 500e18;
-    uint256 internal constant TIER3_USD = 800e18;
-    uint256 internal constant TIER4_USD = 1500e18;
+    // Burn tier thresholds in USD (1e18) — test cut: 1 / 5 / 8 / 15 (was 100 / 500 / 800 / 1500).
+    uint256 internal constant TIER1_USD = 1e18;
+    uint256 internal constant TIER2_USD = 5e18;
+    uint256 internal constant TIER3_USD = 8e18;
+    uint256 internal constant TIER4_USD = 15e18;
 
     // Pool weights bps [3333, 2500, 2500, 1667] = 10000
     function poolWeightBps(uint8 tier) internal pure returns (uint16) {
@@ -67,5 +67,9 @@ library Constants {
     // Mainnet addresses (documentation + deploy defaults)
     address internal constant UMPLAN_MAINNET = 0xad09D287327C383283820CfCEe7AC0e6C7De7777;
     address internal constant SPCXB_MAINNET = 0xbe9D156892E55e7154BcD3cB0FEA677F9D3103E1;
+    address internal constant USDT_MAINNET = 0x55d398326f99059fF775485246999027B3197955;
+    address internal constant PANCAKE_V2_ROUTER = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+    /// @dev Pancake V2 pair UMplan/SPCXB (primary liquidity ~0.25% fee).
+    address internal constant UMPLAN_SPCXB_PAIR = 0xC3118CCC0be00E7FA39aC8041694e09F52178d6F;
     address internal constant DEAD = 0x000000000000000000000000000000000000dEaD;
 }

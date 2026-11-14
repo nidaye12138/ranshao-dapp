@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAccount, useReadContract } from "wagmi";
-import { isAddress, zeroAddress } from "viem";
+import { zeroAddress } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
+import { toChecksumAddress } from "@/lib/addressUtils";
 import { useMounted } from "@/lib/useMounted";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
@@ -49,6 +50,8 @@ export type OnboardingGateState = {
   reopenGate: () => void;
   dismissCoach: () => void;
   openCoach: () => void;
+  /** Re-read on-chain referrer (after bind tx when receipt poll stalls). */
+  refetchReferrer: () => void;
 };
 
 /**
@@ -64,16 +67,17 @@ export function useOnboardingGate(): OnboardingGateState {
   const [editingRef, setEditingRef] = useState(false);
   const [forceCoach, setForceCoach] = useState(false);
 
-  // Persist ?ref= for any landing tab
+  // Persist ?ref= for any landing tab (checksum-tolerant — invite links often mishandle EIP-55)
   useEffect(() => {
     if (!mounted) return;
     const fromUrl = captureRefFromSearch(search);
-    if (fromUrl && isAddress(fromUrl)) {
-      stashPendingRef(fromUrl);
-      setRefDraft(fromUrl);
+    const urlRef = toChecksumAddress(fromUrl);
+    if (urlRef) {
+      stashPendingRef(urlRef);
+      setRefDraft(urlRef);
     } else {
-      const pending = readPendingRef();
-      if (pending && isAddress(pending)) setRefDraft(pending);
+      const pending = toChecksumAddress(readPendingRef());
+      if (pending) setRefDraft(pending);
     }
   }, [mounted, search]);
 
@@ -87,23 +91,41 @@ export function useOnboardingGate(): OnboardingGateState {
 
   const enabled = mounted && isConfigured && !!address;
 
-  const { data: myReferrer, isFetched: referrerFetched } = useReadContract({
+  const {
+    data: myReferrer,
+    isFetched: referrerFetched,
+    isError: referrerError,
+    refetch: refetchReferrerQuery,
+  } = useReadContract({
     address: addresses.registry,
     abi: TreeAbi,
     functionName: "referrerOf",
     args: [address!],
     chainId: appChainId,
-    query: { enabled },
+    query: { enabled, refetchInterval: enabled ? 12_000 : false },
   });
 
-  const { data: rootFlag, isFetched: rootFetched } = useReadContract({
+  const refetchReferrer = useCallback(() => {
+    void refetchReferrerQuery();
+  }, [refetchReferrerQuery]);
+
+  const { data: rootFlag, isFetched: rootFetched, isError: rootError } = useReadContract({
     address: addresses.registry,
     abi: TreeAbi,
     functionName: "isRoot",
     args: [address!],
     chainId: appChainId,
-    query: { enabled },
+    query: { enabled, refetchInterval: enabled ? 12_000 : false },
   });
+
+  // RPC blips must not strand users on the gate after a successful bind
+  useEffect(() => {
+    if (!enabled || (!referrerError && !rootError)) return;
+    const id = window.setInterval(() => {
+      void refetchReferrerQuery();
+    }, 5_000);
+    return () => window.clearInterval(id);
+  }, [enabled, referrerError, rootError, refetchReferrerQuery]);
 
   const { data: activated } = useReadContract({
     address: addresses.dividends,
@@ -215,11 +237,22 @@ export function useOnboardingGate(): OnboardingGateState {
   const phase: GatePhase = useMemo(() => {
     if (!mounted) return "loading";
     if (!isConnected) return softSkipped ? "soft_blocked" : "needs_wallet";
-    if (!enabled || !referrerFetched || !rootFetched) return "loading";
+    if (!enabled || !referrerFetched || !rootFetched || referrerError || rootError) return "loading";
     if (onChainOk || local.completed) return "ready";
     if (softSkipped) return "soft_blocked";
     return "needs_bind";
-  }, [mounted, isConnected, enabled, referrerFetched, rootFetched, onChainOk, local.completed, softSkipped]);
+  }, [
+    mounted,
+    isConnected,
+    enabled,
+    referrerFetched,
+    rootFetched,
+    referrerError,
+    rootError,
+    onChainOk,
+    local.completed,
+    softSkipped,
+  ]);
 
   const featuresUnlocked = onChainOk || !!local.completed;
 
@@ -259,5 +292,6 @@ export function useOnboardingGate(): OnboardingGateState {
     reopenGate,
     dismissCoach,
     openCoach,
+    refetchReferrer,
   };
 }

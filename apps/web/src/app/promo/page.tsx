@@ -7,10 +7,11 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { formatUnits } from "viem";
+import { formatUnits, maxUint256 } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
+import { formatTxError } from "@/lib/txError";
 import { useMounted } from "@/lib/useMounted";
 import { useEarnings, useStats } from "@/lib/api/client";
 import { StakeDesk } from "@/components/StakeDesk";
@@ -21,30 +22,35 @@ import BurnAbi from "@/lib/abi/BurnRouter.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
 
+/** One-time max approve so spot moves don't leave BurnRouter allowance short. */
+const APPROVE_MAX = maxUint256;
+
+/** Spot USD-equivalent burn tiers (test cut: 1/5/8/15; was 100/500/800/1500). */
 const TIERS = [
-  { id: 1, u: 100, label: "100U" },
-  { id: 2, u: 500, label: "500U" },
-  { id: 3, u: 800, label: "800U" },
-  { id: 4, u: 1500, label: "1500U" },
+  { id: 1, u: 1, label: "1U" },
+  { id: 2, u: 5, label: "5U" },
+  { id: 3, u: 8, label: "8U" },
+  { id: 4, u: 15, label: "15U" },
 ];
 
 const POOL_META = [
-  { key: "pool1" as const, tier: "100U", pct: "33.33%", tierId: 1 },
-  { key: "pool2" as const, tier: "500U", pct: "25%", tierId: 2 },
-  { key: "pool3" as const, tier: "800U", pct: "25%", tierId: 3 },
-  { key: "pool4" as const, tier: "1500U", pct: "16.67%", tierId: 4 },
+  { key: "pool1" as const, tier: "1U", pct: "33.33%", tierId: 1 },
+  { key: "pool2" as const, tier: "5U", pct: "25%", tierId: 2 },
+  { key: "pool3" as const, tier: "8U", pct: "25%", tierId: 3 },
+  { key: "pool4" as const, tier: "15U", pct: "16.67%", tierId: 4 },
 ];
 
 export default function PromoPage() {
   const mounted = useMounted();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { address, isConnected } = useAccount();
   const gate = useOnboardingOptional();
   const featuresUnlocked = gate?.featuresUnlocked ?? true;
   const [selectedTierId, setSelectedTierId] = useState<number>(1);
   const [agreed, setAgreed] = useState(false);
   const [nowSec, setNowSec] = useState(0);
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const [pendingAction, setPendingAction] = useState<"approve" | "burn" | null>(null);
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId: appChainId });
   const { data: stats } = useStats();
   const { data: earnings } = useEarnings(address);
@@ -55,30 +61,9 @@ export default function PromoPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const selected = TIERS.find((tier) => tier.id === selectedTierId) ?? TIERS[0];
   const enabled = mounted && isConfigured && !!address;
 
-  const { data: tokenAmount } = useReadContract({
-    address: addresses.burn,
-    abi: BurnAbi,
-    functionName: "quoteTokensForTier",
-    args: [selectedTierId],
-    chainId: appChainId,
-    query: { enabled: isConfigured && selectedTierId >= 1 },
-  });
-
-  const parsed = (tokenAmount as bigint | undefined) ?? 0n;
-
-  const { data: quoteUsd } = useReadContract({
-    address: addresses.burn,
-    abi: BurnAbi,
-    functionName: "quoteBurnUsd",
-    args: [parsed],
-    chainId: appChainId,
-    query: { enabled: enabled && parsed > 0n },
-  });
-
-  const { data: tier } = useReadContract({
+  const { data: tier, refetch: refetchTier } = useReadContract({
     address: addresses.dividends,
     abi: DivAbi,
     functionName: "tierOf",
@@ -87,13 +72,60 @@ export default function PromoPage() {
     query: { enabled },
   });
 
-  const { data: buttonTier } = useReadContract({
+  const { data: effectiveTierRaw, refetch: refetchEffectiveTier } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "effectiveButtonTier",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
+  const { data: buttonTierRaw, refetch: refetchButtonTier } = useReadContract({
     address: addresses.burn,
     abi: BurnAbi,
     functionName: "buttonTierOf",
     args: [address!],
     chainId: appChainId,
     query: { enabled },
+  });
+
+  const myTier = tier != null ? Number(tier) : 0;
+  const buttonTier = buttonTierRaw != null ? Number(buttonTierRaw as number) : 0;
+  const effectiveTier =
+    effectiveTierRaw != null
+      ? Number(effectiveTierRaw as number)
+      : Math.max(myTier, buttonTier);
+  const tierAlreadyOwned = selectedTierId <= effectiveTier;
+  const nextOpenTierId = effectiveTier < 4 ? effectiveTier + 1 : 0;
+  const selected =
+    TIERS.find((tierItem) => tierItem.id === selectedTierId) ??
+    TIERS.find((tierItem) => tierItem.id === nextOpenTierId) ??
+    TIERS[0];
+
+  useEffect(() => {
+    if (nextOpenTierId > 0 && selectedTierId <= effectiveTier) {
+      setSelectedTierId(nextOpenTierId);
+    }
+  }, [effectiveTier, nextOpenTierId, selectedTierId]);
+
+  const { data: parsedRaw } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "quoteTokensForTier",
+    args: [selected.id],
+    chainId: appChainId,
+    query: { enabled: isConfigured && selected.id > 0 },
+  });
+  const parsed = (parsedRaw as bigint | undefined) ?? 0n;
+
+  const { data: quoteUsd } = useReadContract({
+    address: addresses.burn,
+    abi: BurnAbi,
+    functionName: "quoteBurnUsd",
+    args: [parsed],
+    chainId: appChainId,
+    query: { enabled: enabled && parsed > 0n },
   });
 
   const { data: myBurnedUsd } = useReadContract({
@@ -132,7 +164,7 @@ export default function PromoPage() {
     query: { enabled },
   });
 
-  const { data: allowance } = useReadContract({
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: addresses.token,
     abi: ERC20Abi,
     functionName: "allowance",
@@ -140,6 +172,31 @@ export default function PromoPage() {
     chainId: appChainId,
     query: { enabled },
   });
+
+  const { data: tokenBal, refetch: refetchTokenBal } = useReadContract({
+    address: addresses.token,
+    abi: ERC20Abi,
+    functionName: "balanceOf",
+    args: [address!],
+    chainId: appChainId,
+    query: { enabled },
+  });
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    void refetchAllowance();
+    void refetchTokenBal();
+    void refetchTier();
+    void refetchEffectiveTier();
+    void refetchButtonTier();
+  }, [
+    isSuccess,
+    refetchAllowance,
+    refetchTokenBal,
+    refetchTier,
+    refetchEffectiveTier,
+    refetchButtonTier,
+  ]);
 
   const { data: m1 } = useReadContract({
     address: addresses.dividends,
@@ -176,7 +233,14 @@ export default function PromoPage() {
 
   const memberCounts = [m1, m2, m3, m4].map((m) => (m != null ? Number(m as bigint) : null));
 
-  const needApprove = (allowance as bigint | undefined ?? 0n) < parsed;
+  const allowanceReady = allowance !== undefined;
+  const allowanceBi = (allowance as bigint | undefined) ?? 0n;
+  const balBi = (tokenBal as bigint | undefined) ?? null;
+  /** Max approve once → later burns skip 授权 (same UX as Swap). */
+  const needApprove = allowanceReady && parsed > 0n && allowanceBi < parsed;
+  const insufficientBal = balBi != null && parsed > 0n && balBi < parsed;
+  const busy = isPending || confirming;
+  const showApproveCta = needApprove || (busy && pendingAction === "approve");
   const usdPreview =
     quoteUsd != null ? Number(formatUnits(quoteUsd as bigint, 18)) : selected.u;
   const splitFire = usdPreview * 0.3;
@@ -196,7 +260,6 @@ export default function PromoPage() {
       ? Math.max(0, Number(nextClaim) - nowSec)
       : 0;
 
-  const myTier = tier != null ? Number(tier) : 0;
   const burnedGlobal =
     stats?.totalBurnedToken != null ? `${stats.totalBurnedToken} UMplan` : "—";
   const myWeight =
@@ -222,17 +285,26 @@ export default function PromoPage() {
         </div>
 
         <div className="presets">
-          {TIERS.map((tierItem) => (
-            <button
-              key={tierItem.id}
-              type="button"
-              className={selectedTierId === tierItem.id ? "preset-btn on" : "preset-btn"}
-              onClick={() => setSelectedTierId(tierItem.id)}
-            >
-              {tierItem.label}
-              <small>{tierSubs[tierItem.id]}</small>
-            </button>
-          ))}
+          {TIERS.map((tierItem) => {
+            const owned = tierItem.id <= effectiveTier;
+            return (
+              <button
+                key={tierItem.id}
+                type="button"
+                className={selectedTierId === tierItem.id ? "preset-btn on" : "preset-btn"}
+                disabled={owned}
+                aria-disabled={owned}
+                onClick={() => {
+                  if (!owned) setSelectedTierId(tierItem.id);
+                }}
+              >
+                {tierItem.label}
+                <small>
+                  {owned ? t("promo.tierOwned") : tierSubs[tierItem.id]}
+                </small>
+              </button>
+            );
+          })}
         </div>
 
         <div className="input-box tight">
@@ -250,6 +322,8 @@ export default function PromoPage() {
           </div>
         </div>
         <p className="muted tip-line">{t("promo.tipManual")}</p>
+        <p className="muted tip-line">{t("promo.notStakeTip")}</p>
+        <p className="muted tip-line">{t("promo.tierOnceTip")}</p>
 
         <dl className="stats compact-stats">
           <div>
@@ -260,8 +334,12 @@ export default function PromoPage() {
             <dt>{t("promo.myTier")}</dt>
             <dd>
               {tier != null ? `T${tier}` : "—"}
-              {buttonTier != null ? ` · ${t("promo.buttonTier", { n: String(buttonTier) })}` : ""}
+              {buttonTier > 0 ? ` · ${t("promo.buttonTier", { n: String(buttonTier) })}` : ""}
             </dd>
+          </div>
+          <div>
+            <dt>{t("promo.walletBal")}</dt>
+            <dd>{balBi != null ? `${fmtToken(balBi)} UMplan` : "—"}</dd>
           </div>
         </dl>
 
@@ -316,45 +394,110 @@ export default function PromoPage() {
         ) : !isConfigured ? (
           <p className="banner warn">{t("common.contractsUnconfigured")}</p>
         ) : (
-          <div className="cta-row" style={{ marginTop: "0.75rem" }}>
-            {needApprove && (
-              <button
-                type="button"
-                className="btn"
-                disabled={isPending || confirming || !agreed || parsed === 0n || !featuresUnlocked}
-                onClick={() =>
-                  writeContract({
-                    address: addresses.token,
-                    abi: ERC20Abi,
-                    functionName: "approve",
-                    args: [addresses.burn, parsed],
-                    chainId: appChainId,
-                  })
-                }
-              >
-                {isPending || confirming ? t("common.confirming") : t("common.approve")}
-              </button>
+          <>
+            {!agreed && <p className="muted tip-line">{t("promo.needAgree")}</p>}
+            {effectiveTier >= 4 && <p className="banner ok">{t("promo.allTiersDone")}</p>}
+            {agreed && tierAlreadyOwned && effectiveTier < 4 && (
+              <p className="banner warn">{t("promo.tierUsed")}</p>
             )}
-            <button
-              type="button"
-              className="btn primary burn"
-              style={{ flex: 1 }}
-              disabled={
-                isPending || confirming || needApprove || parsed === 0n || !agreed || !featuresUnlocked
-              }
-              onClick={() =>
-                writeContract({
-                  address: addresses.burn,
-                  abi: BurnAbi,
-                  functionName: "burnTier",
-                  args: [selectedTierId],
-                  chainId: appChainId,
-                })
-              }
-            >
-              {isPending || confirming ? t("common.confirming") : t("promo.confirmWeight")}
-            </button>
-          </div>
+            {agreed && !tierAlreadyOwned && parsed === 0n && (
+              <p className="banner warn">{t("promo.quoteFailed")}</p>
+            )}
+            {agreed && !tierAlreadyOwned && insufficientBal && (
+              <p className="banner warn">
+                {t("promo.insufficientBal", {
+                  need: fmtToken(parsed),
+                  have: balBi != null ? fmtToken(balBi) : "—",
+                })}
+              </p>
+            )}
+            {agreed && !tierAlreadyOwned && !allowanceReady && parsed > 0n && (
+              <p className="muted tip-line">{t("promo.checkingAllowance")}</p>
+            )}
+            {agreed &&
+              !tierAlreadyOwned &&
+              needApprove &&
+              parsed > 0n &&
+              !insufficientBal && (
+                <p className="banner warn">{t("promo.needApproveFirst")}</p>
+              )}
+            <div className="cta-row" style={{ marginTop: "0.75rem" }}>
+              {showApproveCta ? (
+                <button
+                  type="button"
+                  className="btn primary"
+                  style={{ flex: 1 }}
+                  disabled={
+                    busy ||
+                    !agreed ||
+                    parsed === 0n ||
+                    !featuresUnlocked ||
+                    insufficientBal ||
+                    tierAlreadyOwned
+                  }
+                  onClick={() => {
+                    reset();
+                    setPendingAction("approve");
+                    writeContract({
+                      address: addresses.token,
+                      abi: ERC20Abi,
+                      functionName: "approve",
+                      args: [addresses.burn, APPROVE_MAX],
+                      chainId: appChainId,
+                    });
+                  }}
+                >
+                  {busy
+                    ? isPending
+                      ? t("swap.waitingWallet")
+                      : t("common.confirming")
+                    : t("common.approve")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn primary burn"
+                  style={{ flex: 1 }}
+                  disabled={
+                    busy ||
+                    !allowanceReady ||
+                    parsed === 0n ||
+                    !agreed ||
+                    !featuresUnlocked ||
+                    insufficientBal ||
+                    tierAlreadyOwned
+                  }
+                  onClick={() => {
+                    if (insufficientBal || tierAlreadyOwned || needApprove) return;
+                    reset();
+                    setPendingAction("burn");
+                    writeContract({
+                      address: addresses.burn,
+                      abi: BurnAbi,
+                      functionName: "burnTier",
+                      args: [selected.id],
+                      chainId: appChainId,
+                    });
+                  }}
+                >
+                  {busy
+                    ? isPending
+                      ? t("swap.waitingWallet")
+                      : t("common.confirming")
+                    : !allowanceReady
+                      ? t("promo.checkingAllowance")
+                      : t("promo.confirmWeight")}
+                </button>
+              )}
+            </div>
+            {error && <p className="banner warn">{formatTxError(error, locale)}</p>}
+            {isSuccess && pendingAction === "approve" && (
+              <p className="banner ok">{t("promo.approveOk")}</p>
+            )}
+            {isSuccess && pendingAction === "burn" && (
+              <p className="banner ok">{t("promo.success")}</p>
+            )}
+          </>
         )}
       </div>
 

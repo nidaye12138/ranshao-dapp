@@ -34,7 +34,9 @@ contract DeployBscTestnet is Script, UmPlanDeployer {
                 tokenUsd: vm.envOr("TOKEN_USD", uint256(1e16)),
                 mintMode: true,
                 maxTaxBps: 0,
-                burnSink: Constants.DEAD
+                burnSink: Constants.DEAD,
+                pancakeRouter: address(0),
+                swapPaymentIsSpcxb: false
             })
         );
 

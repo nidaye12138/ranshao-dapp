@@ -9,9 +9,11 @@
 | Decimals | 18 |
 | Mode | **External existing BEP-20** — dApp does **not** deploy or mint on mainnet |
 
-`SwapFacade` runs in **inventory mode** (`mintMode=false`): operators fund via `depositInventory`, then buys pay out from that balance.
+Mainnet `SwapFacade` runs in **DEX mode**: payment token = **SPCXB**, fills via **Pancake V2** router on the deep **UMplan/SPCXB** pair (`0xc3118ccc0be00e7fa39ac8041694e09f52178d6f`, ~0.25% V2 fee). No inventory / USDT liquidity required for buy/sell.
 
-Testnet / local still deploy `RanshaoToken` with `mintMode=true`.
+- Pancake V2 Router: `0x10ED43C718714eb63d5aA57B78B54704E256024E`
+- There is **no** UMplan/USDT pool; V2 SPCXB/USDT is dust — do not multi-hop USDT on V2 alone.
+- Testnet / local may still use inventory or mint mode (`pancakeRouter=0`, payment=mock USDT).
 
 ## Mainnet SPCXB (dividend pools)
 

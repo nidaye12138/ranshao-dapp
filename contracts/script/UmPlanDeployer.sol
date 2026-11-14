@@ -44,6 +44,10 @@ abstract contract UmPlanDeployer {
         bool mintMode;
         uint16 maxTaxBps;
         address burnSink;
+        /// @dev Pancake V2 router; address(0) = inventory SwapFacade. Mainnet: set + payment=SPCXB.
+        address pancakeRouter;
+        /// @dev When true (mainnet DEX), SwapFacade payment token is SPCXB instead of USDT.
+        bool swapPaymentIsSpcxb;
     }
 
     function _deployUmPlan(Params memory p) internal returns (Addresses memory a) {
@@ -72,17 +76,19 @@ abstract contract UmPlanDeployer {
         ShareholderPool(a.shareholders).setBurnRouter(a.burnRouter);
         DividendPools(a.dividends).setBurnRouter(a.burnRouter);
 
+        address payment = p.swapPaymentIsSpcxb ? a.spcxb : a.usdt;
         a.swap = address(
             new SwapFacade(
                 p.admin,
                 a.token,
-                a.usdt,
+                payment,
                 p.usdtDecimals,
                 a.oracle,
                 a.tree,
                 payable(a.treasury),
                 p.mintMode,
-                p.maxTaxBps
+                p.maxTaxBps,
+                p.pancakeRouter
             )
         );
 

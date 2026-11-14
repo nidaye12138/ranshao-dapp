@@ -1,18 +1,32 @@
-import { type Address, zeroAddress } from "viem";
+import { getAddress, isAddress, type Address, zeroAddress } from "viem";
 import { bsc } from "viem/chains";
 import { appChainId } from "@/lib/chain";
 
 /** BSC mainnet UMplan — owner-confirmed project token (external, not minted by this dApp). */
-export const UMPLAN_MAINNET = "0xad09D287327C383283820CfCEe7AC0e6C7De7777" as const satisfies Address;
+export const UMPLAN_MAINNET = getAddress("0xad09d287327c383283820cfcee7ac0e6c7de7777");
 
 /** BSC mainnet SPCXB — SpaceX US-stock tokenization (dividend pool asset, ≠ UMplan). */
-export const SPCXB_MAINNET = "0xbe9D156892E55e7154BcD3cB0FEA677F9D3103E1" as const satisfies Address;
+export const SPCXB_MAINNET = getAddress("0xbe9d156892e55e7154bcd3cb0fea677f9d3103e1");
 
 /** BSC mainnet Binance-Peg USDT (18 decimals). */
-export const USDT_MAINNET = "0x55d398326f99059fF775485246999027B3197955" as const satisfies Address;
+export const USDT_MAINNET = getAddress("0x55d398326f99059ff775485246999027b3197955");
 
+/** Live SwapFacade (sell no-reward / buy 0.5% UMplan) — EIP-55 checksummed. */
+export const SWAP_MAINNET = getAddress("0x7a853364f4addb839fdaddfdf080a939b1275fbf");
+
+/**
+ * Normalize env / hardcoded hex to EIP-55. Viem rejects mixed-case bad checksums
+ * (e.g. NEXT_PUBLIC_SWAP_ADDRESS=0x7a853364f4AddB…FbF → "Address is invalid").
+ */
 function addr(envValue: string | undefined, fallback: Address = zeroAddress): Address {
-  if (envValue && envValue.startsWith("0x") && envValue.length === 42) return envValue as Address;
+  const raw = (envValue || "").trim();
+  if (raw && isAddress(raw, { strict: false })) {
+    try {
+      return getAddress(raw);
+    } catch {
+      /* fall through */
+    }
+  }
   return fallback;
 }
 
@@ -28,7 +42,7 @@ export const addresses = {
   spcxb: addr(process.env.NEXT_PUBLIC_SPCXB_ADDRESS, mainnetFallbacks ? SPCXB_MAINNET : zeroAddress),
   usdt: addr(process.env.NEXT_PUBLIC_USDT_ADDRESS, mainnetFallbacks ? USDT_MAINNET : zeroAddress),
   registry: addr(process.env.NEXT_PUBLIC_REGISTRY_ADDRESS), // ReferralTree
-  swap: addr(process.env.NEXT_PUBLIC_SWAP_ADDRESS),
+  swap: addr(process.env.NEXT_PUBLIC_SWAP_ADDRESS, mainnetFallbacks ? SWAP_MAINNET : zeroAddress),
   burn: addr(process.env.NEXT_PUBLIC_BURN_ADDRESS),
   dividends: addr(process.env.NEXT_PUBLIC_DIVIDENDS_ADDRESS),
   shareholders: addr(process.env.NEXT_PUBLIC_SHAREHOLDER_ADDRESS),

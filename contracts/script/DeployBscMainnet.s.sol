@@ -5,9 +5,10 @@ import {Script, console2} from "forge-std/Script.sol";
 import {Constants} from "../src/Constants.sol";
 import {UmPlanDeployer} from "./UmPlanDeployer.sol";
 
-/// @notice BSC Mainnet — external UMplan + SPCXB; inventory SwapFacade (no mint).
+/// @notice BSC Mainnet — external UMplan + SPCXB; SwapFacade DEX mode via Pancake V2 (payment=SPCXB).
 contract DeployBscMainnet is Script, UmPlanDeployer {
     address constant DEFAULT_USDT = 0x55d398326f99059fF775485246999027B3197955;
+    address constant PANCAKE_V2_ROUTER = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -16,10 +17,12 @@ contract DeployBscMainnet is Script, UmPlanDeployer {
         address projectToken = vm.envOr("PROJECT_TOKEN", Constants.UMPLAN_MAINNET);
         address spcxbAddr = vm.envOr("SPCXB_ADDRESS", Constants.SPCXB_MAINNET);
         address usdtAddr = vm.envOr("USDT_ADDRESS", DEFAULT_USDT);
+        address pancakeRouter = vm.envOr("PANCAKE_ROUTER", PANCAKE_V2_ROUTER);
 
         console2.log("Deployer / admin", admin);
         console2.log("UMplan", projectToken);
         console2.log("SPCXB", spcxbAddr);
+        console2.log("PancakeRouter", pancakeRouter);
 
         vm.startBroadcast(pk);
 
@@ -34,14 +37,17 @@ contract DeployBscMainnet is Script, UmPlanDeployer {
                 tokenUsd: vm.envOr("TOKEN_USD", uint256(1e16)),
                 mintMode: false,
                 maxTaxBps: uint16(vm.envOr("MAX_TRANSFER_TAX_BPS", uint256(300))),
-                burnSink: Constants.DEAD
+                burnSink: Constants.DEAD,
+                pancakeRouter: pancakeRouter,
+                swapPaymentIsSpcxb: true
             })
         );
 
         vm.stopBroadcast();
 
         console2.log("=== BSC MAINNET UM-PLAN (external UMplan + SPCXB) ===");
-        console2.log("Next: SwapFacade.depositInventory(UMplan); DividendPools.inject(SPCXB); whitelist seats");
+        console2.log("SwapFacade DEX: payment=SPCXB via Pancake V2 UMplan/SPCXB; no inventory deposit needed");
+        console2.log("Next: DividendPools.inject(SPCXB); whitelist seats; update frontend SWAP address");
         console2.log("ReferralTree", a.tree);
         console2.log("Treasury", a.treasury);
         console2.log("MockPriceOracle", a.oracle);
