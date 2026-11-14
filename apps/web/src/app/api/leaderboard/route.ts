@@ -40,13 +40,14 @@ export async function GET() {
 
   const chain = await fetchLeaderboardFromChain(10);
   if (chain.error && chain.items.length === 0) {
+    const registryMissing = /registry unconfigured/i.test(chain.error);
     const body: LeaderboardResponse & { error?: string } = {
-      source: "unconfigured",
+      source: registryMissing ? "unconfigured" : "chain",
       updatedAt,
       items: [],
       error: chain.error,
     };
-    return NextResponse.json(body, { status: graphUrl() ? 502 : 200 });
+    return NextResponse.json(body, { status: graphUrl() || !registryMissing ? 502 : 200 });
   }
 
   const body: LeaderboardResponse = {

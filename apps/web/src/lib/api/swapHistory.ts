@@ -14,6 +14,7 @@ import {
 import { bsc } from "viem/chains";
 import { addresses } from "@/lib/addresses";
 import { formatTokenRaw, tsToLocal } from "@/lib/api/graph";
+import { serverBscRpcCandidates } from "@/lib/api/serverBscRpc";
 import type { EarningsRow } from "@/lib/api/types";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 
@@ -76,16 +77,7 @@ function swapLogAddresses(): Address[] {
 }
 
 function rpcCandidates(): string[] {
-  const env = (process.env.BSC_RPC_URL || process.env.NEXT_PUBLIC_BSC_RPC_URL || "").trim();
-  const list = [
-    env && !/bsc-dataseed/i.test(env) ? env : "",
-    "https://bsc-rpc.publicnode.com",
-    "https://bsc-dataseed1.bnbchain.org",
-    "https://bsc-dataseed2.bnbchain.org",
-    "https://bsc-dataseed1.defibit.io",
-    "https://bsc-dataseed.binance.org",
-  ].filter(Boolean);
-  return [...new Set(list)];
+  return serverBscRpcCandidates();
 }
 
 function explorerTx(hash: Hex): string {
