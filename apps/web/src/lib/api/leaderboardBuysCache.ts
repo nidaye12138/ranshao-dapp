@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Address } from "viem";
 import type { BuyEdge } from "@/lib/api/leaderboardRank";
@@ -26,14 +26,23 @@ export function leaderboardBuyCachePath(): string {
 
 export function loadBuyCache(): LeaderboardBuyCache {
   try {
-    const raw = readFileSync(leaderboardBuyCachePath(), "utf8");
+    const path = leaderboardBuyCachePath();
+    const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw) as LeaderboardBuyCache;
     if (!parsed || !Array.isArray(parsed.buys)) return { scannedTo: 0, buys: [] };
     const scannedTo = Number(parsed.scannedTo) || 0;
     const buys = parsed.buys.filter(
       (b) => b && typeof b.buyer === "string" && typeof b.tokenAmount === "string",
     );
-    return { scannedTo, buys, updatedAt: parsed.updatedAt };
+    let updatedAt = parsed.updatedAt;
+    if (!updatedAt) {
+      try {
+        updatedAt = new Date(statSync(path).mtimeMs).toISOString();
+      } catch {
+        /* ignore */
+      }
+    }
+    return { scannedTo, buys, updatedAt };
   } catch {
     return { scannedTo: 0, buys: [] };
   }

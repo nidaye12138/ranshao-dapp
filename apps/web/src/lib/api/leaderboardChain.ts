@@ -34,8 +34,16 @@ export const DEFAULT_LEADERBOARD_ROOT = "0x1e403807bA07c1f45C08e080AF3c53C238582
 
 /** 48.club / similar: eth_getLogs max ~5000 blocks. */
 const LOGS_SPAN = 5_000n;
-/** Keep /api/leaderboard under CF/nginx budgets while catching up the buy cache. */
-const BUY_SCAN_BUDGET_MS = 8_000;
+/**
+ * Buy-log catch-up must stay tiny: nginx proxy_read_timeout is 60s and a single
+ * hung eth_getLogs can eat 10–20s. Prefer disk cache; never block the response.
+ */
+const BUY_SCAN_BUDGET_MS = 2_500;
+/** Skip in-request catch-up when cache is this fresh (ms) and already has buys. */
+const BUY_CACHE_FRESH_MS = 120_000;
+/** Max tip lag (blocks) to attempt catch-up in-request; larger lag → cache only. */
+const BUY_CATCHUP_MAX_LAG = 5_000n;
+const LOGS_RPC_TIMEOUT_MS = 4_000;
 
 const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
@@ -225,38 +233,54 @@ async function collectBuysIncremental(
   return { buys: out, reached: reached < fromBlock - 1n ? fromBlock - 1n : reached };
 }
 
+function buyCacheFresh(disk: ReturnType<typeof loadBuyCache>): boolean {
+  if (!disk.buys.length || disk.scannedTo <= 0) return false;
+  const updated = disk.updatedAt ? Date.parse(disk.updatedAt) : NaN;
+  return Number.isFinite(updated) && Date.now() - updated < BUY_CACHE_FRESH_MS;
+}
+
 /**
  * Umbrella volume = 伞下买入币量 (Bought.tokenAmountDelivered), up to 9 layers, exclude self.
- * Uses disk cache + buyer-scoped chunked getLogs on logs-capable RPCs (no wide unbound scans).
+ * Disk cache first (fast path). Optional short tip catch-up only when lag is small —
+ * never wide historical scans in-request (avoids nginx/CF 504).
  */
 async function fetchBuysForTree(binds: BindEdge[]): Promise<BuyEdge[]> {
   const disk = loadBuyCache();
+  // Fast path: recent cache with known buys — rank immediately, skip getLogs.
+  if (buyCacheFresh(disk)) {
+    return cacheToBuyEdges(disk);
+  }
+
   let merged = disk;
   const buyers = treeBuyers(binds);
-
   const logsRpcs = serverBscLogsRpcCandidates();
   const deadline = Date.now() + BUY_SCAN_BUDGET_MS;
-  let tip = 0n;
 
   for (const rpc of logsRpcs) {
     if (Date.now() > deadline) break;
     try {
-      const client = makeClient(rpc, 18_000);
-      tip = await client.getBlockNumber();
+      const client = makeClient(rpc, LOGS_RPC_TIMEOUT_MS);
+      const tip = await client.getBlockNumber();
       const hopFrom = SWAP_HOP_START_BLOCK > tip ? tip : SWAP_HOP_START_BLOCK;
       const cachedTo = BigInt(Math.max(0, disk.scannedTo));
-      // Rescan a small overlap so late-indexed logs are not missed.
-      const resume =
-        cachedTo > 0n ? (cachedTo > 64n ? cachedTo - 64n : 0n) : hopFrom;
+      // Warm cache: only catch up a small tip window. Cold empty cache: do not
+      // backfill history here (seed/ops); return empty buys rather than 504.
+      if (cachedTo <= 0n) {
+        break;
+      }
+      const lag = tip > cachedTo ? tip - cachedTo : 0n;
+      if (lag > BUY_CATCHUP_MAX_LAG) {
+        // Too far behind for an in-request scan — serve stale volume, avoid 504.
+        break;
+      }
+      const resume = cachedTo > 64n ? cachedTo - 64n : 0n;
       const from = resume > hopFrom ? resume : hopFrom;
       if (from > tip) {
         merged = mergeBuyCache(merged, [], Number(tip));
         break;
       }
-      // Cold cache: all SwapFacades. Warm catch-up: live swap only (≤5k windows).
       const live = SWAP_LOG_ADDRESSES[0];
-      const swaps =
-        cachedTo > 0n && live ? [live] : SWAP_LOG_ADDRESSES;
+      const swaps = live ? [live] : SWAP_LOG_ADDRESSES;
       const { buys, reached } = await collectBuysIncremental(
         client,
         buyers,
@@ -266,19 +290,18 @@ async function fetchBuysForTree(binds: BindEdge[]): Promise<BuyEdge[]> {
         swaps,
       );
       const scannedTo = reached >= from ? Number(reached) : Number(from > 0n ? from - 1n : 0n);
-      // Only advance scannedTo when we made progress toward tip (or already caught up).
       const nextScanned =
         scannedTo >= disk.scannedTo || buys.length > 0
           ? Math.max(disk.scannedTo, Math.min(scannedTo, Number(tip)))
           : disk.scannedTo;
       merged = mergeBuyCache(merged, buys, nextScanned);
-      if (buys.length > 0 || nextScanned >= Number(tip) - 1) break;
+      break;
     } catch {
       continue;
     }
   }
 
-  if (merged.buys !== disk.buys || merged.scannedTo !== disk.scannedTo) {
+  if (merged.scannedTo !== disk.scannedTo || merged.buys.length !== disk.buys.length) {
     try {
       saveBuyCache(merged);
     } catch {
