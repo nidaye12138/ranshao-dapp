@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { formatTokenRaw, graphQuery, graphUrl, tsToLocal } from "@/lib/api/graph";
+import { fetchLayerRewardsFromChain } from "@/lib/api/layerRewardsChain";
 import { fetchSwapHistory, historyToSwapPromoRows } from "@/lib/api/swapHistory";
 import { layerLabel, type EarningsResponse, type EarningsRow } from "@/lib/api/types";
 
@@ -49,7 +50,12 @@ function sum(amounts: string[]): bigint {
   return amounts.reduce((acc, x) => acc + BigInt(x || "0"), 0n);
 }
 
-async function chainSwapFallback(address: string, base: EarningsResponse): Promise<EarningsResponse> {
+async function chainEarningsFallback(address: string, base: EarningsResponse): Promise<EarningsResponse> {
+  let next: EarningsResponse = {
+    ...base,
+    source: base.source === "unconfigured" || base.source === "graph" ? "chain" : base.source,
+  };
+
   try {
     const history = await Promise.race([
       fetchSwapHistory(address, { maxMs: 5_000, maxBlocks: 10_000n }),
@@ -57,19 +63,40 @@ async function chainSwapFallback(address: string, base: EarningsResponse): Promi
         setTimeout(() => resolve({ error: "swap history timeout" }), 5_500),
       ),
     ]);
-    if ("error" in history) {
-      return { ...base, source: base.source === "unconfigured" ? "chain" : base.source };
+    if (!("error" in history)) {
+      const rows = historyToSwapPromoRows(history);
+      next = {
+        ...next,
+        source: "chain",
+        swapPromoTotal: history.selfRewardTotal,
+        swapPromoRows: rows,
+      };
     }
-    const rows = historyToSwapPromoRows(history);
-    return {
-      ...base,
-      source: "chain",
-      swapPromoTotal: history.selfRewardTotal,
-      swapPromoRows: rows,
-    };
   } catch {
-    return { ...base, source: base.source === "unconfigured" ? "chain" : base.source };
+    /* keep swap empty */
   }
+
+  // Layer burn rewards (直推/间推/市场) — independent of Swap Bought.
+  const layerEmpty =
+    !next.layerRows?.length &&
+    (!next.layerTotal?.直推 || next.layerTotal.直推.startsWith("0 "));
+  if (layerEmpty) {
+    try {
+      const layer = await fetchLayerRewardsFromChain(address);
+      if (layer && (layer.layerRows.length > 0 || !layer.layerTotal.直推.startsWith("0 "))) {
+        next = {
+          ...next,
+          source: "chain",
+          layerTotal: layer.layerTotal,
+          layerRows: layer.layerRows,
+        };
+      }
+    } catch {
+      /* keep layer empty */
+    }
+  }
+
+  return next;
 }
 
 export async function GET(req: NextRequest) {
@@ -79,7 +106,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!graphUrl()) {
-    return NextResponse.json(await chainSwapFallback(address, empty(address)));
+    return NextResponse.json(await chainEarningsFallback(address, empty(address)));
   }
 
   const result = await graphQuery<{
@@ -92,14 +119,14 @@ export async function GET(req: NextRequest) {
   }>(QUERY, { id: address, first: 50 });
 
   if ("error" in result) {
-    const fallback = await chainSwapFallback(address, { ...empty(address), source: "unconfigured" });
+    const fallback = await chainEarningsFallback(address, { ...empty(address), source: "unconfigured" });
     if (fallback.source === "chain") return NextResponse.json(fallback);
     return NextResponse.json({ ...empty(address), error: result.error }, { status: 502 });
   }
 
   const a = result.data.account;
   if (!a) {
-    return NextResponse.json(await chainSwapFallback(address, { ...empty(address), source: "graph" }));
+    return NextResponse.json(await chainEarningsFallback(address, { ...empty(address), source: "graph" }));
   }
 
   // Sell has no instant rebate — omit SELL from Mine 「Swap 推广奖励」.
@@ -145,8 +172,8 @@ export async function GET(req: NextRequest) {
     dividendRows,
   };
 
-  if (!swapPromoRows.length) {
-    body = await chainSwapFallback(address, body);
+  if (!swapPromoRows.length || !layerRows.length) {
+    body = await chainEarningsFallback(address, body);
   }
 
   return NextResponse.json(body);

@@ -14,6 +14,9 @@ export const USDT_MAINNET = getAddress("0x55d398326f99059ff775485246999027b31979
 /** Live SwapFacade (sell no-reward / buy 0.5% UMplan) — EIP-55 checksummed. */
 export const SWAP_MAINNET = getAddress("0x7a853364f4addb839fdaddfdf080a939b1275fbf");
 
+/** Live LayerRewards (burn → 9-layer UMplan) — EIP-55 checksummed. */
+export const LAYER_REWARDS_MAINNET = getAddress("0x53b854ce25e6daa3bacd8f3dced82fc6e6c7b79b");
+
 /**
  * Normalize env / hardcoded hex to EIP-55. Viem rejects mixed-case bad checksums
  * (e.g. NEXT_PUBLIC_SWAP_ADDRESS=0x7a853364f4AddB…FbF → "Address is invalid").
@@ -44,6 +47,10 @@ export const addresses = {
   registry: addr(process.env.NEXT_PUBLIC_REGISTRY_ADDRESS), // ReferralTree
   swap: addr(process.env.NEXT_PUBLIC_SWAP_ADDRESS, mainnetFallbacks ? SWAP_MAINNET : zeroAddress),
   burn: addr(process.env.NEXT_PUBLIC_BURN_ADDRESS),
+  layerRewards: addr(
+    process.env.NEXT_PUBLIC_LAYER_REWARDS_ADDRESS,
+    mainnetFallbacks ? LAYER_REWARDS_MAINNET : zeroAddress,
+  ),
   dividends: addr(process.env.NEXT_PUBLIC_DIVIDENDS_ADDRESS),
   shareholders: addr(process.env.NEXT_PUBLIC_SHAREHOLDER_ADDRESS),
   elite: addr(process.env.NEXT_PUBLIC_ELITE_ADDRESS),
