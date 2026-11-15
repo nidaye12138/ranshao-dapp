@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAccount,
+  usePublicClient,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { formatUnits, maxUint256 } from "viem";
+import { formatUnits, maxUint256, parseUnits, type Address } from "viem";
 import { addresses, isConfigured } from "@/lib/addresses";
 import { appChainId } from "@/lib/chain";
 import { fmtToken } from "@/lib/format";
@@ -22,6 +23,22 @@ import { useI18n } from "@/lib/i18n";
 import BurnAbi from "@/lib/abi/BurnRouter.json";
 import DivAbi from "@/lib/abi/DividendPools.json";
 import ERC20Abi from "@/lib/abi/ERC20.json";
+
+const OracleAbi = [
+  {
+    type: "function",
+    name: "tokenUsd",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
+
+/** Same ceil formula as BurnRouter.quoteTokensForTier. */
+function tokensForTierUsd(tierUsd18: bigint, priceUsd18: bigint): bigint {
+  if (tierUsd18 <= 0n || priceUsd18 <= 0n) return 0n;
+  return (tierUsd18 * 10n ** 18n + priceUsd18 - 1n) / priceUsd18;
+}
 
 /** One-time max approve so spot moves don't leave BurnRouter allowance short. */
 const APPROVE_MAX = maxUint256;
@@ -129,15 +146,103 @@ export default function PromoPage() {
     tier,
   ]);
 
-  const { data: parsedRaw } = useReadContract({
+  const publicClient = usePublicClient({ chainId: appChainId });
+  const tierId = selected.id as 1 | 2 | 3 | 4;
+
+  const {
+    data: parsedRaw,
+    isFetching: quoteFetching,
+    isError: quoteReadError,
+  } = useReadContract({
     address: addresses.burn,
     abi: BurnAbi,
     functionName: "quoteTokensForTier",
-    args: [selected.id],
+    args: [tierId],
     chainId: appChainId,
-    query: { enabled: isConfigured && selected.id > 0 },
+    query: {
+      enabled: mounted && isConfigured && tierId > 0,
+      refetchInterval: 15_000,
+      retry: 3,
+    },
   });
-  const parsed = (parsedRaw as bigint | undefined) ?? 0n;
+
+  /** When wagmi multicall/RPC flakes, fill from publicClient or oracle ceil (same as BurnRouter). */
+  const [fallbackParsed, setFallbackParsed] = useState<bigint | null>(null);
+  const [fallbackPending, setFallbackPending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const wagmiOk = parsedRaw != null && (parsedRaw as bigint) > 0n;
+    if (wagmiOk || !mounted || !isConfigured || tierId < 1) {
+      setFallbackParsed(null);
+      setFallbackPending(false);
+      return;
+    }
+
+    setFallbackPending(true);
+    void (async () => {
+      try {
+        if (publicClient) {
+          try {
+            const q = (await publicClient.readContract({
+              address: addresses.burn,
+              abi: BurnAbi,
+              functionName: "quoteTokensForTier",
+              args: [tierId],
+            })) as bigint;
+            if (!cancelled && q > 0n) {
+              setFallbackParsed(q);
+              return;
+            }
+          } catch {
+            /* oracle path */
+          }
+
+          let oracleAddr = (process.env.NEXT_PUBLIC_ORACLE_ADDRESS || "").trim() as Address;
+          if (!oracleAddr.startsWith("0x") || oracleAddr.length !== 42) {
+            try {
+              oracleAddr = (await publicClient.readContract({
+                address: addresses.burn,
+                abi: BurnAbi,
+                functionName: "oracle",
+              })) as Address;
+            } catch {
+              oracleAddr = "0x" as Address;
+            }
+          }
+          if (oracleAddr.startsWith("0x") && oracleAddr.length === 42) {
+            const price = (await publicClient.readContract({
+              address: oracleAddr,
+              abi: OracleAbi,
+              functionName: "tokenUsd",
+            })) as bigint;
+            const targetUsd = parseUnits(String(selected.u), 18);
+            const q = tokensForTierUsd(targetUsd, price);
+            if (!cancelled && q > 0n) {
+              setFallbackParsed(q);
+              return;
+            }
+          }
+        }
+        if (!cancelled) setFallbackParsed(0n);
+      } finally {
+        if (!cancelled) setFallbackPending(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parsedRaw, mounted, isConfigured, tierId, selected.u, publicClient, quoteReadError]);
+
+  const parsed =
+    parsedRaw != null && (parsedRaw as bigint) > 0n
+      ? (parsedRaw as bigint)
+      : fallbackParsed != null && fallbackParsed > 0n
+        ? fallbackParsed
+        : 0n;
+  const quotePending =
+    parsed === 0n && (quoteFetching || fallbackPending || (parsedRaw == null && fallbackParsed == null));
 
   const { data: quoteUsd } = useReadContract({
     address: addresses.burn,
@@ -437,7 +542,10 @@ export default function PromoPage() {
             {agreed && tierAlreadyOwned && effectiveTier < 4 && (
               <p className="banner warn">{t("promo.tierUsed")}</p>
             )}
-            {agreed && !tierAlreadyOwned && parsed === 0n && (
+            {agreed && !tierAlreadyOwned && quotePending && (
+              <p className="muted tip-line">{t("common.loading")}</p>
+            )}
+            {agreed && !tierAlreadyOwned && !quotePending && parsed === 0n && (
               <p className="banner warn">{t("promo.quoteFailed")}</p>
             )}
             {agreed && !tierAlreadyOwned && insufficientBal && (
