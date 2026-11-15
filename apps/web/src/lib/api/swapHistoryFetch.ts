@@ -277,11 +277,12 @@ export async function fetchSwapHistory(
       const cachedTo = BigInt(Math.max(0, disk.scannedTo));
       const lag = latest > cachedTo ? latest - cachedTo : 0n;
 
-      // Hot path: fresh cache + small tip lag → return immediately.
-      if (cacheFresh && lag <= CATCHUP_MAX_LAG) {
+      // Hot path: fresh disk cache → return immediately (tip rows already merged last hit).
+      // Historical backfill resumes when cache ages past CACHE_FRESH_MS.
+      if (cacheFresh) {
         return responseFromCache(addr, disk, tipNum, "cache");
       }
-      // Large lag: still spend only the short catch-up budget, then return partial/cache.
+      // Stale / cold: tip window + short forward fill under budget, then partial/cache.
 
       const resume = cachedTo > 0n ? (cachedTo > 64n ? cachedTo - 64n : 0n) : hopFrom;
       const histFrom = resume > hopFrom ? resume : hopFrom;
