@@ -15,7 +15,7 @@
   "priorUmplanRewardPauseTx": "0x00e812358297eb6b483adf50c01e9c65859911dca4fd33eeb26439dc5a5ca141",
   "umplanRewardTreasurySetModuleTx": "0x4763b180213fc3cd62ef3e289d8e6c1572f34acdb4554accd68f5e126edf30df",
   "priorUsdtHopPauseTx": "0x61e3b1f99399edc9b82dd96280e8223feb8c222693de654c31a990da3c65877f",
-  "note": "Live SwapFacade: USDT\u2192SPCXB\u2192UMplan hop; buy 0.5% UMplan to referrer/treasury; sell no instant rewards. Burn/weight USD\u2192UMplan uses PancakeSpotOracle. Weight tiers via burnTier once-per-tier upgrade; free burn does not grant tiers; DividendPools highest-tier-only voids lower pool rights.",
+  "note": "Live SwapFacade: USDT\u2192SPCXB\u2192UMplan hop; buy 0.5% UMplan to referrer/treasury; sell no instant rewards. Burn/weight USD\u2192UMplan uses PancakeSpotOracle. Weight tiers via burnTier once-per-tier upgrade; free burn does not grant tiers; DividendPools highest-tier-only voids lower pool rights. Elite daily push cutover 2026-11-15: new Precip+Elite (UMplan reward, releaseDailyToStake). Prior Elite 0xdD5a\u2026 still holds old stakes until users unstake.",
   "spotOracleDeployedAt": "2026-11-13",
   "spotOracleCreateTx": "0xdc72d2a92b514eef5dbd35d6847717efe8b3c6427c495685a749c06bf19452e7",
   "spotOracleBurnSetConfigTx": "0x097657b6c449b340903f350031e7a42aafef95b3bb75d7e3fff3bab2017b1899",
@@ -47,10 +47,10 @@
   "BurnRouter": "0xA4C75FC51B0f3B60053ca0dae55bC922C0454aFc",
   "BurnRouterPriorCumulative": "0x2b2439Bd7894C134b6Db3CbFEB9AE92278419E28",
   "LayerRewards": "0x53B854cE25E6dAa3BaCD8F3dced82FC6E6c7b79b",
-  "PrecipitationPool": "0xC9e2111677a4d565743aA98f535819937054dB3A",
+  "PrecipitationPool": "0x2bB107087b1C34B07B84c97f0d5Fe2457e745399",
   "DividendPools": "0xC9Dc470F2f9CDBcdfC56316516E66459D4a73265",
   "ShareholderPool": "0xF0206e493213CDC1288bAE8D12eEF3ff7654B1fE",
-  "EliteStake": "0xdD5aA4E93719897528cDB4802B19A87026094dCE",
+  "EliteStake": "0xb590DDB3Bf4830a4566dec20481270F6F403F979",
   "BrokerMarket": "0x752da0224E1E299D8409b48e3EacC8cDBff6d633",
   "lockedParams": {
     "buyInstantRewardBps": 50,
@@ -94,5 +94,10 @@
   "BurnRouterPriorOncePerTier": "0xBED03529ecFf7406a9721a900de77d170d83C270",
   "DividendPoolsPrior": "0x0F502BFf1D1e4E24dc3B73A62062B1d74f3161bb",
   "testTiersDeployedAt": "2026-11-14",
-  "testTiersNote": "Weight burn tiers cut to 1/5/8/15 U for testing; DividendPools+BurnRouter redeployed."
+  "testTiersNote": "Weight burn tiers cut to 1/5/8/15 U for testing; DividendPools+BurnRouter redeployed.",
+  "priorPrecipitationPool": "0xC9e2111677a4d565743aA98f535819937054dB3A",
+  "priorEliteStake": "0xdD5aA4E93719897528cDB4802B19A87026094dCE",
+  "eliteDailyPushCutoverAt": "2026-11-15",
+  "eliteDailyPushCreatePrecipTx": "0x8fbb1a4403304c7a697a927b93812d7a0b526fd0545406dc4ff9bea65163cb39",
+  "eliteDailyPushCreateEliteTx": "0x28bd1912b5f4e8867bc3ea589eda773b457ddf096b3f54b1c2d266c22f7321a6"
 }

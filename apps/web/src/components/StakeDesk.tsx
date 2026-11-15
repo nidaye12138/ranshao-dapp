@@ -20,9 +20,9 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
 /**
  * 15U (T4) 质押台 — unlock after burnTier(4) / DividendPools.tierOf == 4.
  * Dividends: precip balance × 5% × stake share (Owner daily push to wallet).
- * Legacy live Elite (0xdD5a…) lacks unlockAt/redeem until cutover.
+ * Mainnet Elite 0xb590…F979 (2026-11-15) has unlockAt / isUnlocked / redeem.
  */
-const LIVE_ELITE_HAS_LOCK_AND_REDEEM = false;
+const LIVE_ELITE_HAS_LOCK_AND_REDEEM = true;
 
 export function StakeDesk() {
   const mounted = useMounted();
