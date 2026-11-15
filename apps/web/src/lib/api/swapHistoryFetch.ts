@@ -38,8 +38,6 @@ const COLD_SCAN_BUDGET_MS = 8_000;
 const CATCHUP_SCAN_BUDGET_MS = 3_500;
 /** Skip catch-up when cache this fresh (ms). */
 const CACHE_FRESH_MS = 90_000;
-/** Tip lag above this → treat cache as fresh enough for hot path. */
-const CATCHUP_MAX_LAG = 5_000n;
 /** Fail fast so a hung RPC (e.g. 48.club) does not eat the whole budget. */
 const LOGS_RPC_TIMEOUT_MS = 2_500;
 
