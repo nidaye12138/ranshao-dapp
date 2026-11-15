@@ -14,12 +14,30 @@ import {
 import { bsc } from "viem/chains";
 import { addresses } from "@/lib/addresses";
 import { formatTokenRaw, tsToLocal } from "@/lib/api/graph";
-import { serverBscRpcCandidates } from "@/lib/api/serverBscRpc";
+import { serverBscLogsRpcCandidates } from "@/lib/api/serverBscRpc";
 import type { EarningsRow } from "@/lib/api/types";
+import {
+  loadSwapHistoryCache,
+  mergeSwapHistoryCache,
+  saveSwapHistoryCache,
+  type CachedSwapRow,
+} from "@/lib/api/swapHistoryCache";
 import SwapAbi from "@/lib/abi/SwapFacade.json";
 
 /** Deploy block of live USDT-hop SwapFacade (sell no-reward) on BSC. */
 export const SWAP_HOP_START_BLOCK = 133_317_567n;
+
+/** 48.club / similar: eth_getLogs max ~5000 blocks. */
+const LOGS_SPAN = 5_000n;
+/**
+ * Soft scan budget under nginx proxy_read_timeout (60s). Prefer disk cache;
+ * return partial + cache when deadline hits.
+ */
+const SCAN_BUDGET_MS = 25_000;
+/** Skip in-request catch-up when cache this fresh and lag small. */
+const CACHE_FRESH_MS = 90_000;
+const CATCHUP_MAX_LAG = 15_000n;
+const LOGS_RPC_TIMEOUT_MS = 8_000;
 
 const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
@@ -46,11 +64,15 @@ export type SwapHistoryRow = {
 };
 
 export type SwapHistoryResponse = {
-  source: "chain";
+  source: "chain" | "cache";
   address: string;
   buyVolumeUsdt: string;
   selfRewardTotal: string;
   rows: SwapHistoryRow[];
+  /** True when scannedTo < tip (more history may arrive on next request). */
+  partial?: boolean;
+  scannedTo?: number;
+  tip?: number;
 };
 
 /** Live + prior SwapFacades that may hold Bought/Sold for a wallet. */
@@ -76,10 +98,6 @@ function swapLogAddresses(): Address[] {
   return out;
 }
 
-function rpcCandidates(): string[] {
-  return serverBscRpcCandidates();
-}
-
 function explorerTx(hash: Hex): string {
   return `https://bscscan.com/tx/${hash}`;
 }
@@ -88,6 +106,17 @@ function fmtAmt(raw: bigint, symbol: string): string {
   return formatTokenRaw(raw, symbol, 18);
 }
 
+function makeClient(rpc: string, timeout = LOGS_RPC_TIMEOUT_MS): PublicClient {
+  return createPublicClient({
+    chain: bsc,
+    transport: http(rpc, { timeout, retryCount: 0 }),
+  });
+}
+
+/**
+ * eth_getLogs in ≤5k windows; stops at deadline (no throw).
+ * Returns reached = last inclusive block successfully advanced past.
+ */
 async function getLogsChunked(
   client: PublicClient,
   params: {
@@ -96,17 +125,18 @@ async function getLogsChunked(
     args: Record<string, unknown>;
     fromBlock: bigint;
     toBlock: bigint;
-    deadlineMs?: number;
+    deadlineMs: number;
   },
-): Promise<Log[]> {
-  /** BSC public RPCs often reject wide eth_getLogs — keep chunks small + degrade. */
-  let span = 500n;
+): Promise<{ logs: Log[]; reached: bigint }> {
   const out: Log[] = [];
   let start = params.fromBlock;
-  const deadline = params.deadlineMs ?? 0;
+  if (params.fromBlock > params.toBlock) {
+    return { logs: out, reached: params.toBlock };
+  }
   while (start <= params.toBlock) {
-    if (deadline > 0 && Date.now() > deadline) break;
-    const end = start + span > params.toBlock ? params.toBlock : start + span;
+    if (Date.now() > params.deadlineMs) break;
+    const end =
+      start + LOGS_SPAN - 1n > params.toBlock ? params.toBlock : start + LOGS_SPAN - 1n;
     try {
       const part = await client.getLogs({
         address: params.address,
@@ -118,18 +148,15 @@ async function getLogsChunked(
       out.push(...part);
       start = end + 1n;
     } catch {
-      if (span > 100n) {
-        span = span / 2n;
-        continue;
-      }
-      // Skip this micro-window rather than failing the whole history.
+      // Skip this window rather than failing the whole history.
       start = end + 1n;
     }
   }
-  return out;
+  const reached = start > params.fromBlock ? start - 1n : params.fromBlock - 1n;
+  return { logs: out, reached };
 }
 
-function decodeBought(log: Log): Omit<SwapHistoryRow, "at"> | null {
+function decodeBought(log: Log): (CachedSwapRow & { paymentWei: string; rewardWei: string }) | null {
   try {
     const { args } = decodeEventLog({
       abi: SwapAbi,
@@ -143,7 +170,6 @@ function decodeBought(log: Log): Omit<SwapHistoryRow, "at"> | null {
       referrerReward?: bigint;
     };
     if (!log.transactionHash || a.paymentAmount == null) return null;
-    // Buy instant is referrer 0.5%; buyerReward may be 0 on live facade.
     const reward = a.buyerReward ?? a.referrerReward ?? 0n;
     return {
       id: `${log.transactionHash}-${log.logIndex}-buy`,
@@ -154,13 +180,16 @@ function decodeBought(log: Log): Omit<SwapHistoryRow, "at"> | null {
       txHash: log.transactionHash,
       blockNumber: (log.blockNumber ?? 0n).toString(),
       explorerUrl: explorerTx(log.transactionHash),
+      at: "—",
+      paymentWei: a.paymentAmount.toString(),
+      rewardWei: reward.toString(),
     };
   } catch {
     return null;
   }
 }
 
-function decodeSold(log: Log): Omit<SwapHistoryRow, "at"> | null {
+function decodeSold(log: Log): CachedSwapRow | null {
   try {
     const { args } = decodeEventLog({
       abi: SwapAbi,
@@ -182,27 +211,61 @@ function decodeSold(log: Log): Omit<SwapHistoryRow, "at"> | null {
       txHash: log.transactionHash,
       blockNumber: (log.blockNumber ?? 0n).toString(),
       explorerUrl: explorerTx(log.transactionHash),
+      at: "—",
+      paymentWei: (a.paymentDelivered ?? 0n).toString(),
+      rewardWei: (a.sellerReward ?? 0n).toString(),
     };
   } catch {
     return null;
   }
 }
 
-async function clientForRpc(url: string, timeout = 8_000): Promise<PublicClient> {
-  return createPublicClient({
-    chain: bsc,
-    transport: http(url, { timeout, retryCount: 0 }),
-  });
-}
-
 export type SwapHistoryOpts = {
-  /** Soft deadline — stop scanning and return what we have (default 6s). */
+  /** Soft deadline for chain catch-up (default SCAN_BUDGET_MS). */
   maxMs?: number;
-  /** Max blocks back from tip (default 12_000 ≈ ~10h on BSC). */
-  maxBlocks?: bigint;
 };
 
-/** Read Bought/Sold for one wallet (live + prior SwapFacades; resilient getLogs). */
+function responseFromCache(
+  addr: string,
+  disk: ReturnType<typeof loadSwapHistoryCache>,
+  tip: number,
+  source: "chain" | "cache",
+): SwapHistoryResponse {
+  let buyWei = 0n;
+  let rewardWei = 0n;
+  try {
+    buyWei = BigInt(disk.buyVolumeWei || "0");
+    rewardWei = BigInt(disk.rewardWei || "0");
+  } catch {
+    /* ignore */
+  }
+  const rows: SwapHistoryRow[] = disk.rows
+    .map((r) => ({
+      id: r.id,
+      side: r.side,
+      paymentAmount: r.paymentAmount,
+      tokenAmount: r.tokenAmount,
+      selfReward: r.selfReward,
+      txHash: r.txHash,
+      blockNumber: r.blockNumber,
+      at: r.at,
+      explorerUrl: r.explorerUrl,
+    }))
+    .slice(0, 50);
+  const partial = tip > 0 && disk.scannedTo > 0 && disk.scannedTo < tip;
+  return {
+    source,
+    address: addr,
+    buyVolumeUsdt: formatUnits(buyWei, 18),
+    selfRewardTotal: formatTokenRaw(rewardWei, "UMplan"),
+    rows,
+    partial: partial || undefined,
+    scannedTo: disk.scannedTo || undefined,
+    tip: tip || undefined,
+  };
+}
+
+/** Read Bought/Sold for one wallet (logs RPC + ≤5k chunks + disk cache). */
 export async function fetchSwapHistory(
   address: string,
   opts?: SwapHistoryOpts,
@@ -213,28 +276,43 @@ export async function fetchSwapHistory(
   const targets = swapLogAddresses();
   if (!targets.length) return { error: "swap unconfigured" };
 
-  const maxMs = opts?.maxMs ?? 6_000;
-  const maxBlocks = opts?.maxBlocks ?? 12_000n;
+  const maxMs = opts?.maxMs ?? SCAN_BUDGET_MS;
   const deadline = Date.now() + maxMs;
-
   const checksummed = getAddress(addr);
+  let disk = loadSwapHistoryCache(addr);
+  let tipNum = 0;
   let lastErr: unknown;
 
-  for (const rpc of rpcCandidates()) {
+  const cacheAgeMs = disk.updatedAt ? Date.now() - Date.parse(disk.updatedAt) : Infinity;
+  const cacheFresh = Number.isFinite(cacheAgeMs) && cacheAgeMs < CACHE_FRESH_MS && disk.rows.length > 0;
+
+  for (const rpc of serverBscLogsRpcCandidates()) {
     if (Date.now() > deadline) break;
     try {
-      const client = await clientForRpc(rpc, Math.min(8_000, Math.max(2_000, deadline - Date.now())));
+      const client = makeClient(rpc, Math.min(LOGS_RPC_TIMEOUT_MS, Math.max(2_000, deadline - Date.now())));
       const latest = await client.getBlockNumber();
+      tipNum = Number(latest);
       const hopFrom = SWAP_HOP_START_BLOCK > latest ? 0n : SWAP_HOP_START_BLOCK;
-      const recentFrom = latest > maxBlocks ? latest - maxBlocks : 0n;
-      const fromBlock = hopFrom > recentFrom ? hopFrom : recentFrom;
+      const cachedTo = BigInt(Math.max(0, disk.scannedTo));
+      const lag = latest > cachedTo ? latest - cachedTo : 0n;
 
-      const [buyLogs, sellLogs] = await Promise.all([
+      // Hot path: fresh cache + small tip lag → return immediately.
+      if (cacheFresh && disk.scannedTo > 0 && lag <= CATCHUP_MAX_LAG && lag < LOGS_SPAN) {
+        return responseFromCache(addr, disk, tipNum, "cache");
+      }
+      // Large lag: still catch up what budget allows; never hang to tip in one request.
+      const resume = cachedTo > 0n ? (cachedTo > 64n ? cachedTo - 64n : 0n) : hopFrom;
+      const from = resume > hopFrom ? resume : hopFrom;
+      if (from > latest) {
+        return responseFromCache(addr, disk, tipNum, disk.rows.length ? "cache" : "chain");
+      }
+
+      const [buyRes, sellRes] = await Promise.all([
         getLogsChunked(client, {
           address: targets,
           event: boughtEvent,
           args: { buyer: checksummed },
-          fromBlock,
+          fromBlock: from,
           toBlock: latest,
           deadlineMs: deadline,
         }),
@@ -242,16 +320,24 @@ export async function fetchSwapHistory(
           address: targets,
           event: soldEvent,
           args: { seller: checksummed },
-          fromBlock,
+          fromBlock: from,
           toBlock: latest,
           deadlineMs: deadline,
         }),
       ]);
 
+      const reached =
+        buyRes.reached < sellRes.reached ? buyRes.reached : sellRes.reached;
+
       const blockTs = new Map<string, bigint>();
-      const needBlocks = [...new Set([...buyLogs, ...sellLogs].map((l) => (l.blockNumber ?? 0n).toString()))];
+      const needBlocks = [
+        ...new Set(
+          [...buyRes.logs, ...sellRes.logs].map((l) => (l.blockNumber ?? 0n).toString()),
+        ),
+      ];
       await Promise.all(
-        needBlocks.slice(0, 40).map(async (bn) => {
+        needBlocks.slice(0, 60).map(async (bn) => {
+          if (Date.now() > deadline) return;
           try {
             const b = await client.getBlock({ blockNumber: BigInt(bn) });
             blockTs.set(bn, b.timestamp);
@@ -261,49 +347,40 @@ export async function fetchSwapHistory(
         }),
       );
 
-      const rows: SwapHistoryRow[] = [];
-      let buyVol = 0n;
-      let rewardSum = 0n;
-      const seen = new Set<string>();
-
-      for (const log of buyLogs) {
+      const incoming: CachedSwapRow[] = [];
+      for (const log of buyRes.logs) {
         const row = decodeBought(log);
-        if (!row || seen.has(row.id)) continue;
-        seen.add(row.id);
+        if (!row) continue;
         const ts = blockTs.get(row.blockNumber);
-        rows.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
-        try {
-          const pay = decodeEventLog({ abi: SwapAbi, data: log.data, topics: log.topics }).args as {
-            paymentAmount?: bigint;
-            buyerReward?: bigint;
-            referrerReward?: bigint;
-          };
-          buyVol += pay.paymentAmount ?? 0n;
-          rewardSum += pay.buyerReward ?? pay.referrerReward ?? 0n;
-        } catch {
-          /* ignore */
-        }
+        incoming.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
       }
-      for (const log of sellLogs) {
+      for (const log of sellRes.logs) {
         const row = decodeSold(log);
-        if (!row || seen.has(row.id)) continue;
-        seen.add(row.id);
+        if (!row) continue;
         const ts = blockTs.get(row.blockNumber);
-        rows.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
+        incoming.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
       }
 
-      rows.sort((a, b) => Number(b.blockNumber) - Number(a.blockNumber));
+      const scannedTo = Number(
+        reached >= from ? reached : from > 0n ? from - 1n : 0n,
+      );
+      const nextScanned = Math.max(disk.scannedTo, Math.min(scannedTo, tipNum));
+      disk = mergeSwapHistoryCache(disk, incoming, nextScanned);
+      try {
+        saveSwapHistoryCache(addr, disk);
+      } catch {
+        /* optional disk */
+      }
 
-      return {
-        source: "chain",
-        address: addr,
-        buyVolumeUsdt: formatUnits(buyVol, 18),
-        selfRewardTotal: formatTokenRaw(rewardSum, "UMplan"),
-        rows: rows.slice(0, 50),
-      };
+      return responseFromCache(addr, disk, tipNum, "chain");
     } catch (e) {
       lastErr = e;
     }
+  }
+
+  // Prefer any cached rows over hard error (partial under timeout / RPC fail).
+  if (disk.rows.length > 0 || disk.scannedTo > 0) {
+    return responseFromCache(addr, disk, tipNum, "cache");
   }
 
   return {
