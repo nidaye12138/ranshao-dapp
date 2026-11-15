@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { formatTokenRaw, graphQuery, graphUrl, tsToLocal } from "@/lib/api/graph";
 import { fetchLayerRewardsFromChain } from "@/lib/api/layerRewardsChain";
-import { fetchSwapHistory, historyToSwapPromoRows } from "@/lib/api/swapHistory";
+import { historyToSwapPromoRows } from "@/lib/api/swapHistory";
+import { fetchSwapHistory } from "@/lib/api/swapHistoryFetch";
 import { layerLabel, type EarningsResponse, type EarningsRow } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
-import { fetchSwapHistory } from "@/lib/api/swapHistory";
+import { fetchSwapHistory } from "@/lib/api/swapHistoryFetch";
 
 export const dynamic = "force-dynamic";
 
