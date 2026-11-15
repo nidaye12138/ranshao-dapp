@@ -14,6 +14,7 @@ import { useLeaderboard, useStats } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import TreeAbi from "@/lib/abi/ReferralTree.json";
 
+/** Fixed product total supply (1B). Do not revert to 10M — VPS partial syncs have drifted before. */
 const TOKEN_SUPPLY = 1_000_000_000;
 
 export default function HomePage() {
