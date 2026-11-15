@@ -31,14 +31,16 @@ import SwapAbi from "@/lib/abi/SwapFacade.json";
 /** 48.club / similar: eth_getLogs max ~5000 blocks. */
 const LOGS_SPAN = 5_000n;
 /**
- * Soft scan budget under nginx proxy_read_timeout (60s). Prefer disk cache;
- * return partial + cache when deadline hits.
+ * Soft scan budgets under nginx proxy_read_timeout (60s).
+ * Prefer disk cache; never spend the whole request catching up a huge lag.
  */
-const SCAN_BUDGET_MS = 25_000;
-/** Skip in-request catch-up when cache this fresh and tip lag small. */
+const COLD_SCAN_BUDGET_MS = 8_000;
+const CATCHUP_SCAN_BUDGET_MS = 2_500;
+/** Skip catch-up when cache this fresh (ms). */
 const CACHE_FRESH_MS = 90_000;
-const CATCHUP_MAX_LAG = 15_000n;
-const LOGS_RPC_TIMEOUT_MS = 8_000;
+/** Tip lag above this → return cache (or one short catch-up) instead of long scan. */
+const CATCHUP_MAX_LAG = 5_000n;
+const LOGS_RPC_TIMEOUT_MS = 4_000;
 
 const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
@@ -192,7 +194,7 @@ function decodeSold(log: Log): CachedSwapRow | null {
 }
 
 export type SwapHistoryOpts = {
-  /** Soft deadline for chain catch-up (default SCAN_BUDGET_MS). */
+  /** Soft deadline for chain catch-up (default cold/catch-up budgets). */
   maxMs?: number;
   /** @deprecated Ignored — scan resumes from disk cache toward tip. */
   maxBlocks?: bigint;
@@ -249,23 +251,24 @@ export async function fetchSwapHistory(
   const targets = swapLogAddresses();
   if (!targets.length) return { error: "swap unconfigured" };
 
-  const maxMs = opts?.maxMs ?? SCAN_BUDGET_MS;
-  const deadline = Date.now() + maxMs;
   const checksummed = getAddress(addr);
   let disk = loadSwapHistoryCache(addr);
   let tipNum = 0;
   let lastErr: unknown;
 
+  const hasCacheProgress = disk.scannedTo > 0;
   const cacheAgeMs = disk.updatedAt ? Date.now() - Date.parse(disk.updatedAt) : Infinity;
-  const cacheFresh =
-    Number.isFinite(cacheAgeMs) && cacheAgeMs < CACHE_FRESH_MS && disk.rows.length > 0;
+  const cacheFresh = Number.isFinite(cacheAgeMs) && cacheAgeMs < CACHE_FRESH_MS && hasCacheProgress;
+  const defaultBudget = hasCacheProgress ? CATCHUP_SCAN_BUDGET_MS : COLD_SCAN_BUDGET_MS;
+  const maxMs = opts?.maxMs ?? defaultBudget;
+  const deadline = Date.now() + maxMs;
 
   for (const rpc of serverBscLogsRpcCandidates()) {
     if (Date.now() > deadline) break;
     try {
       const client = makeClient(
         rpc,
-        Math.min(LOGS_RPC_TIMEOUT_MS, Math.max(2_000, deadline - Date.now())),
+        Math.min(LOGS_RPC_TIMEOUT_MS, Math.max(1_500, deadline - Date.now())),
       );
       const latest = await client.getBlockNumber();
       tipNum = Number(latest);
@@ -273,71 +276,100 @@ export async function fetchSwapHistory(
       const cachedTo = BigInt(Math.max(0, disk.scannedTo));
       const lag = latest > cachedTo ? latest - cachedTo : 0n;
 
-      if (cacheFresh && disk.scannedTo > 0 && lag <= CATCHUP_MAX_LAG && lag < LOGS_SPAN) {
+      // Hot path: fresh cache + small tip lag → return immediately.
+      if (cacheFresh && lag <= CATCHUP_MAX_LAG) {
         return responseFromCache(addr, disk, tipNum, "cache");
       }
+      // Large lag: still spend only the short catch-up budget, then return partial/cache.
 
       const resume = cachedTo > 0n ? (cachedTo > 64n ? cachedTo - 64n : 0n) : hopFrom;
-      const from = resume > hopFrom ? resume : hopFrom;
-      if (from > latest) {
-        return responseFromCache(addr, disk, tipNum, disk.rows.length ? "cache" : "chain");
-      }
-
-      const [buyRes, sellRes] = await Promise.all([
-        getLogsChunked(client, {
-          address: targets,
-          event: boughtEvent,
-          args: { buyer: checksummed },
-          fromBlock: from,
-          toBlock: latest,
-          deadlineMs: deadline,
-        }),
-        getLogsChunked(client, {
-          address: targets,
-          event: soldEvent,
-          args: { seller: checksummed },
-          fromBlock: from,
-          toBlock: latest,
-          deadlineMs: deadline,
-        }),
-      ]);
-
-      const reached = buyRes.reached < sellRes.reached ? buyRes.reached : sellRes.reached;
-
-      const blockTs = new Map<string, bigint>();
-      const needBlocks = [
-        ...new Set(
-          [...buyRes.logs, ...sellRes.logs].map((l) => (l.blockNumber ?? 0n).toString()),
-        ),
-      ];
-      await Promise.all(
-        needBlocks.slice(0, 60).map(async (bn) => {
-          if (Date.now() > deadline) return;
-          try {
-            const b = await client.getBlock({ blockNumber: BigInt(bn) });
-            blockTs.set(bn, b.timestamp);
-          } catch {
-            /* ignore */
-          }
-        }),
-      );
+      const histFrom = resume > hopFrom ? resume : hopFrom;
 
       const incoming: CachedSwapRow[] = [];
-      for (const log of buyRes.logs) {
-        const row = decodeBought(log);
-        if (!row) continue;
-        const ts = blockTs.get(row.blockNumber);
-        incoming.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
-      }
-      for (const log of sellRes.logs) {
-        const row = decodeSold(log);
-        if (!row) continue;
-        const ts = blockTs.get(row.blockNumber);
-        incoming.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
+      const blockTs = new Map<string, bigint>();
+
+      const ingest = async (logs: Log[]) => {
+        const need = [...new Set(logs.map((l) => (l.blockNumber ?? 0n).toString()))];
+        await Promise.all(
+          need.slice(0, 40).map(async (bn) => {
+            if (blockTs.has(bn) || Date.now() > deadline) return;
+            try {
+              const b = await client.getBlock({ blockNumber: BigInt(bn) });
+              blockTs.set(bn, b.timestamp);
+            } catch {
+              /* ignore */
+            }
+          }),
+        );
+        for (const log of logs) {
+          const row = decodeBought(log) || decodeSold(log);
+          if (!row) continue;
+          // decodeBought/Sold are side-specific — try both above; Sold won't match Bought topic.
+          const ts = blockTs.get(row.blockNumber);
+          incoming.push({ ...row, at: ts != null ? tsToLocal(Number(ts)) : "—" });
+        }
+      };
+
+      // 1) Tip window first so recent swaps show up without waiting for full history backfill.
+      const tipFrom = latest > LOGS_SPAN ? latest - LOGS_SPAN + 1n : hopFrom;
+      if (Date.now() < deadline) {
+        const [tipBuy, tipSell] = await Promise.all([
+          getLogsChunked(client, {
+            address: targets,
+            event: boughtEvent,
+            args: { buyer: checksummed },
+            fromBlock: tipFrom,
+            toBlock: latest,
+            deadlineMs: deadline,
+          }),
+          getLogsChunked(client, {
+            address: targets,
+            event: soldEvent,
+            args: { seller: checksummed },
+            fromBlock: tipFrom,
+            toBlock: latest,
+            deadlineMs: deadline,
+          }),
+        ]);
+        await ingest(tipBuy.logs);
+        await ingest(tipSell.logs);
       }
 
-      const scannedTo = Number(reached >= from ? reached : from > 0n ? from - 1n : 0n);
-      const nextScanned = Math.max(disk.scannedTo, Math.min(scannedTo, tipNum));
+      // 2) Forward history fill from cached cursor (when lag is contiguous / budget remains).
+      let nextScanned = disk.scannedTo;
+      if (histFrom <= latest && Date.now() < deadline && lag > 0n) {
+        // Cap this request's forward fill so we stay under budget.
+        const histTo =
+          histFrom + LOGS_SPAN * 2n > latest ? latest : histFrom + LOGS_SPAN * 2n - 1n;
+        const [buyRes, sellRes] = await Promise.all([
+          getLogsChunked(client, {
+            address: targets,
+            event: boughtEvent,
+            args: { buyer: checksummed },
+            fromBlock: histFrom,
+            toBlock: histTo,
+            deadlineMs: deadline,
+          }),
+          getLogsChunked(client, {
+            address: targets,
+            event: soldEvent,
+            args: { seller: checksummed },
+            fromBlock: histFrom,
+            toBlock: histTo,
+            deadlineMs: deadline,
+          }),
+        ]);
+        await ingest(buyRes.logs);
+        await ingest(sellRes.logs);
+        const reached =
+          buyRes.reached < sellRes.reached ? buyRes.reached : sellRes.reached;
+        const scannedTo = Number(
+          reached >= histFrom ? reached : histFrom > 0n ? histFrom - 1n : 0n,
+        );
+        nextScanned = Math.max(disk.scannedTo, Math.min(scannedTo, tipNum));
+      }
+
+      // Tip rows are merged even when scannedTo still trails tip (partial=true).
       disk = mergeSwapHistoryCache(disk, incoming, nextScanned);
       try {
         saveSwapHistoryCache(addr, disk);
