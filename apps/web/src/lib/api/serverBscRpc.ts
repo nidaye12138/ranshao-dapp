@@ -18,9 +18,10 @@ const SEEDS = [
  * 48.club allows ≤5000-block windows; publicnode/blxr for scoped queries.
  */
 const LOGS_SEEDS = [
-  "https://rpc-bsc.48.club",
+  // publicnode first from umplan VPS — 48.club often hangs eth_getLogs here.
   "https://bsc-rpc.publicnode.com",
   "https://bsc.publicnode.com",
+  "https://rpc-bsc.48.club",
   "https://bsc.rpc.blxrbdn.com",
 ] as const;
 

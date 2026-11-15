@@ -35,12 +35,13 @@ const LOGS_SPAN = 5_000n;
  * Prefer disk cache; never spend the whole request catching up a huge lag.
  */
 const COLD_SCAN_BUDGET_MS = 8_000;
-const CATCHUP_SCAN_BUDGET_MS = 2_500;
+const CATCHUP_SCAN_BUDGET_MS = 3_500;
 /** Skip catch-up when cache this fresh (ms). */
 const CACHE_FRESH_MS = 90_000;
-/** Tip lag above this → return cache (or one short catch-up) instead of long scan. */
+/** Tip lag above this → treat cache as fresh enough for hot path. */
 const CATCHUP_MAX_LAG = 5_000n;
-const LOGS_RPC_TIMEOUT_MS = 4_000;
+/** Fail fast so a hung RPC (e.g. 48.club) does not eat the whole budget. */
+const LOGS_RPC_TIMEOUT_MS = 2_500;
 
 const boughtEvent = parseAbiItem(
   "event Bought(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 usdAmount, uint256 tokenAmountQuoted, uint256 tokenAmountDelivered, uint256 buyerReward, uint256 referrerReward)",
