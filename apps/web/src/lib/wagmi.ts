@@ -1,19 +1,35 @@
 "use client";
 
-import { http, createConfig } from "wagmi";
+import { fallback, http, createConfig } from "wagmi";
 import { bsc, bscTestnet, hardhat } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
-import { appChainId, appRpcUrl, resolveRpcUrl, resolveWagmiChains } from "@/lib/chain";
+import {
+  appChainId,
+  appRpcUrl,
+  publicChainEnv,
+  resolveRpcUrl,
+  resolveWagmiChains,
+} from "@/lib/chain";
 
-const chains = resolveWagmiChains(process.env);
+const chains = resolveWagmiChains(publicChainEnv);
+
+const mainnetRpc = resolveRpcUrl(bsc.id, publicChainEnv);
+const chapelRpc = resolveRpcUrl(bscTestnet.id, publicChainEnv);
+const localRpc = resolveRpcUrl(hardhat.id, publicChainEnv);
 
 export const config = createConfig({
   chains,
   connectors: [injected()],
   transports: {
-    [bsc.id]: http(resolveRpcUrl(bsc.id, process.env)),
-    [bscTestnet.id]: http(resolveRpcUrl(bscTestnet.id, process.env)),
-    [hardhat.id]: http(resolveRpcUrl(hardhat.id, process.env)),
+    // Prefer env RPC, then BNB Chain seeds. Avoid relying solely on publicnode (archive-token errors on receipts).
+    [bsc.id]: fallback([
+      http(mainnetRpc),
+      http("https://bsc-dataseed1.bnbchain.org"),
+      http("https://bsc-dataseed2.bnbchain.org"),
+      http("https://bsc-dataseed.binance.org"),
+    ]),
+    [bscTestnet.id]: http(chapelRpc),
+    [hardhat.id]: http(localRpc),
   },
   ssr: true,
 });

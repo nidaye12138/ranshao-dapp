@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { formatTokenRaw, graphQuery, graphUrl, tsToLocal } from "@/lib/api/graph";
+import { fetchLayerRewardsFromChain } from "@/lib/api/layerRewardsChain";
+import { fetchSwapHistory, historyToSwapPromoRows } from "@/lib/api/swapHistory";
 import { layerLabel, type EarningsResponse, type EarningsRow } from "@/lib/api/types";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +11,12 @@ const QUERY = `
   query Earnings($id: ID!, $first: Int!) {
     account(id: $id) {
       id
-      swapRewards(first: $first, orderBy: timestamp, orderDirection: desc, where: { role: "referrer" }) {
+      swapRewards(first: $first, orderBy: timestamp, orderDirection: desc) {
         id
         rewardAmount
         timestamp
         side
+        role
       }
       layerRewards(first: $first, orderBy: timestamp, orderDirection: desc) {
         id
@@ -47,6 +50,55 @@ function sum(amounts: string[]): bigint {
   return amounts.reduce((acc, x) => acc + BigInt(x || "0"), 0n);
 }
 
+async function chainEarningsFallback(address: string, base: EarningsResponse): Promise<EarningsResponse> {
+  let next: EarningsResponse = {
+    ...base,
+    source: base.source === "unconfigured" || base.source === "graph" ? "chain" : base.source,
+  };
+
+  try {
+    const history = await Promise.race([
+      fetchSwapHistory(address, { maxMs: 5_000, maxBlocks: 10_000n }),
+      new Promise<{ error: string }>((resolve) =>
+        setTimeout(() => resolve({ error: "swap history timeout" }), 5_500),
+      ),
+    ]);
+    if (!("error" in history)) {
+      const rows = historyToSwapPromoRows(history);
+      next = {
+        ...next,
+        source: "chain",
+        swapPromoTotal: history.selfRewardTotal,
+        swapPromoRows: rows,
+      };
+    }
+  } catch {
+    /* keep swap empty */
+  }
+
+  // Layer burn rewards (直推/间推/市场) — independent of Swap Bought.
+  const layerEmpty =
+    !next.layerRows?.length &&
+    (!next.layerTotal?.直推 || next.layerTotal.直推.startsWith("0 "));
+  if (layerEmpty) {
+    try {
+      const layer = await fetchLayerRewardsFromChain(address);
+      if (layer && (layer.layerRows.length > 0 || !layer.layerTotal.直推.startsWith("0 "))) {
+        next = {
+          ...next,
+          source: "chain",
+          layerTotal: layer.layerTotal,
+          layerRows: layer.layerRows,
+        };
+      }
+    } catch {
+      /* keep layer empty */
+    }
+  }
+
+  return next;
+}
+
 export async function GET(req: NextRequest) {
   const address = (req.nextUrl.searchParams.get("address") || "").toLowerCase();
   if (!address || !isAddress(address)) {
@@ -54,30 +106,34 @@ export async function GET(req: NextRequest) {
   }
 
   if (!graphUrl()) {
-    return NextResponse.json(empty(address));
+    return NextResponse.json(await chainEarningsFallback(address, empty(address)));
   }
 
   const result = await graphQuery<{
     account: {
       id: string;
-      swapRewards: { id: string; rewardAmount: string; timestamp: string; side: string }[];
+      swapRewards: { id: string; rewardAmount: string; timestamp: string; side: string; role: string }[];
       layerRewards: { id: string; layer: number; amount: string; timestamp: string }[];
       dividendClaims: { id: string; amount: string; timestamp: string }[];
     } | null;
   }>(QUERY, { id: address, first: 50 });
 
   if ("error" in result) {
+    const fallback = await chainEarningsFallback(address, { ...empty(address), source: "unconfigured" });
+    if (fallback.source === "chain") return NextResponse.json(fallback);
     return NextResponse.json({ ...empty(address), error: result.error }, { status: 502 });
   }
 
   const a = result.data.account;
   if (!a) {
-    return NextResponse.json({ ...empty(address), source: "graph" as const });
+    return NextResponse.json(await chainEarningsFallback(address, { ...empty(address), source: "graph" }));
   }
 
-  const swapPromoRows: EarningsRow[] = a.swapRewards.map((r) => ({
+  // Sell has no instant rebate — omit SELL from Mine 「Swap 推广奖励」.
+  const swapRewardsBuyOnly = a.swapRewards.filter((r) => r.side !== "SELL");
+  const swapPromoRows: EarningsRow[] = swapRewardsBuyOnly.map((r) => ({
     id: r.id,
-    label: "直推",
+    label: r.role === "self" ? "买入直推奖" : "直推",
     amount: formatTokenRaw(r.rewardAmount, "USDT"),
     at: tsToLocal(r.timestamp),
   }));
@@ -101,10 +157,10 @@ export async function GET(req: NextRequest) {
     at: tsToLocal(r.timestamp),
   }));
 
-  const body: EarningsResponse = {
+  let body: EarningsResponse = {
     source: "graph",
     address: a.id,
-    swapPromoTotal: formatTokenRaw(sum(a.swapRewards.map((r) => r.rewardAmount)), "USDT"),
+    swapPromoTotal: formatTokenRaw(sum(swapRewardsBuyOnly.map((r) => r.rewardAmount)), "USDT"),
     swapPromoRows,
     layerTotal: {
       直推: formatTokenRaw(sum(l1), "UMplan"),
@@ -115,5 +171,10 @@ export async function GET(req: NextRequest) {
     dividendTotal: formatTokenRaw(sum(a.dividendClaims.map((r) => r.amount)), "SPCXB"),
     dividendRows,
   };
+
+  if (!swapPromoRows.length || !layerRows.length) {
+    body = await chainEarningsFallback(address, body);
+  }
+
   return NextResponse.json(body);
 }

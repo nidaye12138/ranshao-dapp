@@ -112,7 +112,7 @@ forge script script/DeployBscMainnet.s.sol:DeployBscMainnet \
 
 Post-deploy:
 
-1. `SwapFacade.depositInventory(amount)` — fund UMplan inventory (prefer tax-exempt source)
+1. Mainnet DEX SwapFacade (payment=SPCXB, Pancake V2): **no** `depositInventory` — liquidity is the UMplan/SPCXB pair. Inventory mode only if `pancakeRouter=0`.
 2. `DividendPools.inject(amount)` — fund SPCXB across four weighted pools
 3. `ShareholderPool.addShareholder(addr)` — whitelist up to 453
 4. Replace `MockPriceOracle` with Chainlink adapter when ready

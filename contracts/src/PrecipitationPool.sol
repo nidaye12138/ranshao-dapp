@@ -7,12 +7,13 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPrecipitationPool} from "./interfaces/IPrecipitationPool.sol";
+import {IEliteStakeDaily} from "./interfaces/IEliteStakeDaily.sol";
 import {IDividendPools} from "./interfaces/IDividendPools.sol";
 import {Constants} from "./Constants.sol";
 
-/// @title UMplan 变异沉淀池 — missing-layer residue + 5% burn sedimentation.
-/// @dev Q4: equal among 1500U (tier 4) burners for 5% of lifetime deposits.
-///      Q5: remaining 95% stays here; admin may withdraw later.
+/// @title UMplan 沉淀分红池 — missing-layer residue + 5% burn sedimentation.
+/// @dev Primary outflow: Owner daily release of balance×5% → EliteStake auto-push to stakers.
+///      Legacy: allocate1500Share equal among T4 burners (optional).
 contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -20,10 +21,13 @@ contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyG
     IDividendPools public dividends;
     address public layerRewards;
     address public burnRouter;
+    address public eliteStake;
 
     uint256 public totalDeposited;
     uint256 public allocatedTo1500;
     mapping(address => uint256) public claimable;
+    /// @notice Timestamp of last successful releaseDailyToStake (24h cooldown).
+    uint256 public lastDailyReleaseAt;
 
     event MissingLayerReceived(uint256 amount, uint256 totalDeposited);
     event BurnSedimentationReceived(uint256 amount, uint256 totalDeposited);
@@ -31,6 +35,8 @@ contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyG
     event Claimed(address indexed user, uint256 amount);
     event AdminWithdraw(address indexed to, uint256 amount);
     event ConfigUpdated(address dividends, address layerRewards, address burnRouter);
+    event EliteStakeUpdated(address eliteStake);
+    event DailyReleasedToStake(uint256 amount, uint256 balanceAfter, uint256 nextReleaseAt);
 
     modifier onlyLayerRewards() {
         require(msg.sender == layerRewards, "precip: not layer");
@@ -55,12 +61,42 @@ contract PrecipitationPool is IPrecipitationPool, Ownable, Pausable, ReentrancyG
         emit ConfigUpdated(address(dividends), layerRewards, burnRouter);
     }
 
+    function setEliteStake(address eliteStake_) external onlyOwner {
+        require(eliteStake_ != address(0), "precip: zero");
+        eliteStake = eliteStake_;
+        emit EliteStakeUpdated(eliteStake_);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// @notice Current UMplan balance × 5% (customer 「百5」 of precip pool).
+    function previewDailyRelease() public view returns (uint256) {
+        uint256 bal = token.balanceOf(address(this));
+        return (bal * Constants.ELITE_RELEASE_BPS) / Constants.BPS_DENOM;
+    }
+
+    /// @notice Owner/cron: transfer 5% of pool balance to EliteStake and auto-push to staker wallets.
+    function releaseDailyToStake() external onlyOwner nonReentrant whenNotPaused {
+        require(eliteStake != address(0), "precip: no elite");
+        require(
+            lastDailyReleaseAt == 0 || block.timestamp >= lastDailyReleaseAt + Constants.CLAIM_COOLDOWN,
+            "precip: cooldown"
+        );
+        uint256 amount = previewDailyRelease();
+        require(amount > 0, "precip: zero");
+
+        lastDailyReleaseAt = block.timestamp;
+        token.safeTransfer(eliteStake, amount);
+        IEliteStakeDaily(eliteStake).pushDailyRelease(amount);
+
+        uint256 nextAt = lastDailyReleaseAt + Constants.CLAIM_COOLDOWN;
+        emit DailyReleasedToStake(amount, token.balanceOf(address(this)), nextAt);
     }
 
     /// @inheritdoc IPrecipitationPool

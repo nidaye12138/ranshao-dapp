@@ -26,3 +26,11 @@ export function shortAddr(addr?: string): string {
   if (!addr) return "";
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
+
+/** Masked wallet for team lists: `0xabcd****1234`. */
+export function maskAddr(addr?: string): string {
+  if (!addr || addr.length < 10) return addr || "";
+  const hex = addr.startsWith("0x") || addr.startsWith("0X") ? addr.slice(2) : addr;
+  if (hex.length < 8) return addr;
+  return `0x${hex.slice(0, 4)}****${hex.slice(-4)}`;
+}
