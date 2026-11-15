@@ -19,8 +19,12 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
 
 /**
  * 15U (T4) 质押台 — unlock after burnTier(4) / DividendPools.tierOf == 4.
- * Wire: EliteStake (stake UMplan, dividends UMplan, 24h min, redeem / claim+extend).
+ * Wire: EliteStake (stake UMplan). Live mainnet bytecode has stake/unstake/claim/pendingRewards
+ * but NOT unlockAt / isUnlocked / redeem — do not call those or wagmi reads stay empty.
  */
+/** Live EliteStake (0xdD5a…4dCE) lacks lock/redeem selectors; keep UI on present methods only. */
+const LIVE_ELITE_HAS_LOCK_AND_REDEEM = false;
+
 export function StakeDesk() {
   const mounted = useMounted();
   const { t } = useI18n();
@@ -37,6 +41,8 @@ export function StakeDesk() {
   }, []);
 
   const eliteReady = addresses.elite !== zeroAddress;
+  /** Stake reads only need elite + wallet — not the full 4-tab isConfigured gate. */
+  const stakeReadEnabled = mounted && eliteReady && !!address;
   const enabled = mounted && isConfigured && eliteReady && !!address;
 
   const { data: tier } = useReadContract({
@@ -50,16 +56,16 @@ export function StakeDesk() {
 
   const unlocked = tier != null && Number(tier) === 4;
 
-  const { data: staked } = useReadContract({
+  const { data: staked, refetch: refetchStaked } = useReadContract({
     address: addresses.elite,
     abi: EliteAbi,
     functionName: "stakedOf",
     args: [address!],
     chainId: appChainId,
-    query: { enabled },
+    query: { enabled: stakeReadEnabled },
   });
 
-  const { data: totalStaked } = useReadContract({
+  const { data: totalStaked, refetch: refetchTotal } = useReadContract({
     address: addresses.elite,
     abi: EliteAbi,
     functionName: "totalStaked",
@@ -67,13 +73,13 @@ export function StakeDesk() {
     query: { enabled: mounted && eliteReady },
   });
 
-  const { data: pending } = useReadContract({
+  const { data: pending, refetch: refetchPending } = useReadContract({
     address: addresses.elite,
     abi: EliteAbi,
     functionName: "pendingRewards",
     args: [address!],
     chainId: appChainId,
-    query: { enabled },
+    query: { enabled: stakeReadEnabled },
   });
 
   const { data: unlockAt } = useReadContract({
@@ -82,17 +88,24 @@ export function StakeDesk() {
     functionName: "unlockAt",
     args: [address!],
     chainId: appChainId,
-    query: { enabled },
+    query: { enabled: stakeReadEnabled && LIVE_ELITE_HAS_LOCK_AND_REDEEM },
   });
 
-  const { data: isStakeUnlocked } = useReadContract({
+  const { data: isStakeUnlockedRaw } = useReadContract({
     address: addresses.elite,
     abi: EliteAbi,
     functionName: "isUnlocked",
     args: [address!],
     chainId: appChainId,
-    query: { enabled },
+    query: { enabled: stakeReadEnabled && LIVE_ELITE_HAS_LOCK_AND_REDEEM },
   });
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    void refetchStaked();
+    void refetchTotal();
+    void refetchPending();
+  }, [isSuccess, refetchPending, refetchStaked, refetchTotal]);
 
   const { data: tokenBal } = useReadContract({
     address: addresses.token,
@@ -126,12 +139,17 @@ export function StakeDesk() {
   const pendingBn = (pending as bigint | undefined) ?? 0n;
   const unlockTs = unlockAt != null ? Number(unlockAt as bigint) : 0;
   const lockLeft = unlockTs > 0 && nowSec > 0 ? Math.max(0, unlockTs - nowSec) : 0;
+  /** Live contract has no lock getters — treat position as withdrawable for claim/unstake CTAs. */
+  const isStakeUnlocked = LIVE_ELITE_HAS_LOCK_AND_REDEEM
+    ? Boolean(isStakeUnlockedRaw)
+    : stakedBn > 0n;
 
   const previewStake = parsed > 0n ? parsed : stakedBn;
   const previewTotal = totalBn + (parsed > 0n ? parsed : 0n);
+  /** Bigint-safe % (avoids Number(1e18+) precision loss → false 0%). */
   const sharePct =
     previewTotal > 0n && previewStake > 0n
-      ? (Number(previewStake) / Number(previewTotal)) * 100
+      ? Number((previewStake * 1_000_000n) / previewTotal) / 10_000
       : 0;
 
   /**
@@ -238,9 +256,16 @@ export function StakeDesk() {
         </div>
         <p className="quota-note">{t("stake.estimateNote")}</p>
         <div className="quota-row muted-row">
+          <span>{t("stake.principal")}</span>
+          <span>{stakeReadEnabled ? `${fmtToken(stakedBn)} UMplan` : "—"}</span>
+        </div>
+        <div className="quota-row muted-row">
           <span>{t("stake.totalStaked")}</span>
           <span>{totalStaked != null ? fmtToken(totalBn) : "—"}</span>
         </div>
+        {unlocked && stakedBn === 0n && parsed === 0n && (
+          <p className="quota-note">{t("stake.unlocked")}</p>
+        )}
       </div>
 
       {!mounted ? (
@@ -300,12 +325,14 @@ export function StakeDesk() {
               <dt>{t("stake.principal")}</dt>
               <dd>{fmtToken(stakedBn)} UMplan</dd>
             </div>
-            <div>
-              <dt>{t("stake.countdown")}</dt>
-              <dd className={lockLeft > 0 ? "cd-live" : "cd-done"}>
-                {lockLeft > 0 ? fmtCountdown(lockLeft) : isStakeUnlocked ? t("stake.matured") : "—"}
-              </dd>
-            </div>
+            {LIVE_ELITE_HAS_LOCK_AND_REDEEM && (
+              <div>
+                <dt>{t("stake.countdown")}</dt>
+                <dd className={lockLeft > 0 ? "cd-live" : "cd-done"}>
+                  {lockLeft > 0 ? fmtCountdown(lockLeft) : isStakeUnlocked ? t("stake.matured") : "—"}
+                </dd>
+              </div>
+            )}
             <div>
               <dt>{t("stake.pendingDiv")}</dt>
               <dd>
@@ -318,15 +345,26 @@ export function StakeDesk() {
               type="button"
               className="btn primary"
               style={{ flex: 1 }}
-              disabled={!eliteReady || !isStakeUnlocked || isPending || confirming}
-              onClick={() =>
-                writeContract({
-                  address: addresses.elite,
-                  abi: EliteAbi,
-                  functionName: "redeem",
-                  chainId: appChainId,
-                })
-              }
+              disabled={!eliteReady || !isStakeUnlocked || isPending || confirming || stakedBn === 0n}
+              onClick={() => {
+                if (LIVE_ELITE_HAS_LOCK_AND_REDEEM) {
+                  writeContract({
+                    address: addresses.elite,
+                    abi: EliteAbi,
+                    functionName: "redeem",
+                    chainId: appChainId,
+                  });
+                } else {
+                  // Live bytecode has unstake(amount), not redeem().
+                  writeContract({
+                    address: addresses.elite,
+                    abi: EliteAbi,
+                    functionName: "unstake",
+                    args: [stakedBn],
+                    chainId: appChainId,
+                  });
+                }
+              }}
             >
               {t("stake.redeemBoth")}
             </button>
