@@ -219,10 +219,12 @@ export async function GET() {
       totalBurnedToken = formatUsdRaw(burnedTok as bigint);
       totalBurnedUsd = formatUsdRaw(burnedUsd as bigint);
 
-      if (dexPrice) {
-        priceUsd = dexPrice;
-      } else if (typeof tokenUsd === "bigint" && tokenUsd > 0n) {
+      // Prefer PancakeSpotOracle (V2 mid × V3 slot0) — matches Ave/DexScreener mark.
+      // Do NOT prefer thin V2 UMplan→SPCXB→USDT getAmountsOut (~0.0018 vs ~0.00187 spot).
+      if (typeof tokenUsd === "bigint" && tokenUsd > 0n) {
         priceUsd = formatTokenUsd(tokenUsd) ?? Number(formatUnits(tokenUsd, 18)).toFixed(4);
+      } else if (dexPrice) {
+        priceUsd = dexPrice;
       }
       source = source === "graph" ? "mixed" : "chain";
     } catch {
