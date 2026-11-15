@@ -89,7 +89,10 @@ contract UmPlanTest is Test {
         );
         token.setMinter(address(swap), true);
 
-        elite = new EliteStake(admin, address(token), address(spcxb), address(dividends));
+        // Reward token = UMplan (same as staking) — daily precip×5% push path.
+        elite = new EliteStake(admin, address(token), address(token), address(dividends));
+        elite.setPrecip(address(precip));
+        precip.setEliteStake(address(elite));
         broker = new BrokerMarket(admin, address(treasury));
 
         // Seed
@@ -453,9 +456,9 @@ contract UmPlanTest is Test {
         elite.stake(stakeAmt);
         vm.stopPrank();
 
-        // notify release of 10_000 SPCXB → 5% = 500 to stakers
+        // Legacy notifyRelease: 10_000 UMplan notional → 5% = 500 to stakers (pending)
         vm.startPrank(admin);
-        spcxb.approve(address(elite), 500e18);
+        token.approve(address(elite), 500e18);
         elite.notifyRelease(10_000e18);
         vm.stopPrank();
 
@@ -467,12 +470,54 @@ contract UmPlanTest is Test {
         uint256 firstUnlock = elite.unlockAt(alice);
         vm.warp(firstUnlock);
         assertTrue(elite.isUnlocked(alice));
+        uint256 aliceTokBefore = token.balanceOf(alice);
         vm.prank(alice);
         elite.claim();
-        assertEq(spcxb.balanceOf(alice), 500e18);
-        // claim-only extends lock another 24h from prior unlock boundary
+        assertEq(token.balanceOf(alice), aliceTokBefore + 500e18);
         assertFalse(elite.isUnlocked(alice));
         assertEq(elite.unlockAt(alice), firstUnlock + 24 hours);
+    }
+
+    function test_precip_daily_release_pushes_to_staker_wallet() public {
+        vm.prank(alice);
+        tree.bindReferrer(admin);
+        vm.startPrank(alice);
+        token.approve(address(burnRouter), type(uint256).max);
+        burnRouter.burnTier(4);
+        token.approve(address(elite), 100e18);
+        elite.stake(100e18);
+        vm.stopPrank();
+
+        // Seed extra precip UMplan (burnTier already deposited some sedimentation/missing).
+        vm.prank(admin);
+        token.transfer(address(precip), 1_000e18);
+        uint256 precipBal = token.balanceOf(address(precip));
+        uint256 release1 = precip.previewDailyRelease();
+        assertEq(release1, (precipBal * 500) / 10_000);
+
+        uint256 aliceBefore = token.balanceOf(alice);
+        uint256 unlockBefore = elite.unlockAt(alice);
+        vm.prank(admin);
+        precip.releaseDailyToStake();
+
+        assertEq(token.balanceOf(alice), aliceBefore + release1);
+        assertEq(token.balanceOf(address(precip)), precipBal - release1);
+        // Lock extended +24h from prior unlock boundary (still in future).
+        assertEq(elite.unlockAt(alice), unlockBefore + 24 hours);
+
+        // Second release blocked until 24h
+        vm.prank(admin);
+        vm.expectRevert("precip: cooldown");
+        precip.releaseDailyToStake();
+
+        vm.warp(block.timestamp + 24 hours);
+        uint256 bal2 = token.balanceOf(address(precip));
+        uint256 release2 = precip.previewDailyRelease();
+        assertEq(release2, (bal2 * 500) / 10_000);
+        aliceBefore = token.balanceOf(alice);
+        vm.prank(admin);
+        precip.releaseDailyToStake();
+        assertEq(token.balanceOf(alice), aliceBefore + release2);
     }
 
     function test_broker_stub_receiveFee() public {

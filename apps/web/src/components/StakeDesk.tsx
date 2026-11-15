@@ -19,10 +19,9 @@ import ERC20Abi from "@/lib/abi/ERC20.json";
 
 /**
  * 15U (T4) 质押台 — unlock after burnTier(4) / DividendPools.tierOf == 4.
- * Wire: EliteStake (stake UMplan). Live mainnet bytecode has stake/unstake/claim/pendingRewards
- * but NOT unlockAt / isUnlocked / redeem — do not call those or wagmi reads stay empty.
+ * Dividends: precip balance × 5% × stake share (Owner daily push to wallet).
+ * Legacy live Elite (0xdD5a…) lacks unlockAt/redeem until cutover.
  */
-/** Live EliteStake (0xdD5a…4dCE) lacks lock/redeem selectors; keep UI on present methods only. */
 const LIVE_ELITE_HAS_LOCK_AND_REDEEM = false;
 
 export function StakeDesk() {
@@ -41,6 +40,7 @@ export function StakeDesk() {
   }, []);
 
   const eliteReady = addresses.elite !== zeroAddress;
+  const precipReady = addresses.precip !== zeroAddress;
   /** Stake reads only need elite + wallet — not the full 4-tab isConfigured gate. */
   const stakeReadEnabled = mounted && eliteReady && !!address;
   const enabled = mounted && isConfigured && eliteReady && !!address;
@@ -71,6 +71,16 @@ export function StakeDesk() {
     functionName: "totalStaked",
     chainId: appChainId,
     query: { enabled: mounted && eliteReady },
+  });
+
+  /** Customer 「百5」: precip UMplan balance × 5% (works before/after precip cutover). */
+  const { data: precipBalRaw, refetch: refetchDaily } = useReadContract({
+    address: addresses.token,
+    abi: ERC20Abi,
+    functionName: "balanceOf",
+    args: [addresses.precip],
+    chainId: appChainId,
+    query: { enabled: mounted && precipReady && addresses.token !== zeroAddress, refetchInterval: 30_000 },
   });
 
   const { data: pending, refetch: refetchPending } = useReadContract({
@@ -105,7 +115,8 @@ export function StakeDesk() {
     void refetchStaked();
     void refetchTotal();
     void refetchPending();
-  }, [isSuccess, refetchPending, refetchStaked, refetchTotal]);
+    void refetchDaily();
+  }, [isSuccess, refetchDaily, refetchPending, refetchStaked, refetchTotal]);
 
   const { data: tokenBal } = useReadContract({
     address: addresses.token,
@@ -153,14 +164,21 @@ export function StakeDesk() {
       : 0;
 
   /**
-   * Product rule: stake dividends are UMplan (principal + rewards).
-   * Do not surface EliteStake.rewardToken() here — live deploy still points at SPCXB,
-   * which wrongly produced「预估每期分红 (UMplan · 链上 SPCXB)」.
+   * Product rule: stake dividends are UMplan.
+   * Estimate = precip.previewDailyRelease × stakeShare (not pendingRewards / notifyRelease).
    */
   const rewardLabel = "UMplan";
+  const precipBalBn = (precipBalRaw as bigint | undefined) ?? 0n;
+  const dailyReleaseBn = (precipBalBn * 500n) / 10_000n;
+  const myDailyEstimate =
+    previewTotal > 0n && previewStake > 0n && dailyReleaseBn > 0n
+      ? (dailyReleaseBn * previewStake) / previewTotal
+      : 0n;
 
   const estimateDisplay =
-    stakedBn > 0n ? `${fmtToken(pendingBn)} ${rewardLabel}` : "—";
+    previewStake > 0n
+      ? `${fmtToken(myDailyEstimate)} ${rewardLabel}`
+      : "—";
 
   function setPct(pct: number) {
     const bal = tokenBal as bigint | undefined;

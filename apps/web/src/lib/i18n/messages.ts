@@ -565,7 +565,7 @@ export const messages: Record<Locale, MessageTree> = {
       title: "质押分红权益",
       subtitle: "15U 档按钮解锁 · 最短 24h",
       ruleFormula:
-        "分红公式：百 5 的总释放量 ÷ 全网总质押量 = 每个质押币的分红（合约 notifyRelease × 5% / totalStaked）。",
+        "分红公式：沉淀池余额 × 5% ÷ 全网总质押量 = 每个质押币的分红（Owner 每日 releaseDailyToStake 自动打到钱包）。",
       ruleExample:
         "计算示例：本期百 5 释放 500,000 UMplan，全网总质押 25,000,000 UMplan → 每币分红 = 0.02 UMplan；质押 100,000 UMplan 即得 2,000 UMplan。",
       ruleAsset: "币种说明：质押分红以 UMplan 币量发放（本金与分红均为 UMplan）。",
@@ -581,7 +581,7 @@ export const messages: Record<Locale, MessageTree> = {
       shareLabel: "我的分红配额（占总质押）",
       estimateLabel: "预估每期分红（UMplan）",
       estimateNote:
-        "预估取自链上已累计未领；新一期数值随 notifyRelease × 5% × 配额更新。分红以 UMplan 计。",
+        "预估 = 当前沉淀池余额 × 5% × 你的质押占比（即时）。Owner 每日释放后 UMplan 直接打入钱包，无需领取。",
       totalStaked: "全网总质押",
       confirmStake: "确认质押",
       myStake: "我的质押 · 赎回",
@@ -969,7 +969,7 @@ export const messages: Record<Locale, MessageTree> = {
       title: "Stake dividend rights",
       subtitle: "Unlocks after 15U tier button · min 24h",
       ruleFormula:
-        "Dividend formula: 「百5」 total release ÷ network total stake = dividend per staked token (contract notifyRelease × 5% / totalStaked).",
+        "Dividend formula: precip balance × 5% ÷ network stake = per-token dividend (Owner daily releaseDailyToStake auto-pushes to wallets).",
       ruleExample:
         "Example: period 「百5」 release 500,000 UMplan, network stake 25,000,000 UMplan → 0.02 UMplan per token; staking 100,000 UMplan earns 2,000 UMplan.",
       ruleAsset: "Assets: stake dividends are paid in UMplan (principal and dividends).",
@@ -985,7 +985,7 @@ export const messages: Record<Locale, MessageTree> = {
       shareLabel: "My dividend share (of total stake)",
       estimateLabel: "Est. period dividend (UMplan)",
       estimateNote:
-        "Estimate uses on-chain accrued unclaimed rewards; each period updates with notifyRelease × 5% × your share. Counted in UMplan.",
+        "Estimate = current precip balance × 5% × your stake share (live). After the Owner daily release, UMplan is pushed to your wallet — no claim.",
       totalStaked: "Network total stake",
       confirmStake: "Confirm stake",
       myStake: "My stake · redeem",
